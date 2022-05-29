@@ -1,0 +1,21 @@
+name: pt
+channels:
+  - pytorch
+  - conda-forge
+  - default
+dependencies:
+  - uproot
+  - python
+  - tensorflow
+  - numpy
+  - pandas
+  - ipython
+  - matplotlib
+  - root_numpy
+  - scikit-learn
+  - scikit-optimize
+  - root
+  - pytorch
+  - awkward
+  - h5py
+  - jupyter
