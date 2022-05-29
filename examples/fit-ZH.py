@@ -6,32 +6,32 @@ import syncer
 import user
 import os
 
-#import ZH_Nakamura as model
-#
-#features = model.getEvents(10000)
-#weights  = model.getWeights(features, model.make_eft() )
+import ZH_Nakamura as model
+
+features = model.getEvents(10000)
+weights  = model.getWeights(features, model.make_eft() )
 
 frequency     = 1.
-learning_rate = 1e-3
+learning_rate = 1e-2
 device        = 'cuda' if torch.cuda.is_available() else 'cpu'
 n_epoch       = 2000
 plot_every    = 100
 
-# Data Generation
-data_range = 15
-x = data_range*(np.random.rand(data_range*100, 1))-data_range/2
-y = np.sin(frequency*x)
-
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-x_train = torch.from_numpy(x).float().to(device)
-y_train = torch.from_numpy(y).float().to(device)
+# training data
+WC = 'cHW'
+features_train = torch.from_numpy(features).float().to(device)
+w0_train       = torch.from_numpy(weights[()]).float().to(device)
+wp_train       = torch.from_numpy(weights[(WC,)]).float().to(device)
+wpp_train      = torch.from_numpy(weights[(WC,WC)]).float().to(device)
 
+# s and t network
 hidden  = 50
 hidden2 = 50
 
-model = torch.nn.Sequential(
-  torch.nn.Linear(1, hidden),
+model_t = torch.nn.Sequential(
+  torch.nn.Linear(len(model.feature_names), hidden),
   torch.nn.ReLU(),
   torch.nn.Linear(hidden, hidden2),
   torch.nn.ReLU(),
@@ -39,28 +39,40 @@ model = torch.nn.Sequential(
   
 ).to(device)
 
-def mse_loss(input, target):
-    return ((input - target) ** 2).sum() / input.data.nelement()
+model_s = torch.nn.Sequential(
+  torch.nn.Linear(len(model.feature_names), hidden),
+  torch.nn.ReLU(),
+  torch.nn.Linear(hidden, hidden2),
+  torch.nn.ReLU(),
+  torch.nn.Linear(hidden2,1),
+  
+).to(device)
 
-#loss_fn = torch.nn.MSELoss(reduction='sum')
-loss_fn = mse_loss
+# loss functional
+
+def f_loss(w0_input, wp_input, wpp_input, t_output, s_output):
+    base_points = [1, 2]
+    loss = 0.
+    for theta in base_points:
+        fhat  = 1./(1. + ( 1. + theta*t_output)**2 + (theta*s_output)**2 )
+        loss += ( w0_input*( (1. + wp_input/w0_input*theta +.5*wpp_input/w0_input*theta**2)*fhat**2 + (1-fhat)**2 ) ).sum()
+    return loss
 
 #optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(list(model_t.parameters())+list(model_s.parameters()), lr=learning_rate)
 
 losses = []
 
 # variables for ploting results
-res = 10
-x_axis = (np.arange(data_range*res)-data_range/2*res).reshape(data_range*res,1)/res
-x_axis_torch = torch.from_numpy(x_axis).float().to(device)
-model.train()
+model_s.train()
+model_t.train()
 for epoch in range(n_epoch):
     # Forward pass: compute predicted y by passing x to the model.
-    y_pred = model(x_train)
+    pred_t = model_t(features_train)
+    pred_s = model_s(features_train)
 
     # Compute and print loss.
-    loss = loss_fn(y_pred, y_train)
+    loss = f_loss(w0_train, wp_train ,wpp_train, pred_t, pred_s)
     losses.append(loss.item())
     if epoch % 100 == 99:
         print(epoch, loss.item())
@@ -79,20 +91,27 @@ for epoch in range(n_epoch):
     # Calling the step function on an Optimizer makes an update to its
     # parameters
     optimizer.step()
-    if (epoch % plot_every)==0:
-        pred  = model(x_axis_torch).cpu().detach().numpy()
-        truth = ( np.sin(frequency*x_axis_torch.cpu())) .detach().numpy()
-        plt.clf()
-        plt.plot(pred)
-        plt.plot(truth)
-        plt.show()
-        plt.savefig(os.path.join( user.plot_directory, "plt_epoch_%i.png"%epoch ) )
-        
-plt.clf()
-plt.plot(losses)
-plt.show()
-plt.savefig(os.path.join( user.plot_directory, "loss.png" ) )
 
-with torch.no_grad():
-    model.eval()
-    y_train_pred = model(x_train)
+    print (loss.item())
+
+    #print ("model_t", list(model_t.parameters()))
+    #print ("model_s", list(model_s.parameters()))
+
+    print ()
+#    if (epoch % plot_every)==0:
+#        pred  = model(x_axis_torch).cpu().detach().numpy()
+#        truth = ( np.sin(frequency*x_axis_torch.cpu())) .detach().numpy()
+#        plt.clf()
+#        plt.plot(pred)
+#        plt.plot(truth)
+#        plt.show()
+#        plt.savefig(os.path.join( user.plot_directory, "plt_epoch_%i.png"%epoch ) )
+#        
+#plt.clf()
+#plt.plot(losses)
+#plt.show()
+#plt.savefig(os.path.join( user.plot_directory, "loss.png" ) )
+#
+#with torch.no_grad():
+#    model.eval()
+#    y_train_pred = model(x_train)
