@@ -1,0 +1,24 @@
+name: pytorch-gpu
+channels:
+  - pytorch
+  - conda-forge
+  - default
+dependencies:
+  - uproot3
+  - python
+  - tensorflow-gpu
+  - cudatoolkit=11.3
+  - numpy
+  - pandas
+  - ipython
+  - matplotlib
+  - root_numpy
+  - scikit-learn
+  - scikit-optimize
+  - root
+  - pytorch
+  - torchvision
+  - torchaudio
+  - awkward
+  - h5py
+  - jupyter

@@ -1,8 +1,8 @@
 #import torch
 import numpy as np
 import pandas as pd
-import uproot
-
+import uproot3 as uproot
+uproot.default_library='np'
 
 # Copy TTree HZZ4LeptonsAnalysisReduced into a pandas DataFrame
 treename = 'HZZ4LeptonsAnalysisReduced'
@@ -21,6 +21,8 @@ upfile['bkg'] = uproot.open(filename['bkg'])
 
 df['bkg'] = upfile['bkg'][treename].pandas.df(branches=VARS)
 df['VV'] = upfile['VV'][treename].pandas.df(branches=VARS)
+
+assert False, ""
 # Make sure the inputs are well behaved.
 df['VV']= df['VV'][(df['VV'][VARS[0]] > -999) & (df['VV'][VARS[1]] > -999)]
 df['bkg']= df['bkg'][(df['bkg'][VARS[0]] > -999) & (df['bkg'][VARS[1]] > -999)] 

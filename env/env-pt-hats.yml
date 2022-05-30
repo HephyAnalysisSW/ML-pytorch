@@ -1,0 +1,31 @@
+name: pt-hats
+channels:
+  - pytorch
+  - conda-forge
+  - default
+dependencies:
+  - uproot
+  - pip
+  - python
+  - keras
+  - tensorflow
+  - numpy
+  - pandas
+  - ipython
+  - matplotlib
+  - root_numpy
+  - scikit-learn
+  - scikit-optimize
+  - root
+  - pytorch
+  - awkward
+  - h5py
+  - torchvision
+  - torchaudio
+  - cpuonly
+  - ipykernel
+  - tqdm
+  - jupyter
+  - networkx
+  - pip:
+    - torchviz
