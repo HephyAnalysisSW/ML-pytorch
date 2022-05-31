@@ -47,9 +47,6 @@ if args.model == 'ZH_Nakamura':
     w0_train       = torch.from_numpy(weights[()]).float().to(device)
     wp_train       = torch.from_numpy(weights[(WC,)]).float().to(device)
     wpp_train      = torch.from_numpy(weights[(WC,WC)]).float().to(device)
-
-    coefficients   = ZH_Nakamura.derivatives[1:]
-
 elif args.model == 'const':
     features_train = torch.ones(args.nEvents).unsqueeze(-1)
     n_features     = len(features_train[0]) 
