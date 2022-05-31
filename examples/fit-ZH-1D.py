@@ -81,6 +81,8 @@ def f_loss(w0_input, wp_input, wpp_input, t_output, s_output):
     for theta in base_points:
         fhat  = 1./(1. + ( 1. + theta*t_output)**2 + (theta*s_output)**2 )
         loss += ( w0_input*( -0.25 + (1. + wp_input/w0_input*theta +.5*wpp_input/w0_input*theta**2)*fhat**2 + (1-fhat)**2 ) ).sum()
+        #FIXME -> weight ratios should be computed only once ... this is a waste
+        
     return loss
 
 #optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
