@@ -25,15 +25,26 @@ file_sync_storage = []
 
 ## Wrap TCanvas class Print function
 import ROOT
-class myTCanvas( ROOT.TCanvas ):
-    # recall the argument
-    def Print( self, *args):
-        logger.debug( "Appending file %s", args[0] )
-        file_sync_storage.append( args[0] )
-        # call original Print method 
-        super(myTCanvas, self).Print(*args)
-# what could possibly go wrong.
-ROOT.TCanvas = myTCanvas 
+#class myTCanvas( ROOT.TCanvas ):
+#    # recall the argument
+#    def Print( self, *args):
+#        logger.debug( "Appending file %s", args[0] )
+#        file_sync_storage.append( args[0] )
+#        # call original Print method 
+#        super(myTCanvas, self).Print(*args)
+## what could possibly go wrong.
+#ROOT.TCanvas = myTCanvas 
+
+_print = ROOT.TCanvas.Print 
+def myPrint( self, *args):
+    logger.debug( "Appending file %s", args[0] )
+    if not os.path.exists(os.path.dirname( args[0] ) ):
+        os.makedirs( os.path.dirname( args[0] ) )
+    file_sync_storage.append( args[0] )
+    # call original Print method 
+    _print(self, *args)
+
+ROOT.TCanvas.Print = myPrint 
 
 from matplotlib import pyplot as plt
 
@@ -85,9 +96,31 @@ def write_sync_files_txt(output_filename = 'file_sync_storage.txt'):
         print(("Analysis.Tools.syncer: Written %i files to %s for rsync." % (n_files, output_filename)))
     return n_files
 
-def sync():
+gif_cmds = []
+def makeRemoteGif(directory, pattern, name, delay=50):
+    if '/www/' not in directory:
+        print ("makeRemoteGif: /www/ not found. Do nothing.")
+        return
+    directory_ = '/'+(directory.split('/www/')[-1])
+    cern_user = os.environ["CERN_USER"]
+    remotedir = "/eos/user/{INITIAL}/{CERN_USER}/www/{directory}".format( CERN_USER=cern_user, INITIAL=cern_user[0],directory=directory_)
+    cmd = "ssh {CERN_USER}@lxplus.cern.ch 'convert -delay {delay} -loop 0 {remotedir}/{pattern} {remotedir}/{name}.gif'".format(CERN_USER=cern_user, delay=delay, remotedir=remotedir, pattern=pattern, name=name)
+    if cmd not in gif_cmds:
+        gif_cmds.append( cmd )
+
+def make_gifs( cmds=gif_cmds ):
+    ret = []
+    for cmd in cmds:
+        print ("make gif:", cmd )
+        output,error = subprocess.Popen(cmd, shell=True, executable="/bin/bash", stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+        if error:
+            ret.append(cmd)
+    return ret
+
+def sync(gifs=False):
 
     global file_sync_storage
+    global gif_cmds 
 
     if len(file_sync_storage)==0:
         print ("No files for syncing.")
@@ -98,11 +131,14 @@ def sync():
     if write_sync_files_txt(filename)==0: return 
 
     cmd = "rsync -avR  `cat %s` ${CERN_USER}@lxplus.cern.ch:/eos/user/$(echo ${CERN_USER} | head -c 1)/${CERN_USER}/www/" % filename
-    #print cmd
     output,error = subprocess.Popen(cmd, shell=True, executable="/bin/bash", stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
     os.remove(filename)
     file_sync_storage = []
+    if gifs:
+        gif_cmds = make_gifs(gif_cmds) 
+
     return #output, error
 
 import atexit
 atexit.register( sync )
+atexit.register( make_gifs )

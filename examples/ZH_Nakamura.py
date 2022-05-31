@@ -309,13 +309,13 @@ Nbins = 20
 plot_options = {
     #'sqrt_s_hat': {'binning':[40,650,2250],      'tex':"#sqrt{#hat{s}}",},
     #'pT':         {'binning':[35,300,1000],      'tex':"p_{T}",},
-    'sqrt_s_hat': {'binning':[30,0,2500],      'tex':"#sqrt{#hat{s}}",},
-    'pT':         {'binning':[30,200,700],      'tex':"p_{T,Z}",},
+    'sqrt_s_hat': {'binning':[30,0,1800],           'tex':"#sqrt{#hat{s}}",},
+    'pT':         {'binning':[30,0,900],            'tex':"p_{T,Z}",},
     'y':          {'binning':[Nbins,-4,4],          'tex':"y",},
     'cos_theta':  {'binning':[Nbins,-1,1],          'tex':"cos(#Theta)",},
     'cos_theta_hat': {'binning':[Nbins,-1,1],       'tex':"cos(#hat{#theta})",},
     'phi_hat':    {'binning':[Nbins,-pi,pi],        'tex':"#hat{#phi}",},
-    'fLL'         : {'binning':[Nbins,0,1],        'tex':'f_{LL}'          ,},
+    'fLL'         : {'binning':[Nbins,0,1],         'tex':'f_{LL}'          ,},
     'f1TT'        : {'binning':[Nbins,-1,1],        'tex':'f_{1TT}'         ,},
     'f2TT'        : {'binning':[Nbins, 0,4],        'tex':'f_{2TT}'         ,},
     'f1LT'        : {'binning':[Nbins,-1,1],        'tex':'f_{1LT}'         ,},
@@ -335,28 +335,3 @@ eft_plot_points = [
     {'color':ROOT.kMagenta+2,   'eft':make_eft(cHWtil = 0.3),   'tex':"c_{H#tilde{W}} = 0.3"},
     {'color':ROOT.kMagenta-4,   'eft':make_eft(cHWtil = -0.3),  'tex':"c_{H#tilde{W}} = -0.3"},
 ]
-
-bit_cfg = {der: {'n_trees': 250,
-                 'max_depth': 4,
-                 'learning_rate': 0.20,
-                 'min_size': 15,} for der in derivatives if der!=tuple() }
-#bit_cfg[('cHQ3',)]['n_trees'] = 80
-#bit_cfg[('cHQ3','cHQ3')]['n_trees'] = 80
-
-def load(directory = '/groups/hephy/cms/robert.schoefbeck/BIT/models/', prefix = 'bit_ZH_Nakamura_nTraining_5000000', derivatives=derivatives):
-    import sys, os
-    sys.path.insert(0,os.path.expandvars("$CMSSW_BASE/src/BIT"))
-    from BoostedInformationTree import BoostedInformationTree
-    bits = {}
-    for derivative in derivatives:
-        if derivative == tuple(): continue
-
-        filename = os.path.expandvars(os.path.join(directory, "%s_derivative_%s"% (prefix, '_'.join(derivative))) + '.pkl')
-        try:
-            print(("Loading %s for %r"%( filename, derivative)))
-            bits[derivative] = BoostedInformationTree.load(filename)
-        except IOError:
-            print(("Could not load %s for %r"%( filename, derivative)))
-
-    return bits
-
