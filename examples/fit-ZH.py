@@ -16,8 +16,8 @@ ROOT.setTDRStyle()
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="v1",                       help="Plot sub-directory")
-#argParser.add_argument("--model",              action="store",      default="ZH_Nakamura",                      help="Which Model?")
-argParser.add_argument("--nEvents",            action="store",      type=int, default=300000,                   help="nEvents")
+argParser.add_argument("--coefficients",       action="store",      default=['cHW', 'cHWtil', 'cHQ3'],  help="Which coefficients?")
+argParser.add_argument("--nEvents",            action="store",      type=int, default=300000,           help="nEvents")
 #argParser.add_argument("--device",             action="store",      default="cpu",  choices = ["cpu", "cuda"],  help="Device?")
 args = argParser.parse_args()
 
@@ -25,8 +25,6 @@ learning_rate = 1e-3
 device        = 'cuda' if torch.cuda.is_available() else 'cpu'
 n_epoch       = 10000
 plot_every    = 100
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # training data
 import ZH_Nakamura 
@@ -45,15 +43,26 @@ weights    = ZH_Nakamura.getWeights(features, ZH_Nakamura.make_eft() )
 WC = 'cHW'
 features_train = torch.from_numpy(features).float().to(device)
 
-coefficients   = ('cHW', 'cHWtil' )#, 'cHQ3') 
-#combinations   = ZH_Nakamura.derivatives[1:] 
-combinations   =  [ ('cHW',), ('cHWtil',), ('cHW', 'cHW'), ('cHWtil', 'cHWtil'), ('cHW', 'cHWtil')]  
+#coefficients   = ('cHW', ) 
+#combinations   =  [ ('cHW',), ('cHW', 'cHW')] 
+coefficients   =  ( 'cHW', 'cHWtil', 'cHQ3') 
+combinations   =  [ ('cHW',), ('cHWtil',), ('cHQ3',), ('cHW', 'cHW'), ('cHWtil', 'cHWtil'), ('cHQ3', 'cHQ3'), ('cHW', 'cHWtil'), ('cHW', 'cHQ3'), ('cHWtil', 'cHQ3')] 
 
-base_points    = [ { 'cHW':-1.5 }, {'cHW':-.8}, {'cHW':-.4}, {'cHW':-.2}, {'cHW':.2}, {'cHW':.4}, {'cHW':.8}, {'cHW':1.5} ]
-base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
+#base_points = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
+base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, .2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, .2, 0, .2, .8, 1.5]]
+base_points = list(filter( (lambda point: all([ coeff in args.coefficients or (not (coeff in point.keys() and point[coeff]!=0)) for coeff in point.keys()]) and any(map(bool, point.values()))), base_points)) 
+
+coefficients = tuple(filter( lambda coeff: coeff in args.coefficients, list(coefficients))) 
+combinations = tuple(filter( lambda comb: all([c in args.coefficients for c in comb]), combinations)) 
+
+#base_points    = [ { 'cHW':-1.5 }, {'cHW':-.8}, {'cHW':-.4}, {'cHW':-.2}, {'cHW':.2}, {'cHW':.4}, {'cHW':.8}, {'cHW':1.5} ]
+#base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
 #base_points   += [ { 'cHQ3':-.15 }, {'cHQ3':-.08}, {'cHQ3':-.04}, {'cHQ3':-.02}, {'cHQ3':.02}, {'cHQ3':.04}, {'cHQ3':.08}, {'cHQ3':0.15} ]
 
+
 base_points    = list(map( lambda b:ZH_Nakamura.make_eft(**b), base_points ))
+
+
 
 # make standard NN 
 def make_NN( hidden_layers  = [32, 32, 32, 32] ):
@@ -90,7 +99,7 @@ base_point_weight_ratios = list( map( lambda base_point: make_weight_ratio( weig
 
 # loss functional
 def f_loss(predictions):
-    loss = 0.#-0.5*weights[()].sum()
+    loss = -0.5*weights[()].sum()
     for i_base_point, base_point in enumerate(base_points):
         #fhat  = 1./(1. + ( 1. + theta*t_output)**2 + (theta*s_output)**2 )
         fhat  = 1./(1. + r_hat(predictions, base_point) )
@@ -119,8 +128,8 @@ for epoch in range(n_epoch):
     # Compute and print loss.
     loss = f_loss(predictions)
     losses.append(loss.item())
-    #if epoch % 100 == 99:
-    print("epoch", epoch, "loss",  loss.item())
+    if epoch % 100 == 99:
+        print("epoch", epoch, "loss",  loss.item())
 
     optimizer.zero_grad()
 
@@ -128,92 +137,134 @@ for epoch in range(n_epoch):
 
     optimizer.step()
 
-#    if (epoch % plot_every)==0:
-#        with torch.no_grad():
-#            print (loss.item())
-#            pred_t = model_t(features_train).squeeze().cpu().detach().numpy()
-#            pred_s = model_s(features_train).squeeze().cpu().detach().numpy()
-#
-#            for var in plot_vars:
-#                binning     = plot_options[var]['binning']
-#                np_binning  = np.linspace(binning[1], binning[2], 1+binning[0])
-#
-#                truth_0  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train )
-#                truth_p  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wp_train )
-#                truth_pp = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wpp_train )
-#
-#                #pred_0  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train )
-#                pred_p  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*pred_t )
-#                pred_pp = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*(pred_t*pred_t+pred_s**2) )
-#
-#                h_yield       = helpers.make_TH1F(truth_0)
-#                h_truth_p     = helpers.make_TH1F(truth_p)
-#                h_truth_p     .Divide(h_yield) 
-#                h_truth_pp    = helpers.make_TH1F(truth_pp)
-#                h_truth_pp    .Divide(h_yield) 
-#
-#                h_pred_p      = helpers.make_TH1F(pred_p)
-#                h_pred_p      .Divide(h_yield) 
-#                h_pred_pp     = helpers.make_TH1F(pred_pp)
-#                h_pred_pp     .Divide(h_yield) 
-#
-#                l = ROOT.TLegend(0.3,0.7,0.9,0.95)
-#                l.SetNColumns(2)
-#                l.SetFillStyle(0)
-#                l.SetShadowColor(ROOT.kWhite)
-#                l.SetBorderSize(0)
-#
-#                h_yield      .SetLineColor(ROOT.kGray+2) 
-#                h_truth_p    .SetLineColor(ROOT.kBlue) 
-#                h_truth_pp   .SetLineColor(ROOT.kRed) 
-#                h_pred_p     .SetLineColor(ROOT.kBlue) 
-#                h_pred_pp    .SetLineColor(ROOT.kRed) 
-#                h_yield      .SetMarkerColor(ROOT.kGray+2) 
-#                h_truth_p    .SetMarkerColor(ROOT.kBlue) 
-#                h_truth_pp   .SetMarkerColor(ROOT.kRed) 
-#                h_pred_p     .SetMarkerColor(ROOT.kBlue) 
-#                h_pred_pp    .SetMarkerColor(ROOT.kRed) 
-#                h_yield      .SetMarkerStyle(0)
-#                h_truth_p    .SetMarkerStyle(0)
-#                h_truth_pp   .SetMarkerStyle(0)
-#                h_pred_p     .SetMarkerStyle(0)
-#                h_pred_pp    .SetMarkerStyle(0)
-#
-#                l.AddEntry(h_truth_p   , "1^{st.} der (truth)" ) 
-#                l.AddEntry(h_truth_pp  , "2^{st.} der (truth)" ) 
-#                l.AddEntry(h_pred_p    , "1^{st.} der (pred)" ) 
-#                l.AddEntry(h_pred_pp   , "2^{st.} der (pred)" ) 
-#                l.AddEntry(h_yield     , "yield" ) 
-#
-#                h_truth_p    .SetLineStyle(ROOT.kDashed) 
-#                h_truth_pp   .SetLineStyle(ROOT.kDashed)
-#
-#                lines = [ 
-#                        (0.16, 0.965, 'Epoch %5i    Loss %6.4f'%( epoch, loss ))
-#                        ]
-#
-#                max_ = max( map( lambda h:h.GetMaximum(), [ h_truth_p, h_truth_pp ] ))
-#
-#                h_yield.Scale(max_/h_yield.GetMaximum())
-#                for logY in [True, False]:
-#                    c1 = ROOT.TCanvas()
-#                    h_yield   .Draw("hist")
-#                    h_yield   .GetYaxis().SetRangeUser(0.1 if logY else 0, 10**(1.5)*max_ if logY else 1.5*max_)
-#                    h_yield   .Draw("hist")
-#                    h_truth_p .Draw("hsame") 
-#                    h_truth_pp.Draw("hsame")
-#                    h_pred_p  .Draw("hsame") 
-#                    h_pred_pp .Draw("hsame")
-#                    c1.SetLogy(logY) 
-#                    l.Draw()
-#
-#                    drawObjects = [ tex.DrawLatex(*line) for line in lines ]
-#                    for o in drawObjects:
-#                        o.Draw()
-#
-#                    plot_directory = os.path.join( user.plot_directory, args.model, args.plot_directory, "log" if logY else "lin")
-#                    helpers.copyIndexPHP( plot_directory )
-#                    c1.Print( os.path.join( plot_directory, "epoch_%05i_%s.png"%(epoch, var) ) )
-#                    syncer.makeRemoteGif(plot_directory, pattern="epoch_*_%s.png"%var, name=var )
-#
-#            syncer.sync()
+    if (epoch % plot_every)==0:
+        with torch.no_grad():
+            print (loss.item())
+            for comb in combinations:
+                if len(comb)==1: continue
+
+                t1, t2 = comb
+
+                pred_t1 = n_hat[(t1,)](features_train).squeeze().cpu().detach().numpy()
+                if t1 == t2:
+                    pred_t2 = pred_t1
+                else: 
+                    pred_t2 = n_hat[(t2,)](features_train).squeeze().cpu().detach().numpy()
+
+                pred_s  = n_hat[comb](features_train).squeeze().cpu().detach().numpy()
+
+                for var in plot_vars:
+                    binning   = plot_options[var]['binning']
+                    np_binning= np.linspace(binning[1], binning[2], 1+binning[0])
+
+
+                    w0_train  = weights[()]
+                    truth_0   = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train )
+
+                    wp1_train = weights[(t1,)]
+                    wp2_train = weights[(t2,)]
+                    truth_p1  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wp1_train )
+
+                    wpp_train = weights[comb]
+                    truth_pp  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wpp_train )
+
+
+                    #pred_0  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train )
+                    pred_p1  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*pred_t1 )
+                    pred_pp = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*(pred_t1*pred_t2+pred_s**2) )
+
+                    h_yield       = helpers.make_TH1F(truth_0)
+                    h_truth_p1    = helpers.make_TH1F(truth_p1)
+                    h_truth_p1    .Divide(h_yield) 
+                    h_truth_pp    = helpers.make_TH1F(truth_pp)
+                    h_truth_pp    .Divide(h_yield) 
+
+                    h_pred_p1      = helpers.make_TH1F(pred_p1)
+                    h_pred_p1      .Divide(h_yield) 
+                    h_pred_pp     = helpers.make_TH1F(pred_pp)
+                    h_pred_pp     .Divide(h_yield) 
+
+                    l = ROOT.TLegend(0.3,0.7,0.9,0.95)
+                    l.SetNColumns(2)
+                    l.SetFillStyle(0)
+                    l.SetShadowColor(ROOT.kWhite)
+                    l.SetBorderSize(0)
+
+                    h_yield      .SetLineColor(ROOT.kGray+2) 
+                    h_truth_p1   .SetLineColor(ROOT.kBlue) 
+                    h_truth_pp   .SetLineColor(ROOT.kRed) 
+                    h_pred_p1    .SetLineColor(ROOT.kBlue) 
+                    h_pred_pp    .SetLineColor(ROOT.kRed) 
+                    h_yield      .SetMarkerColor(ROOT.kGray+2) 
+                    h_truth_p1   .SetMarkerColor(ROOT.kBlue) 
+                    h_truth_pp   .SetMarkerColor(ROOT.kRed) 
+                    h_pred_p1    .SetMarkerColor(ROOT.kBlue) 
+                    h_pred_pp    .SetMarkerColor(ROOT.kRed) 
+                    h_yield      .SetMarkerStyle(0)
+                    h_truth_p1   .SetMarkerStyle(0)
+                    h_truth_pp   .SetMarkerStyle(0)
+                    h_pred_p1    .SetMarkerStyle(0)
+                    h_pred_pp    .SetMarkerStyle(0)
+                    h_truth_p1   .SetLineStyle(ROOT.kDashed) 
+                    h_truth_pp   .SetLineStyle(ROOT.kDashed)
+
+                    max_ = max( map( lambda h:h.GetMaximum(), [ h_truth_p1, h_truth_pp ] ))
+
+                    l.AddEntry(h_truth_p1  , "D(%s) (truth)"%( t1 ) ) 
+                    l.AddEntry(h_pred_p1   , "D(%s) (pred)"%( t1 ) ) 
+                    if t1!=t2:
+                        truth_p2     = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wp2_train )
+                        pred_p2      = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*pred_t2 )
+                        h_truth_p2   = helpers.make_TH1F(truth_p2)
+                        h_truth_p2   .Divide(h_yield) 
+                        h_pred_p2    = helpers.make_TH1F(pred_p2)
+                        h_pred_p2    .Divide(h_yield)
+                        h_truth_p2   .SetLineColor(ROOT.kGreen) 
+                        h_pred_p2    .SetLineColor(ROOT.kGreen) 
+                        h_truth_p2   .SetMarkerColor(ROOT.kGreen) 
+                        h_pred_p2    .SetMarkerColor(ROOT.kGreen) 
+                        h_truth_p2   .SetMarkerStyle(0)
+                        h_pred_p2    .SetMarkerStyle(0)
+                        h_truth_p2   .SetLineStyle(ROOT.kDashed)
+
+                        max_ = max( map( lambda h:h.GetMaximum(), [ h_truth_p1, h_truth_p2, h_truth_pp ] ))
+
+                        l.AddEntry(h_truth_p2   , "D(%s) (truth)"%( t2 ) ) 
+                        l.AddEntry(h_pred_p2    , "D(%s) (pred)"%( t2 ) ) 
+
+                    l.AddEntry(h_truth_pp  , "D(%s) (truth)"%( ",".join(comb) ) ) 
+                    l.AddEntry(h_pred_pp   , "D(%s) (pred)"%( ",".join(comb) ) ) 
+
+                    l.AddEntry(h_yield     , "yield" ) 
+
+                    lines = [ 
+                            (0.16, 0.965, 'Epoch %5i    Loss %6.4f'%( epoch, loss ))
+                            ]
+
+
+                    h_yield.Scale(max_/h_yield.GetMaximum())
+                    for logY in [True, False]:
+                        c1 = ROOT.TCanvas()
+                        h_yield   .Draw("hist")
+                        h_yield   .GetYaxis().SetRangeUser(0.001 if logY else 0, 10**(1.5)*max_ if logY else 1.5*max_)
+                        h_yield   .Draw("hist")
+                        h_pred_p1  .Draw("hsame") 
+                        h_truth_p1 .Draw("hsame")
+                        if t1!=t2: 
+                            h_pred_p2  .Draw("hsame") 
+                            h_truth_p2 .Draw("hsame") 
+                        h_pred_pp .Draw("hsame")
+                        h_truth_pp.Draw("hsame")
+                        c1.SetLogy(logY) 
+                        l.Draw()
+
+                        drawObjects = [ tex.DrawLatex(*line) for line in lines ]
+                        for o in drawObjects:
+                            o.Draw()
+
+                        plot_directory = os.path.join( user.plot_directory, "ZH_Nakamura", args.plot_directory, "log" if logY else "lin")
+                        helpers.copyIndexPHP( plot_directory )
+                        c1.Print( os.path.join( plot_directory, "epoch_%05i_%s_%s.png"%(epoch, "_".join(comb), var) ) )
+                        syncer.makeRemoteGif(plot_directory, pattern="epoch_*_%s_%s.png"%("_".join(comb), var), name=var+"_"+"_".join(comb) )
+
+            syncer.sync()
