@@ -2,9 +2,11 @@ import torch
 import math
 import numpy as np
 from matplotlib import pyplot as plt
-import syncer 
+import sys
+sys.path.append('..')
+from Tools import syncer 
+from Tools import user
 import os
-import user
 import helpers
 
 import ROOT

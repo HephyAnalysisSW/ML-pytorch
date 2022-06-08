@@ -2,9 +2,11 @@ import torch
 import math
 import numpy as np
 from matplotlib import pyplot as plt
-import syncer 
-import user
 import os
+import sys
+sys.path.append('..')
+from Tools import syncer 
+from Tools import user
 
 #import ZH_Nakamura as model
 #
@@ -81,12 +83,17 @@ for epoch in range(n_epoch):
         plt.clf()
         plt.plot(pred)
         plt.plot(truth)
-        plt.show()
+        plt.show(block=False)
         plt.savefig(os.path.join( user.plot_directory, "plt_epoch_%i.png"%epoch ) )
+        plt.pause(.1)
+        plt.close()
+
         
 plt.plot(losses)
-plt.show()
+plt.show(block=False)
 plt.savefig(os.path.join( user.plot_directory, "loss.png" ) )
+plt.pause(2)
+plt.close()
 
 with torch.no_grad():
     model.eval()
