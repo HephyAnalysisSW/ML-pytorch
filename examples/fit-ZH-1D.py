@@ -10,9 +10,7 @@ import os
 import helpers
 
 import ROOT
-ROOT.gROOT.LoadMacro("tdrstyle.C")
-ROOT.setTDRStyle()
-
+from Tools import tdrstyle
 
 # Parser
 import argparse
