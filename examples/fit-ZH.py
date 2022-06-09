@@ -2,13 +2,16 @@ import torch
 import math
 import numpy as np
 from matplotlib import pyplot as plt
-import syncer 
 import os
-import user
-import helpers
 
 import ROOT
+
+import sys
+sys.path.append('..')
 from Tools import tdrstyle
+from Tools import syncer 
+from Tools import user
+from Tools import helpers
 
 
 # Parser
