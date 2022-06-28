@@ -203,5 +203,4 @@ for epoch in range(n_epoch):
                     helpers.copyIndexPHP( plot_directory )
                     c1.Print( os.path.join( plot_directory, "epoch_%05i_%s.png"%(epoch, var) ) )
                     syncer.makeRemoteGif(plot_directory, pattern="epoch_*_%s.png"%var, name=var )
-
             syncer.sync()
