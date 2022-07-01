@@ -18,6 +18,8 @@ argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="v3",                       help="Plot sub-directory")
 argParser.add_argument("--model",              action="store",      default="ZH_Nakamura",                      help="Which Model?")
 argParser.add_argument("--nEvents",            action="store",      type=int, default=300000,                   help="nEvents")
+argParser.add_argument('--network',            nargs='*', type=int, default = [32,32],  help='Network architecture')
+
 #argParser.add_argument("--device",             action="store",      default="cpu",  choices = ["cpu", "cuda"],  help="Device?")
 argParser.add_argument("--bias",            action="store",      type=float, default=0,                   help="Bias weights by bias**pT ")
 args = argParser.parse_args()
