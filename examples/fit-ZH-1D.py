@@ -15,10 +15,11 @@ from Tools import tdrstyle
 # Parser
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
-argParser.add_argument("--plot_directory",     action="store",      default="v1",                       help="Plot sub-directory")
+argParser.add_argument("--plot_directory",     action="store",      default="v3",                       help="Plot sub-directory")
 argParser.add_argument("--model",              action="store",      default="ZH_Nakamura",                      help="Which Model?")
 argParser.add_argument("--nEvents",            action="store",      type=int, default=300000,                   help="nEvents")
 #argParser.add_argument("--device",             action="store",      default="cpu",  choices = ["cpu", "cuda"],  help="Device?")
+argParser.add_argument("--bias",            action="store",      type=float, default=0,                   help="Bias weights by bias**pT ")
 args = argParser.parse_args()
 
 learning_rate = 1e-3
@@ -42,11 +43,21 @@ if args.model == 'ZH_Nakamura':
 
     n_features = len(features[0]) 
     weights    = ZH_Nakamura.getWeights(features, ZH_Nakamura.make_eft() )
+    pT=features[:,feature_names.index('pT')]
+    bias_factor=bias**pT
+    
+    for key,value in weights.items():
+        value*=bias_factor
+        weights[key]=value
+    
+    
     WC = 'cHW'
     features_train = torch.from_numpy(features).float().to(device)
     w0_train       = torch.from_numpy(weights[()]).float().to(device)
     wp_train       = torch.from_numpy(weights[(WC,)]).float().to(device)
     wpp_train      = torch.from_numpy(weights[(WC,WC)]).float().to(device)
+    
+    
 elif args.model == 'const':
     features_train = torch.ones(args.nEvents).unsqueeze(-1)
     n_features     = len(features_train[0]) 

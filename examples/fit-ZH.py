@@ -17,7 +17,7 @@ from Tools import helpers
 # Parser
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
-argParser.add_argument("--plot_directory",     action="store",      default="v1",                       help="Plot sub-directory")
+argParser.add_argument("--plot_directory",     action="store",      default="v1_3D",                       help="Plot sub-directory")
 argParser.add_argument("--coefficients",       action="store",      default=['cHW', 'cHWtil', 'cHQ3'],  help="Which coefficients?")
 argParser.add_argument("--nEvents",            action="store",      type=int, default=300000,           help="nEvents")
 #argParser.add_argument("--device",             action="store",      default="cpu",  choices = ["cpu", "cuda"],  help="Device?")
