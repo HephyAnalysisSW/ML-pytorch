@@ -6,7 +6,7 @@ max_NJets = 1
 #thresholds = [20,40,10**6]
 #thresholds = [20,10**6]
 
-def getEvents( NEvents = 100000, nBins=None):
+def getEvents( NEvents = 100000, nBins=None, sigmas = [+1,0,-1]):
 
     # array of exp numbers, reshape to two more
     #jets = np.random.exponential( scale=alpha, size=(3+max_NJets)*NEvents).reshape(NEvents,-1)
@@ -15,7 +15,7 @@ def getEvents( NEvents = 100000, nBins=None):
     np.matrix.sort(jets)
     jets=np.flip(jets)[:, :max_NJets]
 
-    jets = {0:jets, -1:(1-jec)*jets, +1:(1+jec)*jets}
+    jets = {sigma:(1+sigma*jec)*jets for sigma in sigmas}
     # remove low pt jets
     for k, j in jets.items():
         j[j<20]=-1
@@ -29,5 +29,3 @@ def getEvents( NEvents = 100000, nBins=None):
     return jets
 
 features = ["jet_pt_%i"%i for i in range(max_NJets)]
-#plot_options = {"jet_pt_%i"%i:{'tex':'p_{T}(j_{%i})'%i, 'binning':[50,20,520]} for i in range(max_NJets)}
-plot_options = {"jet_pt_%i"%i:{'tex':'p_{T}(j_{%i})'%i, 'binning':[3,0,3]} for i in range(max_NJets)}
