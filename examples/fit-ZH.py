@@ -48,10 +48,10 @@ features_train = torch.from_numpy(features).float().to(device)
 #coefficients   = ('cHW', ) 
 #combinations   =  [ ('cHW',), ('cHW', 'cHW')] 
 coefficients   =  ( 'cHW', 'cHWtil', 'cHQ3') 
-combinations   =  [ ('cHW',), ('cHWtil',), ('cHQ3',), ('cHW', 'cHW'), ('cHWtil', 'cHWtil'), ('cHQ3', 'cHQ3'), ('cHW', 'cHWtil'), ('cHW', 'cHQ3'), ('cHWtil', 'cHQ3')] 
+combinations   =  [ ('cHW',), ('cHWtil',), ('cHQ3',), ('cHW', 'cHW'), ('cHWtil', 'cHWtil'), ('cHQ3', 'cHQ3'), ('cHW', 'cHWtil'), ('cHQ3', 'cHW'), ('cHQ3', 'cHWtil')] 
 
 #base_points = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
-base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, .2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, .2, 0, .2, .8, 1.5]]
+base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, -.2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, -.2, 0, .2, .8, 1.5]]
 base_points = list(filter( (lambda point: all([ coeff in args.coefficients or (not (coeff in point.keys() and point[coeff]!=0)) for coeff in point.keys()]) and any(map(bool, point.values()))), base_points)) 
 
 coefficients = tuple(filter( lambda coeff: coeff in args.coefficients, list(coefficients))) 
@@ -61,10 +61,7 @@ combinations = tuple(filter( lambda comb: all([c in args.coefficients for c in c
 #base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
 #base_points   += [ { 'cHQ3':-.15 }, {'cHQ3':-.08}, {'cHQ3':-.04}, {'cHQ3':-.02}, {'cHQ3':.02}, {'cHQ3':.04}, {'cHQ3':.08}, {'cHQ3':0.15} ]
 
-
 base_points    = list(map( lambda b:ZH_Nakamura.make_eft(**b), base_points ))
-
-
 
 # make standard NN 
 def make_NN( hidden_layers  = [32, 32, 32, 32] ):
@@ -85,7 +82,7 @@ for combination in combinations:
 def r_hat( predictions, eft ):
     return torch.add( 
         torch.sum( torch.stack( [(1. + predictions[(c,)]*eft[c])**2 for c in coefficients ]), dim=0),
-        torch.sum( torch.stack( [torch.sum( torch.stack( [ predictions[(c_1,c_2)]*eft[c_2] for c_2 in coefficients[i_c_1:] ]), dim=0)**2 for i_c_1, c_1 in enumerate(coefficients) ] ), dim=0 ) )
+        torch.sum( torch.stack( [torch.sum( torch.stack( [ predictions[tuple(sorted((c_1,c_2)))]*eft[c_2] for c_2 in coefficients[i_c_1:] ]), dim=0)**2 for i_c_1, c_1 in enumerate(coefficients) ] ), dim=0 ) )
 
 def make_weight_ratio( weights, **kwargs ):
     eft      = kwargs
