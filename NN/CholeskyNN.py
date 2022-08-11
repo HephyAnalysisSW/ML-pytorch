@@ -1,83 +1,48 @@
 import torch
 import math
 import numpy as np
-from matplotlib import pyplot as plt
 import os
-
-import ROOT
+import itertools
 
 import sys
 sys.path.append('..')
-from tools import tdrstyle
-from tools import syncer 
-from tools import user
 from tools import helpers
 
-# Parser
-import argparse
-argParser = argparse.ArgumentParser(description = "Argument parser")
-argParser.add_argument("--plot_directory",     action="store",      default="v1_3D",                       help="Plot sub-directory")
-argParser.add_argument("--coefficients",       action="store",      default=['cHW', 'cHWtil', 'cHQ3'],  help="Which coefficients?")
-argParser.add_argument("--nEvents",            action="store",      type=int, default=300000,           help="nEvents")
-#argParser.add_argument("--device",             action="store",      default="cpu",  choices = ["cpu", "cuda"],  help="Device?")
-args = argParser.parse_args()
+class CholeskyNN:
+    def __init__( self, coefficients, hidden_layers  = [32, 32, 32, 32]):
 
-learning_rate = 1e-3
-device        = 'cuda' if torch.cuda.is_available() else 'cpu'
-n_epoch       = 10000
-plot_every    = 100
+        # Configuration    
+        self.learning_rate = 1e-3
+        self.device        = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-# training data
-import models.ZH_Nakamura as model
+        # Coefficients
+        self.coefficients  = tuple(sorted(coefficients))
+        self.combinations  = list(itertools.combinations_with_replacement(self.coefficients, 2))
 
-model.feature_names = model.feature_names[0:6] # restrict features
-features   = model.getEvents(args.nEvents)[:,0:6]
-feature_names  = model.feature_names
-plot_options   = model.plot_options
-plot_vars      = model.feature_names
+        # Plotting
+        n_epoch       = 10000
+        plot_every    = 100
 
-mask       = (features[:,feature_names.index('pT')]<900) & (features[:,feature_names.index('sqrt_s_hat')]<1800) 
-features = features[mask]
+        # Setup NN
+        self.n_hat = {} 
+        for combination in combinations:
+            self.hidden_layers = hidden_layers
+            model_nn = [torch.nn.BatchNorm1d(n_features), torch.nn.ReLU(), torch.nn.Linear(n_features, hidden_layers[0])]
+            for i_layer, layer in enumerate(hidden_layers):
 
-n_features = len(features[0]) 
-weights    = model.getWeights(features, model.make_eft() )
+                model_nn.append(torch.nn.Linear(hidden_layers[i_layer], hidden_layers[i_layer+1] if i_layer+1<len(hidden_layers) else 1))
+                if i_layer+1<len(hidden_layers):
+                    model_nn.append( torch.nn.ReLU() )
 
-WC = 'cHW'
-features_train = torch.from_numpy(features).float().to(device)
+            self.n_hat[combination] = torch.nn.Sequential(*model_nn)
 
-#coefficients   = ('cHW', ) 
-#combinations   =  [ ('cHW',), ('cHW', 'cHW')] 
-coefficients   =  ( 'cHW', 'cHWtil', 'cHQ3') 
-combinations   =  [ ('cHW',), ('cHWtil',), ('cHQ3',), ('cHW', 'cHW'), ('cHWtil', 'cHWtil'), ('cHQ3', 'cHQ3'), ('cHW', 'cHWtil'), ('cHQ3', 'cHW'), ('cHQ3', 'cHWtil')] 
+    def print_model( self ):
+        for combination in self.combinations:
+            print ("n_hat( %s ) = \n"% ", ".join(combination), self.n_hat[combination])
 
-#base_points = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
-base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, -.2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, -.2, 0, .2, .8, 1.5]]
-base_points = list(filter( (lambda point: all([ coeff in args.coefficients or (not (coeff in point.keys() and point[coeff]!=0)) for coeff in point.keys()]) and any(map(bool, point.values()))), base_points)) 
+    def training( self, base_points ):
+        pass
 
-coefficients = tuple(filter( lambda coeff: coeff in args.coefficients, list(coefficients))) 
-combinations = tuple(filter( lambda comb: all([c in args.coefficients for c in comb]), combinations)) 
-
-#base_points    = [ { 'cHW':-1.5 }, {'cHW':-.8}, {'cHW':-.4}, {'cHW':-.2}, {'cHW':.2}, {'cHW':.4}, {'cHW':.8}, {'cHW':1.5} ]
-#base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
-#base_points   += [ { 'cHQ3':-.15 }, {'cHQ3':-.08}, {'cHQ3':-.04}, {'cHQ3':-.02}, {'cHQ3':.02}, {'cHQ3':.04}, {'cHQ3':.08}, {'cHQ3':0.15} ]
-
-base_points    = list(map( lambda b:model.make_eft(**b), base_points ))
-
-# make standard NN 
-def make_NN( hidden_layers  = [32, 32, 32, 32] ):
-    model_nn = [torch.nn.BatchNorm1d(n_features), torch.nn.ReLU(), torch.nn.Linear(n_features, hidden_layers[0])]
-    for i_layer, layer in enumerate(hidden_layers):
-
-        model_nn.append(torch.nn.Linear(hidden_layers[i_layer], hidden_layers[i_layer+1] if i_layer+1<len(hidden_layers) else 1))
-        if i_layer+1<len(hidden_layers):
-            model_nn.append( torch.nn.ReLU() )
-
-    return torch.nn.Sequential(*model_nn)
-
-n_hat = { combination:make_NN() for combination in combinations }
-
-for combination in combinations:
-    print ("n_hat( %s ) = \n"% ", ".join(combination), n_hat[combination])
 
 def r_hat( predictions, eft ):
     return torch.add( 
@@ -109,10 +74,6 @@ def f_loss(predictions):
 optimizer = torch.optim.Adam(sum([list(nn.parameters()) for nn in n_hat.values()],[]), lr=learning_rate)
 
 losses = []
-
-tex = ROOT.TLatex()
-tex.SetNDC()
-tex.SetTextSize(0.04)
 
 # variables for ploting results
 for nn in n_hat.values():
@@ -267,3 +228,46 @@ for epoch in range(n_epoch):
                         syncer.makeRemoteGif(plot_directory, pattern="epoch_*_%s_%s.png"%("_".join(comb), var), name=var+"_"+"_".join(comb) )
 
             syncer.sync()
+if __name__ == '__main__':
+
+    # training data
+    import models.ZH_Nakamura as model
+
+    model.feature_names = model.feature_names[0:6] # restrict features
+    features   = model.getEvents(args.nEvents)[:,0:6]
+    feature_names  = model.feature_names
+    plot_options   = model.plot_options
+    plot_vars      = model.feature_names
+
+    mask       = (features[:,feature_names.index('pT')]<900) & (features[:,feature_names.index('sqrt_s_hat')]<1800) 
+    features = features[mask]
+
+    n_features = len(features[0]) 
+    weights    = model.getWeights(features, model.make_eft() )
+
+    # select coefficients
+    WC = 'cHW'
+    features_train = torch.from_numpy(features).float().to(device)
+
+    #coefficients   = ('cHW', ) 
+    #combinations   =  [ ('cHW',), ('cHW', 'cHW')] 
+    coefficients   =  ( 'cHW', 'cHWtil', 'cHQ3') 
+
+    # Initialize model
+
+    nn = CholeskyNN( coefficients ) 
+
+#    #base_points = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
+#    base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, -.2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, -.2, 0, .2, .8, 1.5]]
+#    base_points = list(filter( (lambda point: all([ coeff in args.coefficients or (not (coeff in point.keys() and point[coeff]!=0)) for coeff in point.keys()]) and any(map(bool, point.values()))), base_points)) 
+#
+#    coefficients = tuple(filter( lambda coeff: coeff in args.coefficients, list(coefficients))) 
+#    combinations = tuple(filter( lambda comb: all([c in args.coefficients for c in comb]), combinations)) 
+#
+#    #base_points    = [ { 'cHW':-1.5 }, {'cHW':-.8}, {'cHW':-.4}, {'cHW':-.2}, {'cHW':.2}, {'cHW':.4}, {'cHW':.8}, {'cHW':1.5} ]
+#    #base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
+#    #base_points   += [ { 'cHQ3':-.15 }, {'cHQ3':-.08}, {'cHQ3':-.04}, {'cHQ3':-.02}, {'cHQ3':.02}, {'cHQ3':.04}, {'cHQ3':.08}, {'cHQ3':0.15} ]
+#
+#    base_points    = list(map( lambda b:model.make_eft(**b), base_points ))
+#
+#    nn_model.train ( base_points )
