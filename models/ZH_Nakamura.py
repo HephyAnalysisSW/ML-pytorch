@@ -10,10 +10,13 @@ import ROOT
 import csv
 import os
 import array
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
 h_pdf = {} 
 for c_pdf in [ "u", "ubar", "d", "dbar", "s", "sbar", "c", "cbar", "b", "bbar", "gluon"]:
 
-    with open(os.path.expandvars("./pdf_data/pdf_%s.txt"%c_pdf)) as f:
+    with open(os.path.join(dir_path, "./pdf_data/pdf_%s.txt"%c_pdf)) as f:
         reader = csv.reader(f)
         data = list(reader)
         thresholds = []

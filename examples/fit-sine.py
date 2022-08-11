@@ -5,13 +5,8 @@ from matplotlib import pyplot as plt
 import os
 import sys
 sys.path.append('..')
-from Tools import syncer 
-from Tools import user
-
-#import ZH_Nakamura as model
-#
-#features = model.getEvents(10000)
-#weights  = model.getWeights(features, model.make_eft() )
+from tools import syncer 
+from tools import user
 
 frequency     = 1.
 learning_rate = 1e-3

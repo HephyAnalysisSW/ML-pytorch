@@ -5,12 +5,12 @@ from matplotlib import pyplot as plt
 import os
 import sys
 sys.path.append('..')
-from Tools import syncer 
-from Tools import user
-from Tools import helpers
+from tools import syncer 
+from tools import user
+from tools import helpers
 
 import ROOT
-from Tools import tdrstyle
+from tools import tdrstyle
 
 # Parser
 import argparse
@@ -33,18 +33,18 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # training data
 if args.model == 'ZH_Nakamura':
-    import ZH_Nakamura 
-    ZH_Nakamura.feature_names = ZH_Nakamura.feature_names[0:6] # restrict features
-    features   = ZH_Nakamura.getEvents(args.nEvents)[:,0:6]
-    feature_names  = ZH_Nakamura.feature_names
-    plot_options   = ZH_Nakamura.plot_options
-    plot_vars      = ZH_Nakamura.feature_names
+    import models.ZH_Nakamura as model
+    model.feature_names = model.feature_names[0:6] # restrict features
+    features   = model.getEvents(args.nEvents)[:,0:6]
+    feature_names  = model.feature_names
+    plot_options   = model.plot_options
+    plot_vars      = model.feature_names
 
     mask       = (features[:,feature_names.index('pT')]<900) & (features[:,feature_names.index('sqrt_s_hat')]<1800) 
     features = features[mask]
 
     n_features = len(features[0]) 
-    weights    = ZH_Nakamura.getWeights(features, ZH_Nakamura.make_eft() )
+    weights    = model.getWeights(features, model.make_eft() )
     pT=features[:,feature_names.index('pT')]
     bias_factor=bias**pT
     
