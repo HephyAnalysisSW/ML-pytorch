@@ -3,35 +3,51 @@ import math
 import numpy as np
 import os
 import itertools
-
+import time
+import copy
 import sys
 sys.path.append('..')
 from tools import helpers
+        
+device        = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+default_cfg = {
+    "n_epoch"       : 100,
+    "learning_rate" : 1e-3,
+    "hidden_layers" : [32, 32, 32, 32],
+    "plot_every"    : 100,
+}
 
 class CholeskyNN:
-    def __init__( self, coefficients, hidden_layers  = [32, 32, 32, 32]):
+    def __init__( self, coefficients, n_features, **kwargs):
 
-        # Configuration    
-        self.learning_rate = 1e-3
-        self.device        = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.n_features = n_features
+
+        # make cfg and node_cfg from the kwargs keys known by the Node
+        self.cfg = default_cfg
+        for (key, val) in kwargs.items():
+            if key in default_cfg.keys():
+                self.cfg[key]      = val
+            else:
+                raise RuntimeError( "Got unexpected keyword arg: %s:%r" %( key, val ) )
+
+        for (key, val) in self.cfg.items():
+                setattr( self, key, val )
 
         # Coefficients
         self.coefficients  = tuple(sorted(coefficients))
-        self.combinations  = list(itertools.combinations_with_replacement(self.coefficients, 2))
+        self.lin_combinations  = list(itertools.combinations_with_replacement(self.coefficients, 1))
+        self.quad_combinations = list(itertools.combinations_with_replacement(self.coefficients, 2))
+        self.combinations = self.lin_combinations + self.quad_combinations
 
-        # Plotting
-        n_epoch       = 10000
-        plot_every    = 100
-
-        # Setup NN
+        # Setup NN 
         self.n_hat = {} 
-        for combination in combinations:
-            self.hidden_layers = hidden_layers
-            model_nn = [torch.nn.BatchNorm1d(n_features), torch.nn.ReLU(), torch.nn.Linear(n_features, hidden_layers[0])]
-            for i_layer, layer in enumerate(hidden_layers):
+        for combination in self.combinations:
+            model_nn = [torch.nn.BatchNorm1d(self.n_features), torch.nn.ReLU(), torch.nn.Linear(self.n_features, self.hidden_layers[0])]
+            for i_layer, layer in enumerate(self.hidden_layers):
 
-                model_nn.append(torch.nn.Linear(hidden_layers[i_layer], hidden_layers[i_layer+1] if i_layer+1<len(hidden_layers) else 1))
-                if i_layer+1<len(hidden_layers):
+                model_nn.append(torch.nn.Linear(self.hidden_layers[i_layer], self.hidden_layers[i_layer+1] if i_layer+1<len(self.hidden_layers) else 1))
+                if i_layer+1<len(self.hidden_layers):
                     model_nn.append( torch.nn.ReLU() )
 
             self.n_hat[combination] = torch.nn.Sequential(*model_nn)
@@ -40,201 +56,110 @@ class CholeskyNN:
         for combination in self.combinations:
             print ("n_hat( %s ) = \n"% ", ".join(combination), self.n_hat[combination])
 
-    def training( self, base_points ):
-        pass
+    def r_hat( self, predictions, eft ):
+        return torch.add( 
+            torch.sum( torch.stack( [(1. + predictions[(c,)]*eft[c])**2 for c in self.coefficients ]), dim=0),
+            torch.sum( torch.stack( [torch.sum( torch.stack( [ predictions[tuple(sorted((c_1,c_2)))]*eft[c_2] for c_2 in self.coefficients[i_c_1:] ]), dim=0)**2 for i_c_1, c_1 in enumerate(self.coefficients) ] ), dim=0 ) )
 
+    def make_weight_ratio( self, weights, **kwargs ):
+        ''' Computes 1 + (theta-theta_0)_a w_a + 0.5 * (theta-theta_0)_a (theta-theta_0)_b w_ab from input events
+        '''
+        eft      = kwargs
+        result = torch.ones(len(weights[()])) 
+        for combination in self.combinations:
+            if len(combination)==1:
+                result += eft[combination[0]]*weights[combination]/weights[()]
+            elif len(combination)==2:# add up without the factor 1/2 because off diagonals are only summed in upper triangle 
+                result += (0.5 if len(set(combination))==1 else 1.)*eft[combination[0]]*eft[combination[1]]*weights[combination]/weights[()]
+        return result
 
-def r_hat( predictions, eft ):
-    return torch.add( 
-        torch.sum( torch.stack( [(1. + predictions[(c,)]*eft[c])**2 for c in coefficients ]), dim=0),
-        torch.sum( torch.stack( [torch.sum( torch.stack( [ predictions[tuple(sorted((c_1,c_2)))]*eft[c_2] for c_2 in coefficients[i_c_1:] ]), dim=0)**2 for i_c_1, c_1 in enumerate(coefficients) ] ), dim=0 ) )
+    def predict( self, features ):
+        if type(features) == np.ndarray:
+            return {combination:self.n_hat[combination](torch.from_numpy(features).float().to(device)).squeeze() for combination in self.combinations} 
+        else:
+            return {combination:self.n_hat[combination](features).squeeze() for combination in self.combinations} 
 
-def make_weight_ratio( weights, **kwargs ):
-    eft      = kwargs
-    result = torch.ones(len(weights[()])) 
-    for combination in combinations:
-        if len(combination)==1:
-            result += eft[combination[0]]*weights[combination]/weights[()]
-        elif len(combination)==2:# add up without the factor 1/2 because off diagonals are only summed in upper triangle 
-            result += (0.5 if len(set(combination))==1 else 1.)*eft[combination[0]]*eft[combination[1]]*weights[combination]/weights[()]
-    return result
+    # main training method
+    def train( self, base_points, weights, features, test_weights = None, test_features = None, monitor_epoch = None, snapshots = None):
 
-base_point_weight_ratios = list( map( lambda base_point: make_weight_ratio( weights, **base_point ), base_points ) )
+        torch_features = torch.from_numpy(features).float().to(device)
 
-# loss functional
-def f_loss(predictions):
-    loss = -0.5*weights[()].sum()
-    for i_base_point, base_point in enumerate(base_points):
-        #fhat  = 1./(1. + ( 1. + theta*t_output)**2 + (theta*s_output)**2 )
-        fhat  = 1./(1. + r_hat(predictions, base_point) )
-        loss += ( torch.tensor(weights[()])*( -0.25 + base_point_weight_ratios[i_base_point]*fhat**2 + (1-fhat)**2 ) ).sum()
-    return loss
+        self.monitoring = []
 
-#optimizer = torch.optim.RMSprop(model.parameters(), lr=learning_rate)
-optimizer = torch.optim.Adam(sum([list(nn.parameters()) for nn in n_hat.values()],[]), lr=learning_rate)
+        optimizer               = torch.optim.Adam(sum([list(nn.parameters()) for nn in self.n_hat.values()],[]), lr=self.learning_rate)
+        base_point_weight_ratios= list( map( lambda base_point: self.make_weight_ratio( weights, **base_point ), base_points ) )
+        training_time           = 0 
+        self.snapshots          = {} 
 
-losses = []
+        if test_features is not None:
+            torch_test_features = torch.from_numpy(test_features).float().to(device)
+            base_point_test_weight_ratios= list( map( lambda base_point: self.make_weight_ratio( test_weights, **base_point ), base_points ) )
 
-# variables for ploting results
-for nn in n_hat.values():
-    nn.train()
+        for epoch in range(self.n_epoch):
 
-for epoch in range(n_epoch):
-    # Forward pass: compute predicted y by passing x to the model.
-    predictions = {combination:n_hat[combination](features_train).squeeze() for combination in combinations}
+            monitoring  = {'epoch':epoch}
+            start_time  = time.process_time()
+            predictions = self.predict( torch_features) #{combination:self.n_hat[combination](torch_features).squeeze() for combination in self.combinations}
 
-    #print ("t", pred_t.mean(), "s", pred_s.mean())
+            # remove const piece
+            loss = -0.5*weights[()].sum()
+            for i_base_point, base_point in enumerate(base_points):
+                fhat  = 1./(1. + self.r_hat(predictions, base_point) )
+                loss += ( torch.tensor(weights[()])*( -0.25 + base_point_weight_ratios[i_base_point]*fhat**2 + (1-fhat)**2 ) ).sum()
 
-    # Compute and print loss.
-    loss = f_loss(predictions)
-    losses.append(loss.item())
-    if epoch % 100 == 99:
-        print("epoch", epoch, "loss",  loss.item())
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            total_time         =  time.process_time() - start_time
+            training_time      += total_time 
+            monitoring['training_loss'] = loss.item()
+            monitoring['training_time'] = training_time 
+            self.monitoring.append( monitoring ) 
+            print ( "Epoch %i time %3.2f"%( epoch, time.process_time()-start_time))
 
-    optimizer.zero_grad()
+            if snapshots is not None and epoch in snapshots:
+                #self.snapshots[epoch] = copy.deepcopy( self ) #{ key:net.state_dict() for key, net in self.n_hat.items() }
+                self.snapshots[epoch] = copy.deepcopy( { key:net.state_dict() for key, net in self.n_hat.items() } )
+                #print(self.snapshots[epoch])
+            # Compute test loss
+            if test_features is not None:
+                if monitor_epoch is None or epoch in monitor_epoch: 
+                    with torch.no_grad():
+                        test_predictions = {combination:self.n_hat[combination](torch_test_features).squeeze() for combination in self.combinations}                         
+                        test_loss        = -0.5*test_weights[()].sum()
+                        for i_base_point, base_point in enumerate(base_points):
+                            test_fhat  = 1./(1. + self.r_hat(test_predictions, base_point) )
+                            test_loss += ( torch.tensor(test_weights[()])*( -0.25 + base_point_test_weight_ratios[i_base_point]*test_fhat**2 + (1-test_fhat)**2 ) ).sum()
+                    monitoring['test_loss'] = test_loss.item() 
 
-    loss.backward()
+    # Wrappers just to have the same interface as BIT
+    @classmethod
+    def load(cls, filename):
+        with open(filename, 'rb') as _file:
+            return torch.load(_file)
 
-    optimizer.step()
+    # sett the NN cfg to the snapshot
+    def load_snapshot( self, snapshot ):
+        for key, dict_ in snapshot.items():
+            self.n_hat[key].load_state_dict( dict_ )
 
-    if (epoch % plot_every)==0:
-        with torch.no_grad():
-            print (loss.item())
-            for comb in combinations:
-                if len(comb)==1: continue
+    def save(self, filename):
+        _path = os.path.dirname(filename)
+        if not os.path.exists(_path):
+            os.makedirs(_path)
+        with open(filename, 'wb') as _file:
+            torch.save( self, _file )
 
-                t1, t2 = comb
-
-                pred_t1 = n_hat[(t1,)](features_train).squeeze().cpu().detach().numpy()
-                if t1 == t2:
-                    pred_t2 = pred_t1
-                else: 
-                    pred_t2 = n_hat[(t2,)](features_train).squeeze().cpu().detach().numpy()
-
-                pred_s  = n_hat[comb](features_train).squeeze().cpu().detach().numpy()
-
-                for var in plot_vars:
-                    binning   = plot_options[var]['binning']
-                    np_binning= np.linspace(binning[1], binning[2], 1+binning[0])
-
-
-                    w0_train  = weights[()]
-                    truth_0   = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train )
-
-                    wp1_train = weights[(t1,)]
-                    wp2_train = weights[(t2,)]
-                    truth_p1  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wp1_train )
-
-                    wpp_train = weights[comb]
-                    truth_pp  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wpp_train )
-
-
-                    #pred_0  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train )
-                    pred_p1  = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*pred_t1 )
-                    pred_pp = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*(pred_t1*pred_t2+pred_s**2) )
-
-                    h_yield       = helpers.make_TH1F(truth_0)
-                    h_truth_p1    = helpers.make_TH1F(truth_p1)
-                    h_truth_p1    .Divide(h_yield) 
-                    h_truth_pp    = helpers.make_TH1F(truth_pp)
-                    h_truth_pp    .Divide(h_yield) 
-
-                    h_pred_p1      = helpers.make_TH1F(pred_p1)
-                    h_pred_p1      .Divide(h_yield) 
-                    h_pred_pp     = helpers.make_TH1F(pred_pp)
-                    h_pred_pp     .Divide(h_yield) 
-
-                    l = ROOT.TLegend(0.3,0.7,0.9,0.95)
-                    l.SetNColumns(2)
-                    l.SetFillStyle(0)
-                    l.SetShadowColor(ROOT.kWhite)
-                    l.SetBorderSize(0)
-
-                    h_yield      .SetLineColor(ROOT.kGray+2) 
-                    h_truth_p1   .SetLineColor(ROOT.kBlue) 
-                    h_truth_pp   .SetLineColor(ROOT.kRed) 
-                    h_pred_p1    .SetLineColor(ROOT.kBlue) 
-                    h_pred_pp    .SetLineColor(ROOT.kRed) 
-                    h_yield      .SetMarkerColor(ROOT.kGray+2) 
-                    h_truth_p1   .SetMarkerColor(ROOT.kBlue) 
-                    h_truth_pp   .SetMarkerColor(ROOT.kRed) 
-                    h_pred_p1    .SetMarkerColor(ROOT.kBlue) 
-                    h_pred_pp    .SetMarkerColor(ROOT.kRed) 
-                    h_yield      .SetMarkerStyle(0)
-                    h_truth_p1   .SetMarkerStyle(0)
-                    h_truth_pp   .SetMarkerStyle(0)
-                    h_pred_p1    .SetMarkerStyle(0)
-                    h_pred_pp    .SetMarkerStyle(0)
-                    h_truth_p1   .SetLineStyle(ROOT.kDashed) 
-                    h_truth_pp   .SetLineStyle(ROOT.kDashed)
-
-                    max_ = max( map( lambda h:h.GetMaximum(), [ h_truth_p1, h_truth_pp ] ))
-
-                    l.AddEntry(h_truth_p1  , "D(%s) (truth)"%( t1 ) ) 
-                    l.AddEntry(h_pred_p1   , "D(%s) (pred)"%( t1 ) ) 
-                    if t1!=t2:
-                        truth_p2     = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=wp2_train )
-                        pred_p2      = np.histogram(features_train[:,feature_names.index(var)], np_binning, weights=w0_train*2*pred_t2 )
-                        h_truth_p2   = helpers.make_TH1F(truth_p2)
-                        h_truth_p2   .Divide(h_yield) 
-                        h_pred_p2    = helpers.make_TH1F(pred_p2)
-                        h_pred_p2    .Divide(h_yield)
-                        h_truth_p2   .SetLineColor(ROOT.kGreen) 
-                        h_pred_p2    .SetLineColor(ROOT.kGreen) 
-                        h_truth_p2   .SetMarkerColor(ROOT.kGreen) 
-                        h_pred_p2    .SetMarkerColor(ROOT.kGreen) 
-                        h_truth_p2   .SetMarkerStyle(0)
-                        h_pred_p2    .SetMarkerStyle(0)
-                        h_truth_p2   .SetLineStyle(ROOT.kDashed)
-
-                        max_ = max( map( lambda h:h.GetMaximum(), [ h_truth_p1, h_truth_p2, h_truth_pp ] ))
-
-                        l.AddEntry(h_truth_p2   , "D(%s) (truth)"%( t2 ) ) 
-                        l.AddEntry(h_pred_p2    , "D(%s) (pred)"%( t2 ) ) 
-
-                    l.AddEntry(h_truth_pp  , "D(%s) (truth)"%( ",".join(comb) ) ) 
-                    l.AddEntry(h_pred_pp   , "D(%s) (pred)"%( ",".join(comb) ) ) 
-
-                    l.AddEntry(h_yield     , "yield" ) 
-
-                    lines = [ 
-                            (0.16, 0.965, 'Epoch %5i    Loss %6.4f'%( epoch, loss ))
-                            ]
-
-
-                    h_yield.Scale(max_/h_yield.GetMaximum())
-                    for logY in [True, False]:
-                        c1 = ROOT.TCanvas()
-                        h_yield   .Draw("hist")
-                        h_yield   .GetYaxis().SetRangeUser(0.001 if logY else 0, 10**(1.5)*max_ if logY else 1.5*max_)
-                        h_yield   .Draw("hist")
-                        h_pred_p1  .Draw("hsame") 
-                        h_truth_p1 .Draw("hsame")
-                        if t1!=t2: 
-                            h_pred_p2  .Draw("hsame") 
-                            h_truth_p2 .Draw("hsame") 
-                        h_pred_pp .Draw("hsame")
-                        h_truth_pp.Draw("hsame")
-                        c1.SetLogy(logY) 
-                        l.Draw()
-
-                        drawObjects = [ tex.DrawLatex(*line) for line in lines ]
-                        for o in drawObjects:
-                            o.Draw()
-
-                        plot_directory = os.path.join( user.plot_directory, "ZH_Nakamura", args.plot_directory, "log" if logY else "lin")
-                        helpers.copyIndexPHP( plot_directory )
-                        c1.Print( os.path.join( plot_directory, "epoch_%05i_%s_%s.png"%(epoch, "_".join(comb), var) ) )
-                        syncer.makeRemoteGif(plot_directory, pattern="epoch_*_%s_%s.png"%("_".join(comb), var), name=var+"_"+"_".join(comb) )
-
-            syncer.sync()
 if __name__ == '__main__':
 
     # training data
     import models.ZH_Nakamura as model
 
+    nEvents = 30000 
+
     model.feature_names = model.feature_names[0:6] # restrict features
-    features   = model.getEvents(args.nEvents)[:,0:6]
+    features   = model.getEvents(nEvents)[:,0:6]
     feature_names  = model.feature_names
     plot_options   = model.plot_options
     plot_vars      = model.feature_names
@@ -242,32 +167,27 @@ if __name__ == '__main__':
     mask       = (features[:,feature_names.index('pT')]<900) & (features[:,feature_names.index('sqrt_s_hat')]<1800) 
     features = features[mask]
 
-    n_features = len(features[0]) 
     weights    = model.getWeights(features, model.make_eft() )
 
     # select coefficients
     WC = 'cHW'
-    features_train = torch.from_numpy(features).float().to(device)
 
-    #coefficients   = ('cHW', ) 
-    #combinations   =  [ ('cHW',), ('cHW', 'cHW')] 
-    coefficients   =  ( 'cHW', 'cHWtil', 'cHQ3') 
+    coefficients   = ('cHW', ) 
+    #coefficients   =  ( 'cHW', 'cHWtil', 'cHQ3') 
 
     # Initialize model
+    nn = CholeskyNN( coefficients, len(features[0])) 
 
-    nn = CholeskyNN( coefficients ) 
+    base_points = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
+    #base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, -.2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, -.2, 0, .2, .8, 1.5]]
+    #base_points = list(filter( (lambda point: all([ coeff in args.coefficients or (not (coeff in point.keys() and point[coeff]!=0)) for coeff in point.keys()]) and any(map(bool, point.values()))), base_points)) 
 
-#    #base_points = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
-#    base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, -.2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, -.2, 0, .2, .8, 1.5]]
-#    base_points = list(filter( (lambda point: all([ coeff in args.coefficients or (not (coeff in point.keys() and point[coeff]!=0)) for coeff in point.keys()]) and any(map(bool, point.values()))), base_points)) 
-#
-#    coefficients = tuple(filter( lambda coeff: coeff in args.coefficients, list(coefficients))) 
-#    combinations = tuple(filter( lambda comb: all([c in args.coefficients for c in comb]), combinations)) 
-#
-#    #base_points    = [ { 'cHW':-1.5 }, {'cHW':-.8}, {'cHW':-.4}, {'cHW':-.2}, {'cHW':.2}, {'cHW':.4}, {'cHW':.8}, {'cHW':1.5} ]
-#    #base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
-#    #base_points   += [ { 'cHQ3':-.15 }, {'cHQ3':-.08}, {'cHQ3':-.04}, {'cHQ3':-.02}, {'cHQ3':.02}, {'cHQ3':.04}, {'cHQ3':.08}, {'cHQ3':0.15} ]
-#
-#    base_points    = list(map( lambda b:model.make_eft(**b), base_points ))
-#
-#    nn_model.train ( base_points )
+    #coefficients = tuple(filter( lambda coeff: coeff in args.coefficients, list(coefficients))) 
+
+    #base_points    = [ { 'cHW':-1.5 }, {'cHW':-.8}, {'cHW':-.4}, {'cHW':-.2}, {'cHW':.2}, {'cHW':.4}, {'cHW':.8}, {'cHW':1.5} ]
+    #base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
+    #base_points   += [ { 'cHQ3':-.15 }, {'cHQ3':-.08}, {'cHQ3':-.04}, {'cHQ3':-.02}, {'cHQ3':.02}, {'cHQ3':.04}, {'cHQ3':.08}, {'cHQ3':0.15} ]
+
+    base_points    = list(map( lambda b:model.make_eft(**b), base_points ))
+
+    nn.train( base_points, weights, features )
