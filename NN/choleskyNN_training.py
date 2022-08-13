@@ -34,12 +34,12 @@ argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="choleskyNN",                  help="plot sub-directory")
 argParser.add_argument("--model",              action="store",      default="ZH_Nakamura",                 help="plot sub-directory")
 argParser.add_argument("--prefix",             action="store",      default=None, type=str,  help="prefix")
-argParser.add_argument("--nTraining",          action="store",      default=30000,        type=int,  help="number of training events")
+argParser.add_argument("--nTraining",          action="store",      default=100000,        type=int,  help="number of training events")
 argParser.add_argument("--coefficients",       action="store",      default=['cHW'],       nargs="*", help="Which coefficients?")
-argParser.add_argument("--n_epoch",            action="store",      default=100,           nargs="*", type=int, help="Number of training epochs.")
-argParser.add_argument("--plot_epoch",         action="store",      default=None,          nargs="*", type=int, help="Certain epochs to plot? If first epoch is -1, plot only the epochs in the list.")
+argParser.add_argument("--n_epoch",            action="store",      default=10000,           nargs="*", type=int, help="Number of training epochs.")
+#argParser.add_argument("--snapshots",         action="store",      default=None,          nargs="*", type=int, help="Certain epochs to plot? If first epoch is -1, plot only the epochs in the list.")
 argParser.add_argument('--overwrite',          action='store',      default=None, choices = [None, "training", "data", "all"],  help="Overwrite output?")
-argParser.add_argument('--bias',               action='store',      default=None, nargs = "*",  help="Bias training? Example:  --bias 'pT' '10**(({}-200)/200) ")
+argParser.add_argument('--bias',               action='store',      default=None, nargs = "*",  help="Bias training? Example:  --bias 'pT' '10**(({}-200)/200)' ")
 argParser.add_argument('--debug',              action='store_true', help="Make debug plots?")
 argParser.add_argument('--feature_plots',      action='store_true', help="Feature plots?")
 
@@ -116,7 +116,7 @@ def drawObjects( offset=0 ):
     tex2.SetTextSize(0.04)
     tex2.SetTextAlign(11) # align right
 
-    line1 = ( 0.15+offset, 0.95, "Boosted Info Trees" )
+    line1 = ( 0.15+offset, 0.95, "choleskyNN" )
     return [ tex1.DrawLatex(*line1) ]#, tex2.DrawLatex(*line2) ]
 
 ###############
@@ -237,10 +237,13 @@ if args.coefficients is not None:
 from CholeskyNN import CholeskyNN
 
 filename = os.path.join(user.model_directory, cnn_name)+'.pkl'
-try:
-    print ("Loading %s for %s"%(cnn_name, filename))
-    cnn = CholeskyNN.load(filename)
-except IOError:
+if not args.overwrite in ["all", "training"]:
+    try:
+        print ("Loading %s for %s"%(cnn_name, filename))
+        cnn = CholeskyNN.load(filename)
+    except IOError:
+        cnn = None
+else:
     cnn = None
 
 # reweight training data according to bias
@@ -267,28 +270,28 @@ else:
         print ("Loaded test data from", test_data_filename)
 
 # Which iterations to plot
-plot_epoch = list(range(0,10)) + list(range(10,args.n_epoch,10)) + [args.n_epoch-1] 
-
-# Add plot epoch from command line, if provided
-if type(args.plot_epoch)==type([]):
-    if args.plot_epoch[0]<0:
-        plot_epoch+=args.plot_epoch[1:]
-    else:
-        plot_epoch = args.plot_epoch
-    plot_epoch.sort()
+plot_epoch = list(range(0,args.n_epoch,100)) + [args.n_epoch-1] 
+## Add plot epoch from command line, if provided
+#if type(args.plot_epoch)==type([]):
+#    if args.plot_epoch[0]<0:
+#        plot_epoch+=args.plot_epoch[1:]
+#    else:
+#        plot_epoch = args.plot_epoch
+#    plot_epoch.sort()
 
 if cnn is None or args.overwrite in ["all", "training"]:
     time1 = time.time()
     cnn = CholeskyNN( args.coefficients, len(training_features[0]))
 
-    cnn.train( base_points, training_weights, training_features, test_weights, test_features, monitor_epoch = None, snapshots = plot_epoch)
+    cnn.train( base_points, training_weights, training_features, test_weights, test_features, monitor_epoch = None, snapshots = plot_epoch,
+               learning_rate = 1e-3, n_epoch = args.n_epoch)
  
     cnn.save(filename)
     print ("Written %s"%( filename ))
 
     time2 = time.time()
-    boosting_time = time2 - time1
-    print ("Boosting time: %.2f seconds" % boosting_time)
+    training_time = time2 - time1
+    print ("Training time: %.2f seconds" % training_time)
 
 # we don't want to update any weights beyond here
 torch.autograd.set_grad_enabled( False )
@@ -348,25 +351,26 @@ if args.debug:
     tex.SetNDC()
     tex.SetTextSize(0.06)
 
-    # Which iterations to plot
-    plot_iterations = range(1,10)+range(10,bit.n_trees+1,10)
-    # Add plot iterations from command line, if provided
-    if type(args.plot_iterations)==type([]):
-        if args.plot_iterations[0]<0:
-            plot_iterations+=args.plot_iterations[1:]
-        else:
-            plot_iterations = args.plot_iterations
-        plot_iterations.sort()
+    # n_hat -> [ [d_lin_1, ..., d_quad_N] ] according to the "combinations" 
+    def dict_to_derivatives( dict_ ):
+        lin  = 2*np.array([dict_[c] for c in cnn.lin_combinations])
+        quad = 2*np.array([dict_[(c[0],)]*dict_[(c[1],)] + np.sum( [dict_[tuple(sorted((c2, c[0])))]*dict_[tuple(sorted((c2, c[1])))] for c2 in cnn.coefficients if (cnn.coefficients.index(c2)>=cnn.coefficients.index(c[0]) and cnn.coefficients.index(c2)>=cnn.coefficients.index(c[1])) ],axis=0)  for c in cnn.quad_combinations ])
+       
+        return np.concatenate( (lin, quad), axis=0).transpose() 
 
-    for max_n_tree in plot_iterations:
-        if max_n_tree==0: max_n_tree=1
+    for epoch in plot_epoch:
         stuff = []
-        test_predictions = bit.vectorized_predict(test_features, max_n_tree = max_n_tree)
+
+        cnn.load_snapshot( cnn.snapshots[epoch] )
+        test_predictions = cnn.predict(test_features)
+        test_predictions = cnn.dict_to_derivatives( test_predictions ) 
+
+        #test_predictions = np.array( [test_predictions[k].numpy() for k in cnn.combinations ] ).transpose() 
 
         # colors
         color = {}
         i_lin, i_diag, i_mixed = 0,0,0
-        for i_der, der in enumerate(bit.derivatives):
+        for i_der, der in enumerate(cnn.combinations):
             if len(der)==1:
                 color[der] = ROOT.kAzure + i_lin
                 i_lin+=1
@@ -391,14 +395,14 @@ if args.debug:
 
             h_w0[feature]           = np.array([  w0[m].sum() for m in mask])
             h_derivative_prediction = np.array([ (w0.reshape(-1,1)*test_predictions)[m].sum(axis=0) for m in mask])
-            h_derivative_truth      = np.array([ (np.transpose(np.array([test_weights[der] for der in bit.derivatives])))[m].sum(axis=0) for m in mask])
+            h_derivative_truth      = np.array([ (np.transpose(np.array([test_weights[der] for der in cnn.combinations])))[m].sum(axis=0) for m in mask])
 
             h_ratio_prediction[feature] = h_derivative_prediction/h_w0[feature].reshape(-1,1) 
             h_ratio_truth[feature]      = h_derivative_truth/h_w0[feature].reshape(-1,1)
 
         n_pads = len(model.feature_names)+1
         n_col  = min(4, n_pads)
-        n_rows = n_pads/n_col
+        n_rows = n_pads//n_col
         if n_rows*n_col<n_pads: n_rows+=1
 
         for logY in [False, True]:
@@ -417,8 +421,8 @@ if args.debug:
                 th1d_yield       = helpers.make_TH1F( (h_w0[feature], lin_binning[feature]) )
                 c1.cd(i_feature+1)
                 ROOT.gStyle.SetOptStat(0)
-                th1d_ratio_pred  = { der: helpers.make_TH1F( (h_ratio_prediction[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
-                th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
+                th1d_ratio_pred  = { der: helpers.make_TH1F( (h_ratio_prediction[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( cnn.combinations ) }
+                th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( cnn.combinations ) }
                 stuff.append(th1d_yield)
                 stuff.append(th1d_ratio_truth)
                 stuff.append(th1d_ratio_pred)
@@ -431,7 +435,7 @@ if args.debug:
 
                 th1d_yield.Draw("hist")
 
-                for i_der, der in enumerate(bit.derivatives):
+                for i_der, der in enumerate(cnn.combinations):
                     th1d_ratio_truth[der].SetTitle("")
                     th1d_ratio_truth[der].SetLineColor(color[der])
                     th1d_ratio_truth[der].SetMarkerColor(color[der])
@@ -463,25 +467,24 @@ if args.debug:
                 ROOT.gPad.SetLogy(logY)
                 th1d_yield   .GetYaxis().SetRangeUser(0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_), 10**(1.5)*max_ if logY else 1.5*max_)
                 th1d_yield   .Draw("hist")
-                for h in th1d_ratio_truth.values()+th1d_ratio_pred.values():
+                for h in list(th1d_ratio_truth.values()) + list(th1d_ratio_pred.values()):
                     h .Draw("hsame")
 
             c1.cd(len(model.feature_names)+1)
             l.Draw()
 
-            lines = [ (0.29, 0.9, 'N_{B} =%5i'%( max_n_tree )) ]
+            lines = [ (0.29, 0.9, 'Epoch =%5i'%( epoch )) ]
             drawObjects = [ tex.DrawLatex(*line) for line in lines ]
             for o in drawObjects:
                 o.Draw()
 
-            plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logY else "lin" )
+            plot_directory_ = os.path.join( plot_directory, "training_plots", cnn_name, "log" if logY else "lin" )
             if not os.path.isdir(plot_directory_):
                 try:
                     os.makedirs( plot_directory_ )
                 except IOError:
                     pass
-            from RootTools.plot.helpers import copyIndexPHP
-            copyIndexPHP( plot_directory_ )
-            c1.Print( os.path.join( plot_directory_, "epoch_%05i.png"%(max_n_tree) ) )
+            helpers.copyIndexPHP( plot_directory_ )
+            c1.Print( os.path.join( plot_directory_, "epoch_%05i.png"%(epoch) ) )
             syncer.makeRemoteGif(plot_directory_, pattern="epoch_*.png", name="epoch" )
         syncer.sync()

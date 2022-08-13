@@ -70,6 +70,7 @@ T3q = {1:-.5,    2:.5, 3: -.5, 4:.5, 5:-.5}
 
 # EFT settings, parameters, defaults
 wilson_coefficients    = ['cHW', 'cHWtil', 'cHQ3']
+tex                    = {"cHW":"C_{HW}", "cHWtil":"C_{H#tilde{W}}", "cHQ3":"C_{HQ^{(3)}}"}
 
 default_eft_parameters = { 'Lambda':1000. }
 default_eft_parameters.update( {var:0. for var in wilson_coefficients} )

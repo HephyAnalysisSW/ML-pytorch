@@ -12,10 +12,7 @@ from tools import helpers
 device        = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 default_cfg = {
-    "n_epoch"       : 100,
-    "learning_rate" : 1e-3,
     "hidden_layers" : [32, 32, 32, 32],
-    "plot_every"    : 100,
 }
 
 class CholeskyNN:
@@ -75,18 +72,24 @@ class CholeskyNN:
 
     def predict( self, features ):
         if type(features) == np.ndarray:
-            return {combination:self.n_hat[combination](torch.from_numpy(features).float().to(device)).squeeze() for combination in self.combinations} 
+            return {combination:self.n_hat[combination](torch.from_numpy(features).float().to(device)).squeeze().numpy() for combination in self.combinations} 
         else:
             return {combination:self.n_hat[combination](features).squeeze() for combination in self.combinations} 
 
-    # main training method
-    def train( self, base_points, weights, features, test_weights = None, test_features = None, monitor_epoch = None, snapshots = None):
+    # n_hat -> [ [d_lin_1, ..., d_quad_N] ] according to the "combinations" 
+    def dict_to_derivatives( self, dict_ ):
+        lin  = 2*np.array([dict_[c] for c in self.lin_combinations])
+        quad = 2*np.array([dict_[(c[0],)]*dict_[(c[1],)] + np.sum( [dict_[tuple(sorted((c2, c[0])))]*dict_[tuple(sorted((c2, c[1])))] for c2 in self.coefficients if (self.coefficients.index(c2)>=self.coefficients.index(c[0]) and self.coefficients.index(c2)>=self.coefficients.index(c[1])) ],axis=0)  for c in self.quad_combinations ])
 
+        return np.concatenate( (lin, quad), axis=0).transpose()
+
+    # main training method
+    def train( self, base_points, weights, features, test_weights = None, test_features = None, monitor_epoch = None, snapshots = None, n_epoch = 100, learning_rate = 1e-3):
         torch_features = torch.from_numpy(features).float().to(device)
 
         self.monitoring = []
 
-        optimizer               = torch.optim.Adam(sum([list(nn.parameters()) for nn in self.n_hat.values()],[]), lr=self.learning_rate)
+        optimizer               = torch.optim.Adam(sum([list(nn.parameters()) for nn in self.n_hat.values()],[]), lr=learning_rate)
         base_point_weight_ratios= list( map( lambda base_point: self.make_weight_ratio( weights, **base_point ), base_points ) )
         training_time           = 0 
         self.snapshots          = {} 
@@ -95,7 +98,7 @@ class CholeskyNN:
             torch_test_features = torch.from_numpy(test_features).float().to(device)
             base_point_test_weight_ratios= list( map( lambda base_point: self.make_weight_ratio( test_weights, **base_point ), base_points ) )
 
-        for epoch in range(self.n_epoch):
+        for epoch in range(n_epoch):
 
             monitoring  = {'epoch':epoch}
             start_time  = time.process_time()
@@ -116,7 +119,7 @@ class CholeskyNN:
             monitoring['training_loss'] = loss.item()
             monitoring['training_time'] = training_time 
             self.monitoring.append( monitoring ) 
-            print ( "Epoch %i time %3.2f"%( epoch, time.process_time()-start_time))
+            print ( "Epoch %i time %3.2f Loss %7.5f"%( epoch, time.process_time()-start_time, loss))
 
             if snapshots is not None and epoch in snapshots:
                 #self.snapshots[epoch] = copy.deepcopy( self ) #{ key:net.state_dict() for key, net in self.n_hat.items() }
