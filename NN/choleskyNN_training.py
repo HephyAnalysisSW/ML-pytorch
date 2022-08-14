@@ -220,9 +220,12 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
     print ("Done with plots")
     syncer.sync()
 
+base_point_grids = [ 0.01, .5, 1 ]
 base_points = []
-for comb in list(itertools.combinations_with_replacement(args.coefficients,1))+list(itertools.combinations_with_replacement(args.coefficients,2)):
-    base_points.append( {c:comb.count(c) for c in args.coefficients} )
+for grid_spacing in base_point_grids:
+    for comb in list(itertools.combinations_with_replacement(args.coefficients,1))+list(itertools.combinations_with_replacement(args.coefficients,2)):
+        base_points.append( {c:grid_spacing*comb.count(c) for c in args.coefficients} )
+
 if args.prefix == None:
     cnn_name = "choleskyNN_%s_%s_nTraining_%i"%(args.model, "_".join(args.coefficients), args.nTraining)
 else:
@@ -250,7 +253,7 @@ else:
 if args.bias is not None:
     if len(args.bias)!=2: raise RuntimeError ("Bias is defined by <var> <function>, i.e. 'x' '10**(({}-200)/200). Got instead %r"%args.bias)
     function     = eval( 'lambda x:'+args.bias[1].replace('{}','x') ) 
-    bias_weights = np.array(map( function, training_features[:, model.feature_names.index(args.bias[0])] ))
+    bias_weights = np.array(list(map( function, training_features[:, model.feature_names.index(args.bias[0])] )))
     bias_weights /= np.mean(bias_weights)
     training_weights = {k:v*bias_weights for k,v in training_weights.items()} 
 
@@ -297,7 +300,7 @@ if cnn is None or args.overwrite in ["all", "training"]:
 torch.autograd.set_grad_enabled( False )
 
 if args.bias is not None:
-    bias_weights = np.array(map( function, test_features[:, model.feature_names.index(args.bias[0])] ))
+    bias_weights = np.array(list(map( function, test_features[:, model.feature_names.index(args.bias[0])] )))
     bias_weights /= np.mean(bias_weights)
     test_weights = {k:v*bias_weights for k,v in test_weights.items()} 
 
