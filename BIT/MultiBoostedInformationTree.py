@@ -51,22 +51,24 @@ class MultiBoostedInformationTree:
 
     @classmethod
     def load(cls, filename):
-        old_instance = pickle.load(file( filename ))
-        new_instance = cls( None, None, 
-                n_trees = old_instance.n_trees, 
-                learning_rate = old_instance.learning_rate, 
-                )
-        new_instance.trees = old_instance.trees
+        with open(filename,'rb') as file_:
+            old_instance = pickle.load(file_)
+            new_instance = cls( None, None, 
+                    n_trees = old_instance.n_trees, 
+                    learning_rate = old_instance.learning_rate, 
+                    )
+            new_instance.trees = old_instance.trees
 
-        # new_instance.derivatives = old_instance.trees[0].derivatives[1:]# can remove next time I overwrite
+            # new_instance.derivatives = old_instance.trees[0].derivatives[1:]# can remove next time I overwrite
 
-        return new_instance  
+            return new_instance  
 
     def __setstate__(self, state):
         self.__dict__ = state
 
     def save(self, filename):
-        pickle.dump( self, file( filename, 'w' ) )
+        with open(filename,'wb') as file_:
+            pickle.dump( self, file_ )
 
     def boost( self ):
 
@@ -79,8 +81,9 @@ class MultiBoostedInformationTree:
 
         weak_learner_time = 0.0
         update_time = 0.0
-
         for n_tree in range(self.n_trees):
+
+            training_time = 0
 
             # fit to data
             time1 = time.process_time()
@@ -95,6 +98,7 @@ class MultiBoostedInformationTree:
 
             time2 = time.process_time()
             weak_learner_time += time2 - time1
+            training_time      = time2 - time1
 
             self.trees.append( root )
 
@@ -108,9 +112,10 @@ class MultiBoostedInformationTree:
                 self.training_weights[der] += -self.learning_rate*delta_weight[:,i_der]
 
             time2 = time.process_time()
-            update_time += time2 - time1
+            update_time   += time2 - time1
+            training_time += time2 - time1
 
-            self.trees[-1].time_stamp = weak_learner_time+update_time
+            self.trees[-1].training_time = training_time 
 
             # update the bar
             if self.n_trees>=toolbar_width:

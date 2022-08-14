@@ -339,3 +339,8 @@ eft_plot_points = [
     {'color':ROOT.kMagenta+2,   'eft':make_eft(cHWtil = 0.3),   'tex':"c_{H#tilde{W}} = 0.3"},
     {'color':ROOT.kMagenta-4,   'eft':make_eft(cHWtil = -0.3),  'tex':"c_{H#tilde{W}} = -0.3"},
 ]
+
+multi_bit_cfg = {'n_trees': 100,
+                 'max_depth': 4,
+                 'learning_rate': 0.20,
+                 'min_size': 15 }
