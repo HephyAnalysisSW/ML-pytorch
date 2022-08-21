@@ -5,7 +5,9 @@ import operator
 from math import sqrt
 import itertools
 import sys
-sys.path.append('..')
+sys.path.insert(0,'..')
+sys.path.insert(0,'.')
+
 import functools
 
 default_cfg = {
@@ -17,6 +19,7 @@ default_cfg = {
     "feature_names":    None,
     "positive":         False,
     "min_node_size_neg_adjust": False,
+    "loss" : "MSE", # or "CrossEntropy" 
 }
 
 class MultiNode:
@@ -33,6 +36,9 @@ class MultiNode:
         # data set
         self.features           = features
         self.size               = len(self.features)
+
+        if self.cfg['loss'] not in ["MSE", "CrossEntropy"]:
+            raise RuntimeError( "Unknown loss. Should be 'MSE' or 'CrossEntropy'." ) 
 
         # Master node: Split format
         if type(training_weights)==dict:
@@ -146,8 +152,18 @@ class MultiNode:
             plateau_and_split_range_mask &= (sorted_weight_sums[:,0]>0)
             plateau_and_split_range_mask &= (sorted_weight_sums_right[:,0]>0)
 
-            neg_loss_gains = np.sum(np.dot( sorted_weight_sums, self.base_point_const.transpose())**2,axis=1)/sorted_weight_sums[:,0]
-            neg_loss_gains+= np.sum(np.dot( sorted_weight_sums_right, self.base_point_const.transpose())**2,axis=1)/sorted_weight_sums_right[:,0]
+            if self.cfg['loss'] == 'MSE':
+                neg_loss_gains = np.sum(np.dot( sorted_weight_sums, self.base_point_const.transpose())**2,axis=1)/sorted_weight_sums[:,0]
+                neg_loss_gains+= np.sum(np.dot( sorted_weight_sums_right, self.base_point_const.transpose())**2,axis=1)/sorted_weight_sums_right[:,0]
+            elif self.cfg['loss'] == 'CrossEntropy':
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    r       = np.dot( sorted_weight_sums, self.base_point_const.transpose())/sorted_weight_sums[:,0].reshape(-1,1)
+                    r_right = np.dot( sorted_weight_sums_right, self.base_point_const.transpose())/sorted_weight_sums_right[:,0].reshape(-1,1)
+                    #neg_loss_gains  = sorted_weight_sums[:,0]*np.sum( ( r*0.5*np.log(r**2) + (1.-r)*0.5*np.log((1.-r)**2) ), axis=1)
+                    #neg_loss_gains += sorted_weight_sums_right[:,0]*np.sum( ( r_right*0.5*np.log(r_right**2) + (1.-r_right)*0.5*np.log((1.-r_right)**2) ), axis=1)
+                    neg_loss_gains  = sorted_weight_sums[:,0]*      np.sum( ( 0.5*np.log((1./(1.+r))**2) + r*0.5*np.log((r/(1.+r))**2) ), axis=1)
+                    neg_loss_gains += sorted_weight_sums_right[:,0]*np.sum( ( 0.5*np.log((1./(1.+r_right))**2) + r_right*0.5*np.log((r_right/(1.+r_right))**2) ), axis=1)
+                    neg_loss_gains -= min(neg_loss_gains)# make loss positive
 
             with np.errstate(divide='ignore', invalid='ignore'):
                 if self.cfg['min_node_size_neg_adjust']:
@@ -349,7 +365,7 @@ if __name__=='__main__':
     import models.analytic as model
     #model = models.analytic
     coefficients = sorted(['theta1'])
-    nTraining    = 50000
+    nTraining    = 10000 
 
     features          = model.getEvents(nTraining)
     training_weights  = model.getWeights(features, eft=model.default_eft_parameters)
@@ -376,4 +392,6 @@ if __name__=='__main__':
                       max_n_split = max_n_split, 
                       base_points = base_points,
                       feature_names = model.feature_names,
+                      loss = "CrossEntropy",
+                      max_depth=2,
                     )

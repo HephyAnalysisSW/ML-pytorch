@@ -11,7 +11,8 @@ def make_TH1F( h, ignore_binning = False):
     else:
         histo = ROOT.TH1F("h","h",len(thrs)-1,array.array('d', thrs))
     for i_v, v in enumerate(vals):
-        histo.SetBinContent(i_v+1, v)
+        if v<float('inf'): # NAN protection
+            histo.SetBinContent(i_v+1, v)
     return histo
 
 # https://stackoverflow.com/questions/21844024/weighted-percentile-using-numpy
@@ -56,4 +57,4 @@ def copyIndexPHP( directory ):
     '''
     index_php = os.path.join( directory, 'index.php' )
     if not os.path.exists( directory ): os.makedirs( directory )
-    shutil.copyfile( os.path.expandvars( '..//php/index.php' ), index_php )
+    shutil.copyfile( os.path.join(os.path.dirname(__file__), 'scripts/php/index.php'), index_php )

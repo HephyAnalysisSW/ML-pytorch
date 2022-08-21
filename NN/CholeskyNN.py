@@ -76,6 +76,9 @@ class CholeskyNN:
         else:
             return {combination:self.n_hat[combination](features).squeeze() for combination in self.combinations} 
 
+    def vectorized_predict( self, features):
+        return self.predict( features )
+
     # n_hat -> [ [d_lin_1, ..., d_quad_N] ] according to the "combinations" 
     def dict_to_derivatives( self, dict_ ):
         lin  = 2*np.array([dict_[c] for c in self.lin_combinations])
@@ -146,6 +149,7 @@ class CholeskyNN:
     def load_snapshot( self, snapshot ):
         for key, dict_ in snapshot.items():
             self.n_hat[key].load_state_dict( dict_ )
+        return self
 
     def save(self, filename):
         _path = os.path.dirname(filename)

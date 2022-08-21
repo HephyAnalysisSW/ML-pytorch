@@ -2,7 +2,8 @@
 # Standard imports
 import cProfile
 import sys
-sys.path.insert( 0, '..')
+#sys.path.insert( 0, '..')
+#sys.path.insert( 0, '.')
 import time
 import pickle
 import copy
@@ -16,6 +17,7 @@ import MultiNode
 default_cfg = {
     "n_trees" : 100,
     "learning_rate" : 0.2, 
+    "loss" : "MSE", # or "CrossEntropy" 
 #    "bagging_fraction": 1.,
 }
 
@@ -35,6 +37,7 @@ class MultiBoostedInformationTree:
                 self.cfg[key]      = val
             else:
                 raise RuntimeError( "Got unexpected keyword arg: %s:%r" %( key, val ) )
+        self.node_cfg['loss'] = self.cfg['loss'] 
 
         for (key, val) in self.cfg.items():
                 setattr( self, key, val )
@@ -59,7 +62,7 @@ class MultiBoostedInformationTree:
                     )
             new_instance.trees = old_instance.trees
 
-            # new_instance.derivatives = old_instance.trees[0].derivatives[1:]# can remove next time I overwrite
+            new_instance.derivatives = old_instance.trees[0].derivatives[1:]
 
             return new_instance  
 

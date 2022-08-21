@@ -14,7 +14,6 @@ import itertools
 import array
 import torch
 
-# RootTools
 dir_path = os.path.dirname(os.path.realpath(__file__))
 ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../tools/scripts/tdrstyle.C"))
 ROOT.setTDRStyle()

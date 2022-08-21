@@ -166,7 +166,11 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
             binning = model.plot_options[feature]['binning']
 
             h[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight) )
-            h[name][feature].style      = styles.lineStyle( eft_plot_point['color'], width=2, dashed=False )
+            h[name][feature].SetLineWidth(2)
+            h[name][feature].SetLineColor( eft_plot_point['color'] )
+            h[name][feature].SetMarkerStyle(0)
+            h[name][feature].SetMarkerColor(eft_plot_point['color'])
+
             h[name][feature].legendText = tex_name
 
     for i_feature, feature in enumerate(feature_names):
@@ -177,24 +181,36 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
                 for eft_plot_point in model.eft_plot_points:
                     _h[eft_plot_point['eft']['name']][feature].Scale(1./norm) 
 
-        histos = [[h[eft_plot_point['eft']['name']][feature]] for eft_plot_point in reversed(model.eft_plot_points)]
-        plot   = Plot.fromHisto( feature+'_nom',  histos, texX=model.plot_options[feature]['tex'], texY="1/#sigma_{SM}d#sigma/d%s"%model.plot_options[feature]['tex'] )
+        histos = [h[eft_plot_point['eft']['name']][feature] for eft_plot_point in reversed(model.eft_plot_points)]
 
-        for log in [True, False]:
+        max_ = max( map( lambda h:h.GetMaximum(), histos ))
 
-            # Add subdirectory for lin/log plots
-            plot_directory_ = os.path.join( plot_directory, "feature_plots", "nTraining_%i"%args.nTraining, "log" if log else "lin" )
-            for p in [plot] :#, plot_lin, plot_rw_lin]:
-                plotting.draw( p,
-                               plot_directory = plot_directory_,
-                               logX = False, logY = log, sorting = False,
-                               yRange = "auto" if not log else (0.002,"auto"),
-                               ratio = None,
-        #                       drawObjects = drawObjects( lumi, offset=titleOffset ),
-                                legend=[(0.2,0.68,0.9,0.91),2],
-                               #histModifications = histModifications,
-                               copyIndexPHP = True,
-                               )
+        for logY in [True, False]:
+
+
+            c1 = ROOT.TCanvas("c1");
+            l = ROOT.TLegend(0.2,0.68,0.9,0.91)
+            l.SetNColumns(2)
+            l.SetFillStyle(0)
+            l.SetShadowColor(ROOT.kWhite)
+            l.SetBorderSize(0)
+            for i_histo, histo in enumerate(histos):
+                histo.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                histo.GetYaxis().SetTitle("1/#sigma_{SM}d#sigma/d%s"%model.plot_options[feature]['tex'])
+                if i_histo == 0:
+                    histo.Draw('hist')
+                    histo.GetYaxis().SetRangeUser( (0.001 if logY else 0), (10*max_ if logY else 1.3*max_))
+                    histo.Draw('hist')
+                else:
+                    histo.Draw('histsame')
+                l.AddEntry(histo, histo.legendText)
+                c1.SetLogy(logY)
+            l.Draw()
+
+            plot_directory_ = os.path.join( plot_directory, "feature_plots", "nTraining_%i"%args.nTraining, "log" if logY else "lin" )
+            helpers.copyIndexPHP( plot_directory_ )
+            c1.Print( os.path.join( plot_directory_, feature+'.png' ))
+
 print ("Done with plots")
 syncer.sync()
 
@@ -313,7 +329,7 @@ if args.debug:
     tex.SetTextSize(0.06)
 
     # Which iterations to plot
-    plot_iterations = range(1,10)+range(10,bit.n_trees+1,10)
+    plot_iterations = list(range(1,10))+list(range(10,bit.n_trees+1,10))
     # Add plot iterations from command line, if provided
     if type(args.plot_iterations)==type([]):
         if args.plot_iterations[0]<0:
@@ -362,7 +378,7 @@ if args.debug:
 
         n_pads = len(model.feature_names)+1
         n_col  = min(4, n_pads)
-        n_rows = n_pads/n_col
+        n_rows = n_pads//n_col
         if n_rows*n_col<n_pads: n_rows+=1
 
         for logY in [False, True]:
@@ -383,6 +399,7 @@ if args.debug:
                 ROOT.gStyle.SetOptStat(0)
                 th1d_ratio_pred  = { der: helpers.make_TH1F( (h_ratio_prediction[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
                 th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
+
                 stuff.append(th1d_yield)
                 stuff.append(th1d_ratio_truth)
                 stuff.append(th1d_ratio_pred)
@@ -427,7 +444,7 @@ if args.debug:
                 ROOT.gPad.SetLogy(logY)
                 th1d_yield   .GetYaxis().SetRangeUser(0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_), 10**(1.5)*max_ if logY else 1.5*max_)
                 th1d_yield   .Draw("hist")
-                for h in th1d_ratio_truth.values()+th1d_ratio_pred.values():
+                for h in list(th1d_ratio_truth.values())+list(th1d_ratio_pred.values()):
                     h .Draw("hsame")
 
             c1.cd(len(model.feature_names)+1)
@@ -444,8 +461,7 @@ if args.debug:
                     os.makedirs( plot_directory_ )
                 except IOError:
                     pass
-            from RootTools.plot.helpers import copyIndexPHP
-            copyIndexPHP( plot_directory_ )
+            helpers.copyIndexPHP( plot_directory_ )
             c1.Print( os.path.join( plot_directory_, "epoch_%05i.png"%(max_n_tree) ) )
             syncer.makeRemoteGif(plot_directory_, pattern="epoch_*.png", name="epoch" )
         syncer.sync()
