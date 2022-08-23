@@ -5,3 +5,5 @@ if os.environ['USER'] in ['robert.schoefbeck']:
     data_directory         = "/groups/hephy/cms/robert.schoefbeck/NN/data/"
 elif os.environ['USER'] in ['robert.schoefbeckcern.ch']:
     plot_directory = './plots/'
+    model_directory= "/Users/robert.schoefbeckcern.ch/ML-pytorch/models"
+    data_directory = "/Users/robert.schoefbeckcern.ch/ML-pytorch/data"
