@@ -1,7 +1,25 @@
-
 import   numpy as np
 import   ROOT
 import   array
+
+
+def clip_quantile( features, quantile, weights = None ):
+
+    selected  = np.array(list(range(len(features)))).reshape(-1)
+    selection = np.ones_like( selected ).astype('bool')
+
+    for i_feature in range(len(features[0])):
+        selection&= 1==np.digitize( features[:, i_feature], np.quantile( features[:, i_feature], ( quantile, 1.-quantile )) )
+
+    #len_before = len(selected)
+    selected = selected[selection]
+    #print( "Autoclean efficiency of %3.2f: %3.2f"%(args.auto_clean, np.count_nonzero( selection )/len_before) )
+    return_features = features[selected]
+    if weights is not None:
+        return_weights = {k:weights[k][selected] for k in weights.keys()}
+        return return_features, return_weights
+    else:
+        return return_features
 
 def make_TH1F( h, ignore_binning = False):
     # remove infs from thresholds

@@ -203,10 +203,10 @@ class MultiBoostedInformationTree:
 
 if __name__=='__main__':
 
-    #import models.ZH_Nakamura as model
+    #import toy_models.ZH_Nakamura as model
     #coefficients = sorted(['cHW', 'cHWtil'])
 
-    import models.analytic as model
+    import toy_models.analytic as model
     coefficients = sorted(['theta1'])
 
     base_points = []

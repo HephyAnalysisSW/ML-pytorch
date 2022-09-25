@@ -63,8 +63,8 @@ for key, val in extra_args.items():
 #        model.multi_bit_cfg[derivative].update( extra_args )
 
 
-import models.analytic as model
-#model = models.analytic
+import toy_models.analytic as model
+#model = toy_models.analytic
 coefficients = sorted(['theta1'])
 
 feature_names = model.feature_names

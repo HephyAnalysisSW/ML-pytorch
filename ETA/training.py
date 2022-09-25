@@ -1,5 +1,3 @@
-
-
 N_events = 5000
 N_channels = 11
 

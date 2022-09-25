@@ -101,8 +101,7 @@ class DataGenerator(Sequence):
         else:
             filestart, filestop = 0, len(self.input_files)
 
-        
-        array = uproot.lazy([f+':'+self.tree_name for f in self.input_files], self.branches)
+        array = uproot.concatenate([f+':'+self.tree_name for f in self.input_files], self.branches)
         # apply selection, if any
         len_before = len(array)
         if self.selection is not None: 
@@ -133,6 +132,13 @@ class DataGenerator(Sequence):
             return self.load( index )
 
     def scalar_branches( self, branches ):
+    
+        #d=[]
+        #for b in branches: 
+        #    print (b)
+        #    d.append( self.data[b].to_list() )       
+
+        #return np.array( d ).transpose()
         return np.array( [ self.data[b].to_list() for b in branches ] ).transpose()
 
     def vector_branch( self, branches, padding_target=50, padding_value=0.):

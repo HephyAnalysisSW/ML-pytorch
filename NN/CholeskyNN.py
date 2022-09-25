@@ -24,12 +24,12 @@ class CholeskyNN:
         self.cfg = default_cfg
         for (key, val) in kwargs.items():
             if key in default_cfg.keys():
-                self.cfg[key]      = val
+                self.cfg[key] = val
             else:
                 raise RuntimeError( "Got unexpected keyword arg: %s:%r" %( key, val ) )
 
         for (key, val) in self.cfg.items():
-                setattr( self, key, val )
+            setattr( self, key, val )
 
         # Coefficients
         self.coefficients  = tuple(sorted(coefficients))
@@ -88,6 +88,10 @@ class CholeskyNN:
 
     # main training method
     def train( self, base_points, weights, features, test_weights = None, test_features = None, monitor_epoch = None, snapshots = None, n_epoch = 100, learning_rate = 1e-3):
+
+        for net in list(self.n_hat.values()):
+            net.train(True)
+
         torch_features = torch.from_numpy(features).float().to(device)
 
         self.monitoring = []
@@ -98,8 +102,9 @@ class CholeskyNN:
         self.snapshots          = {} 
 
         if test_features is not None:
-            torch_test_features = torch.from_numpy(test_features).float().to(device)
-            base_point_test_weight_ratios= list( map( lambda base_point: self.make_weight_ratio( test_weights, **base_point ), base_points ) )
+            with torch.no_grad():
+                torch_test_features = torch.from_numpy(test_features).float().to(device)
+                base_point_test_weight_ratios= list( map( lambda base_point: self.make_weight_ratio( test_weights, **base_point ), base_points ) )
 
         for epoch in range(n_epoch):
 
@@ -112,6 +117,7 @@ class CholeskyNN:
             for i_base_point, base_point in enumerate(base_points):
                 fhat  = 1./(1. + self.r_hat(predictions, base_point) )
                 loss += ( torch.tensor(weights[()])*( -0.25 + base_point_weight_ratios[i_base_point]*fhat**2 + (1-fhat)**2 ) ).sum()
+                #loss += - ( torch.tensor(weights[()])*( base_point_weight_ratios[i_base_point]*torch.log(1-fhat) + torch.log(fhat) ) ).sum()
 
             optimizer.zero_grad()
             loss.backward()
@@ -139,16 +145,24 @@ class CholeskyNN:
                             test_loss += ( torch.tensor(test_weights[()])*( -0.25 + base_point_test_weight_ratios[i_base_point]*test_fhat**2 + (1-test_fhat)**2 ) ).sum()
                     monitoring['test_loss'] = test_loss.item() 
 
+        for net in list(self.n_hat.values()):
+            net.train(False)
+
     # Wrappers just to have the same interface as BIT
     @classmethod
     def load(cls, filename):
         with open(filename, 'rb') as _file:
-            return torch.load(_file)
+            self_ = torch.load(_file)
+            for net in list(self_.n_hat.values()):
+                net.train(False)
+            return self_ 
 
     # sett the NN cfg to the snapshot
     def load_snapshot( self, snapshot ):
         for key, dict_ in snapshot.items():
             self.n_hat[key].load_state_dict( dict_ )
+        for net in list(self.n_hat.values()):
+            net.train(False)
         return self
 
     def save(self, filename):
