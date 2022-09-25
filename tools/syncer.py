@@ -131,8 +131,9 @@ def sync(gifs=False):
     if write_sync_files_txt(filename)==0: return 
 
     cmd = "rsync -avR  `cat %s` ${CERN_USER}@lxplus.cern.ch:/eos/user/$(echo ${CERN_USER} | head -c 1)/${CERN_USER}/www/" % filename
+    print (cmd)
     output,error = subprocess.Popen(cmd, shell=True, executable="/bin/bash", stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-    os.remove(filename)
+    #os.remove(filename)
     file_sync_storage = []
     if gifs:
         gif_cmds = make_gifs(gif_cmds) 

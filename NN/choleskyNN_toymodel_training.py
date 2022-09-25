@@ -74,7 +74,7 @@ for key, val in extra_args.items():
         extra_args[key]=val[0]
 
 import imp
-f, path, desc = imp.find_module(args.model, ["../models/"])
+f, path, desc = imp.find_module(args.model, ["../toy_models/"])
 model = imp.load_module(args.model, f, path, desc)
 
 # directory for plots

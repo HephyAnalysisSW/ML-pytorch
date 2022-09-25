@@ -19,3 +19,7 @@ dependencies:
   - h5py
   - jupyter
 #  - root_numpy
+
+
+# liblinear
+#  pip install -U liblinear-official
