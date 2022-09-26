@@ -36,7 +36,6 @@ sm         = make_eft()
 
 feature_names =  ['x']
 
-# qq -> ZH
 def getEvents(N_events_requested):
 
     #x = 0.5*np.ones(N_events_requested) 
@@ -44,7 +43,7 @@ def getEvents(N_events_requested):
 
     return np.transpose(np.array( [x] ))
 
-def getWeights(features, eft):
+def getWeights(features, eft=default_eft_parameters):
 
     #dsigma/dx = 1 + (1-theta1)**2 = 1 + 1 - 2*theta1 + theta1**2 = 2-2*theta1+theta1**2
 
@@ -52,9 +51,9 @@ def getWeights(features, eft):
                ('theta1',): -2*np.ones(len(features)), 
                ('theta1','theta1'): 2*np.ones(len(features)),
     }
-    for key in list(weights.keys()):
-        if key==(): continue
-        weights[key][features[:,0]<0.5]=0.
+    #for key in list(weights.keys()):
+    #    if key==(): continue
+    #    weights[key][features[:,0]<0.5]=0.
 
     return weights
 
