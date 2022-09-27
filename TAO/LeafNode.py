@@ -4,11 +4,14 @@ import numpy as np
 
 default_cfg = {
     "alpha" : 0.000001,
+    "min_size" : 50,
 }
+
+from DecisionNode import DecisionNode
 
 class LeafNode:
 
-    def __init__( self, features, weights, base_points, **kwargs):
+    def __init__( self, features, weights, base_points, _indices = None, **kwargs):
 
         self.cfg = default_cfg
         self.cfg.update( kwargs )
@@ -25,18 +28,53 @@ class LeafNode:
         self.weights     = weights
         self.base_points = base_points if type(base_points) == BasePoints else BasePoints(coefficients, base_points)
 
-        self.lasso    = linear_model.Lasso(alpha=self.cfg['alpha'], fit_intercept=True)
+        # Just one fit class -> give it to the class
+        if not hasattr( self.__class__, "lasso" ):
+            self.__class__.lasso = linear_model.Lasso(alpha=self.cfg['alpha'], fit_intercept=True)
+
+        # the root node has no indices at init time
+        self._indices = _indices
+
+    # randomized split
+    def split_even( self, i_feature = None):
+        if i_feature is None:
+            i_feature = np.random.randint(len(self.features[0]))
+
+        if self._indices is None:
+            self._indices = np.array(range(len(self.features)))
+
+        # only split when we have 2x min_node_size
+        if len(self._indices)>2*self.cfg['min_size']:
+
+            parent = DecisionNode( self._indices )
+
+            # get threshold
+            threshold = np.quantile( self.features[:, i_feature], .5) 
+            mask      = self.features[:, i_feature] > threshold
+
+            parent.right = LeafNode( features = self.features[mask],  weights = {k:w[mask]  for k, w in self.weights.items()},  base_points=self.base_points, _indices = self._indices[mask],  **self.cfg) 
+            parent.left  = LeafNode( features = self.features[~mask], weights = {k:w[~mask] for k, w in self.weights.items()},  base_points=self.base_points, _indices = self._indices[~mask], **self.cfg)
+
+            parent.right.parent = parent
+            parent.left.parent  = parent
+
+            return parent
+        else:
+            print("Warning! Do not split because node is too small.")
 
     def fit( self ):
-        self.lasso.fit( self.features, self.base_points.L.dot( np.array( [ weights[c] for c in self.base_points.combinations ] ) ).transpose(), sample_weight = self.weights[()] ) 
+        self.lasso.fit( self.features, self.base_points.L.dot( np.array( [ self.weights[c] for c in self.base_points.combinations ] ) ).transpose(), sample_weight = self.weights[()] ) 
 
-        self.w0    = self.base_points.Linv.dot( self.lasso.intercept_.reshape(-1,1) )
-        self.w1    = self.base_points.Linv.dot(self.lasso.coef_)
+        self.w0 = self.base_points.Linv.dot(self.lasso.intercept_.reshape(-1,1))
+        self.w1 = self.base_points.Linv.dot(self.lasso.coef_)
 
-        #print ("Const: %r linear: %r" %(self.w0, self.w1))
+        print ("Const: %r linear: %r" %(self.w0, self.w1))
 
     def predict( self, features ):
         return self.base_points.Linv.dot(self.lasso.predict(features).transpose()).transpose()
+
+    def print_tree(self, _depth=0):
+        print('%sLeafNode nEvents: %i' % (_depth* ' ', len(self._indices)) )
 
 if __name__ == "__main__":
     import itertools
