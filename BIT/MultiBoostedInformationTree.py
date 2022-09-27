@@ -25,7 +25,6 @@ class MultiBoostedInformationTree:
 
     def __init__( self, training_features, training_weights, **kwargs ):
 
-
         # make cfg and node_cfg from the kwargs keys known by the Node
         self.cfg = default_cfg
         self.cfg.update( kwargs )
