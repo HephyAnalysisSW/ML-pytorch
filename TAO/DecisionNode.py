@@ -29,11 +29,35 @@ class DecisionNode:
         self.intercept_ = res.intercept_
         self.classes_   = res.classes_
 
+    # pass down 
     def loss( self, features, weights):
-        pass    
+        pred = self.predict_node( features ).reshape(-1)
+        loss = np.zeros_like(pred).astype('float')
+        loss[pred==-1] = self.left.loss(features[pred==-1], {k:weights[k][pred==-1] for k in weights.keys()})
+        loss[pred==+1] = self.left.loss(features[pred==+1], {k:weights[k][pred==+1] for k in weights.keys()})
+
+        return loss
 
     def predict( self, features ):
+        pred = self.predict_node( features ).reshape(-1)
+        res_left  = self.left.predict(features[pred==-1])
+        res_right = self.left.predict(features[pred==+1])
+
+        if len(res_left)==0 and not len(res_right)==0:
+            return res_right
+        elif len(res_right)==0 and not len(res_left)==0:
+            return res_left
+        elif len(res_right)==len(res_left)==0:
+            return np.array([]).astype('float')
+        
+        res = np.zeros((len(features), len(res_left[0]))).astype('float')
+        res[pred==-1]=res_left
+        res[pred==+1]=res_right
+
+        return res
+
+    def predict_node( self, features ):
         # predict
-        scores = safe_sparse_dot(self.features, self.coef_, dense_output=True) + self.intercept_
+        scores = safe_sparse_dot(features, self.coef_, dense_output=True) + self.intercept_
         indices = (scores > 0).astype(int)
         return self.classes_[indices]

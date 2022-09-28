@@ -91,10 +91,14 @@ class DecisionTree:
                     n_leaf_nodes+=1
             print ("Fitted %i all leaf nodes." % n_leaf_nodes)
 
+            # fit all nodes
             for depth in reversed(range(self.cfg['max_depth'])):
                 for node in filter( lambda node_: node_.depth==depth and type(node_)==DecisionNode.DecisionNode, self.nodes ):
                     print ("At depth %i: Working on Node %r"%(depth, node))
                     node.fit( self.log_reg )
+
+    def predict( self, features ):
+        return self.root.predict( features )
  
 if __name__ == "__main__":
     import itertools
@@ -141,9 +145,9 @@ if __name__ == "__main__":
 
     #loss_terms_left =
 
-    for C in [0.001, 0.01, 0.1, 1, 10, 100, 100]:
-        for i in range(100):
-            print (i, "C",C)
-            lr = linear_model.LogisticRegression(penalty='l1', solver='liblinear', C=C, max_iter=500)
-            node.fit(lr)
-            print (node.coef_, node.intercept_) 
+    #for C in [0.001, 0.01, 0.1, 1, 10, 100, 100]:
+    #    for i in range(100):
+    #        print (i, "C",C)
+    #        lr = linear_model.LogisticRegression(penalty='l1', solver='liblinear', C=C, max_iter=500)
+    #        node.fit(lr)
+    #        print (node.coef_, node.intercept_) 
