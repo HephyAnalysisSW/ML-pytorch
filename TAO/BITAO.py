@@ -5,9 +5,12 @@ import numpy as np
 import operator
 
 default_cfg = {
-    "C":             1000.,
-    #"init":          "axisaligned",
     "max_depth":     3,
+    "C":             0.01,     # LogisticRegression
+    "alpha":         0.0001,    # Lasso
+   #"initialization": "axisaligned", # nothing else atm
+    "strategy":     "rBFS", # or "BFS"
+    "max_iter":     500,
 }
 
 import LeafNode
@@ -28,14 +31,17 @@ class DecisionTree:
             else:
                 raise RuntimeError( "Got unexpected keyword arg: %s:%r" %( key, val ) )
 
-        self.LogisticRegression = linear_model.LogisticRegression(penalty='l1', solver='liblinear', C=self.cfg['C'])
+        # classifier for DecisionNode
+        self.log_reg = linear_model.LogisticRegression(penalty='l1', solver='liblinear', C=self.cfg['C'], max_iter=self.cfg['max_iter'])
+        # regressor for LeafNode
+        self.lasso   = linear_model.Lasso(alpha=self.cfg['alpha'], fit_intercept=True)
 
         # root node    
         self.nodes = [LeafNode.LeafNode(features, weights, base_points, **self.leaf_node_cfg)]
         self.nodes[-1].depth=0
    
+        # Initialization: split all nodes and replace with parent and right/left children 
         #if self.cfg["init"]=="axisaligned":
-        # split all nodes and replace with parent and right/left children 
         for depth in range(0, self.cfg['max_depth'] ):
             new_elements = []
             discard = []
@@ -65,15 +71,31 @@ class DecisionTree:
 
         self.root = self.nodes[0]
 
+    @property
+    def leafnodes(self):
+        return [ n for n in self.nodes if type(n)==LeafNode.LeafNode]
+
     def print_tree( self ):
         self.root.print_tree() 
 
     def fit_iteration( self ):
-       
-        for node in self.nodes:
-            if type( node ) == LeafNode.LeafNode:
-                node.fit() 
+
+        if self.cfg["strategy"] == "rBFS":       
         
+            # fit all leaf nodes
+            print ("Fitting all leaf nodes...")
+            n_leaf_nodes=0
+            for node in self.nodes:
+                if type( node ) == LeafNode.LeafNode:
+                    node.fit( self.lasso )
+                    n_leaf_nodes+=1
+            print ("Fitted %i all leaf nodes." % n_leaf_nodes)
+
+            for depth in reversed(range(self.cfg['max_depth'])):
+                for node in filter( lambda node_: node_.depth==depth and type(node_)==DecisionNode.DecisionNode, self.nodes ):
+                    print ("At depth %i: Working on Node %r"%(depth, node))
+                    node.fit( self.log_reg )
+ 
 if __name__ == "__main__":
     import itertools
 
@@ -95,12 +117,33 @@ if __name__ == "__main__":
 
     d = DecisionTree( features, weights, base_points )
 
-    #from sklearn.datasets import load_iris
-    #X, y = load_iris(return_X_y=True)
-    #y[y==2]=1
+    d.fit_iteration()
+    # try to fit this node
+    node = d.nodes[-3]
 
-    #lr = linear_model.LogisticRegression(penalty='l1', C=100., solver='liblinear').fit(X,y)
-    #lr2 = linear_model.LogisticRegression(penalty='l1', C=100., solver='liblinear')
-    #lr2.classes_ = lr.classes_
-    #lr2.coef_ = 0.5*np.ones_like(lr.coef_)
-    #lr2.intercept_ = lr.intercept_
+    _indices = np.concatenate((node.left._indices, node.right._indices))
+    features = np.concatenate((node.left.features, node.right.features))
+    weights  = {k:np.concatenate((node.left.weights[k], node.right.weights[k])) for k in node.left.weights.keys()}
+
+    delta_loss  = node.left.loss( features, weights = weights) - node.right.loss( features, weights = weights)
+    # best loss
+
+    y_target_new = np.sign(delta_loss).astype('int')
+    y_weight     = np.abs( delta_loss )
+    
+    res = d.log_reg.fit( features, y_target_new, sample_weight = y_weight ) 
+
+    # predict
+    from sklearn.utils.extmath import safe_sparse_dot
+    scores = safe_sparse_dot(features, res.coef_.T, dense_output=True) + res.intercept_
+    indices = (scores > 0).astype(int)
+    pred = res.classes_[indices]
+
+    #loss_terms_left =
+
+    for C in [0.001, 0.01, 0.1, 1, 10, 100, 100]:
+        for i in range(100):
+            print (i, "C",C)
+            lr = linear_model.LogisticRegression(penalty='l1', solver='liblinear', C=C, max_iter=500)
+            node.fit(lr)
+            print (node.coef_, node.intercept_) 

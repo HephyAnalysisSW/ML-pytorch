@@ -3,7 +3,6 @@ from BasePoints import BasePoints
 import numpy as np
 
 default_cfg = {
-    "alpha" : 0.000001,
     "min_size" : 50,
 }
 
@@ -27,10 +26,6 @@ class LeafNode:
         self.features    = features
         self.weights     = weights
         self.base_points = base_points if type(base_points) == BasePoints else BasePoints(coefficients, base_points)
-
-        # Just one fit class -> give it to the class
-        if not hasattr( self.__class__, "lasso" ):
-            self.__class__.lasso = linear_model.Lasso(alpha=self.cfg['alpha'], fit_intercept=True)
 
         # the root node has no indices at init time
         self._indices = _indices
@@ -62,16 +57,20 @@ class LeafNode:
         else:
             print("Warning! Do not split because node is too small.")
 
-    def fit( self ):
-        self.lasso.fit( self.features, self.base_points.L.dot( np.array( [ self.weights[c] for c in self.base_points.combinations ] ) ).transpose(), sample_weight = self.weights[()] ) 
+    def fit( self, lasso):
+        lasso = lasso.fit( self.features, self.base_points.L.dot( np.array( [ self.weights[c]/self.weights[()] for c in self.base_points.combinations ] ) ).transpose(), sample_weight = self.weights[()] ) 
 
-        self.w0 = self.base_points.Linv.dot(self.lasso.intercept_.reshape(-1,1))
-        self.w1 = self.base_points.Linv.dot(self.lasso.coef_)
+        self.w0 = self.base_points.Linv.dot(lasso.intercept_.reshape(-1,1))
+        self.w1 = self.base_points.Linv.dot(lasso.coef_)
 
-        print ("Const: %r linear: %r" %(self.w0, self.w1))
+        #print ("Const: %r linear: %r" %(self.w0, self.w1))
 
     def predict( self, features ):
-        return self.base_points.Linv.dot(self.lasso.predict(features).transpose()).transpose()
+        return features.dot(self.w1.transpose()) + self.w0.transpose()
+        #return self.base_points.Linv.dot(self.lasso.predict(features).transpose()).transpose()
+
+    def loss( self, features, weights):
+        return  weights[()]*np.sum( self.base_points.L.dot( np.array( [ weights[c]/weights[()] for c in self.base_points.combinations ]  - self.predict(features).transpose() ) )**2, axis=0)
 
     def print_tree(self, _depth=0):
         print('%sLeafNode nEvents: %i' % (_depth* ' ', len(self._indices)) )
