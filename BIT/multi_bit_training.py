@@ -31,7 +31,8 @@ import tools.user as user
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="multiBIT_P3_VH",                 help="plot sub-directory")
-argParser.add_argument("--model",              action="store",      default="ZH_Nakamura",                 help="plot sub-directory")
+argParser.add_argument("--model",              action="store",      default="ZH_Nakamura",                 help="Which model?")
+argParser.add_argument("--modelFile",          action="store",      default="toy_models",                 help="Which model directory?")
 argParser.add_argument("--prefix",             action="store",      default=None, type=str,  help="prefix")
 argParser.add_argument("--nTraining",          action="store",      default=500000,        type=int,  help="number of training events")
 argParser.add_argument("--coefficients",       action="store",      default=['cHW'],       nargs="*", help="Which coefficients?")
@@ -40,6 +41,7 @@ argParser.add_argument('--overwrite',          action='store',      default=None
 argParser.add_argument('--bias',               action='store',      default=None, nargs = "*",  help="Bias training? Example:  --bias 'pT' '10**(({}-200)/200) ")
 argParser.add_argument('--debug',              action='store_true', help="Make debug plots?")
 argParser.add_argument('--feature_plots',      action='store_true', help="Feature plots?")
+argParser.add_argument('--auto_clip',          action='store',      default=None, type=float, help="Remove quantiles of the training variable?")
 
 args, extra = argParser.parse_known_args(sys.argv[1:])
 
@@ -72,8 +74,8 @@ for key, val in extra_args.items():
     if type(val)==type([]) and len(val)==1:
         extra_args[key]=val[0]
 
-# import the VH model
-exec('import models.%s as model'%args.model)
+# import the model
+exec('import %s.%s as model'%(args.modelFile, args.model)) 
 
 model.multi_bit_cfg.update( extra_args )
 
@@ -90,8 +92,7 @@ if not os.path.isdir(plot_directory):
 
 training_data_filename = os.path.join(user.data_directory, args.model, "training_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(training_data_filename):
-    training_features = model.getEvents(args.nTraining)
-    training_weights  = model.getWeights(training_features, eft=model.default_eft_parameters)
+    training_features, training_weights = model.getEvents(args.nTraining)
     print ("Created data set of size %i" % len(training_features) )
     if not os.path.exists(os.path.dirname(training_data_filename)):
         os.makedirs(os.path.dirname(training_data_filename))
@@ -102,6 +103,28 @@ else:
     with open( training_data_filename, 'rb') as _file:
         training_features, training_weights = pickle.load( _file )
         print ("Loaded training data from", training_data_filename)
+
+if args.auto_clip is not None:
+    len_before = len(training_features)
+    training_features, training_weights = helpers.clip_quantile(training_features, args.auto_clip, training_weights )
+    print ("Auto clip efficiency (training) %4.3f is %4.3f"%( args.auto_clip, len(training_features)/len_before ) )
+
+#selected = np.array(list(range(len(training_features)))).reshape(-1)
+#if args.auto_clean is not None:
+#    selection = np.ones_like( selected ).astype('bool')
+#    for i_feature_name, feature_name in enumerate(model.feature_names):
+#        selection&= 1==np.digitize( training_features[:, i_feature_name], np.quantile( training_features[:, i_feature_name], ( args.auto_clean, 1.-args.auto_clean )) )
+#
+#    len_before = len(selected)
+#    selected = selected[selection]
+#    print( "Autoclean efficiency of %3.2f: %3.2f"%(args.auto_clean, np.count_nonzero( selection )/len_before) )
+#
+#    training_features, test_features, training_weights_indices, test_weights_indices = features[selected], features[selected], selected, selected #train_test_split( features, selected )
+#    training_weights = {k:weights[k][training_weights_indices] for k in weights.keys()}
+#    test_weights = {k:weights[k][test_weights_indices] for k in weights.keys()}
+#    nTraining = len(training_features)
+
+
 
 # Text on the plots
 def drawObjects( offset=0 ):
@@ -232,7 +255,7 @@ filename = os.path.join(user.model_directory, bit_name)+'.pkl'
 try:
     print ("Loading %s for %s"%(bit_name, filename))
     bit = MultiBoostedInformationTree.load(filename)
-except (IOError, EOFError):
+except (IOError, EOFError, ValueError):
     bit = None
 
 # reweight training data according to bias
@@ -262,8 +285,7 @@ if bit is None or args.overwrite in ["all", "training"]:
 
 test_data_filename = os.path.join(user.data_directory, args.model, "test_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(test_data_filename):
-    test_features = model.getEvents(args.nTraining)
-    test_weights  = model.getWeights(test_features, eft=model.default_eft_parameters)
+    test_features, test_weights = model.getEvents(args.nTraining)
     print ("Created data set of size %i" % len(test_features) )
     if not os.path.exists(os.path.dirname(test_data_filename)):
         os.makedirs(os.path.dirname(test_data_filename))
@@ -274,6 +296,11 @@ else:
     with open( test_data_filename, 'rb') as _file:
         test_features, test_weights = pickle.load( _file )
         print ("Loaded test data from", test_data_filename)
+
+if args.auto_clip is not None:
+    len_before = len(test_features)
+    test_features, test_weights = helpers.clip_quantile(test_features, args.auto_clip, test_weights )
+    print ("Auto clip efficiency (test) %4.3f is %4.3f"%( args.auto_clip, len(test_features)/len_before ) )
 
 if args.bias is not None:
     bias_weights = np.array(map( function, test_features[:, model.feature_names.index(args.bias[0])] ))
@@ -438,13 +465,21 @@ if args.debug:
                     l.AddEntry( th1d_yield, "yield (SM)")
 
                 max_ = max( map( lambda h:h.GetMaximum(), th1d_ratio_truth.values() ))
+                max_ = 10**(1.5)*max_ if logY else 1.5*max_
                 min_ = min( map( lambda h:h.GetMinimum(), th1d_ratio_truth.values() ))
-                th1d_yield.Scale(max_/th1d_yield.GetMaximum())
+                min_ = 0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_)
+
+                th1d_yield_min = th1d_yield.GetMinimum()
+                th1d_yield_max = th1d_yield.GetMaximum()
+                for bin_ in range(1, th1d_yield.GetNbinsX() ):
+                    th1d_yield.SetBinContent( bin_, (th1d_yield.GetBinContent( bin_ ) - th1d_yield_min)/th1d_yield_max*(max_-min_)*0.95 + min_  )
+
+                #th1d_yield.Scale(max_/th1d_yield.GetMaximum())
                 th1d_yield   .Draw("hist")
                 ROOT.gPad.SetLogy(logY)
-                th1d_yield   .GetYaxis().SetRangeUser(0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_), 10**(1.5)*max_ if logY else 1.5*max_)
+                th1d_yield   .GetYaxis().SetRangeUser(min_, max_)
                 th1d_yield   .Draw("hist")
-                for h in list(th1d_ratio_truth.values())+list(th1d_ratio_pred.values()):
+                for h in list(th1d_ratio_truth.values()) + list(th1d_ratio_pred.values()):
                     h .Draw("hsame")
 
             c1.cd(len(model.feature_names)+1)

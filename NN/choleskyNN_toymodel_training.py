@@ -35,7 +35,7 @@ argParser.add_argument("--model",              action="store",      default="ZH_
 argParser.add_argument("--prefix",             action="store",      default=None, type=str,  help="prefix")
 argParser.add_argument("--nTraining",          action="store",      default=100000,        type=int,  help="number of training events")
 argParser.add_argument("--coefficients",       action="store",      default=['cHW'],       nargs="*", help="Which coefficients?")
-argParser.add_argument("--n_epoch",            action="store",      default=10000,           nargs="*", type=int, help="Number of training epochs.")
+argParser.add_argument("--n_epoch",            action="store",      default=1000,           nargs="*", type=int, help="Number of training epochs.")
 #argParser.add_argument("--snapshots",         action="store",      default=None,          nargs="*", type=int, help="Certain epochs to plot? If first epoch is -1, plot only the epochs in the list.")
 argParser.add_argument('--overwrite',          action='store',      default=None, choices = [None, "training", "data", "all"],  help="Overwrite output?")
 argParser.add_argument('--bias',               action='store',      default=None, nargs = "*",  help="Bias training? Example:  --bias 'pT' '10**(({}-200)/200)' ")

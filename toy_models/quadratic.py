@@ -45,11 +45,13 @@ def getEvents(N_events_requested):
 
 def getWeights(features, eft=default_eft_parameters):
 
-    #dsigma/dx = 1 + (1-theta1)**2 = 1 + 1 - 2*theta1 + theta1**2 = 2-2*theta1+theta1**2
+    #dsigma/dx = (1+theta x)^2 = 1+2*theta*x + theta**2*x**2
 
-    weights = { tuple():     2*np.ones(len(features)),
-               ('theta1',): -2*np.ones(len(features)), 
-               ('theta1','theta1'): 2*np.ones(len(features)),
+    weights = { tuple():     np.ones(len(features)),
+               #('theta1',): 2*np.ones(len(features)),
+               ('theta1',): 2*features[:,0], 
+               #('theta1','theta1'): 2*np.ones(len(features)),
+               ('theta1','theta1'): 2*features[:,0]**2,
     }
     #for key in list(weights.keys()):
     #    if key==(): continue

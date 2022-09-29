@@ -114,7 +114,7 @@ def make_s_cos_theta( N_events, pT_min = pT_min):
     return s_hat, sqrt_s_hat, pT, cos_theta
 
 # qq -> ZH
-def getEvents(N_events_requested):
+def _getEvents(N_events_requested):
 
     # correct efficiency of pt cut
     _, _, pT, _ = make_s_cos_theta( N_events_requested, pT_min = pT_min)
@@ -162,7 +162,7 @@ def getEvents(N_events_requested):
 
     return np.transpose(np.array( [sqrt_s_hat, pT, y, cos_theta, phi_hat, cos_theta_hat, fLL, f1TT, f2TT, f1LT, f2LT, f1tildeLT, f2tildeLT, fTTprime, ftildeTTprime]))
 
-def getWeights(features, eft):
+def _getWeights(features, eft):
 
     sqrt_s_hat    = features[:,feature_names.index('sqrt_s_hat')]
     y             = features[:,feature_names.index('y')]
@@ -308,6 +308,14 @@ def getWeights(features, eft):
     # Check(ed) that residual imaginary parts are tiny
     dsigmaZH  = {k:np.real(dsigmaZH[k])  for k in derivatives}
     return dsigmaZH
+
+def getEvents( nTraining, eft=default_eft_parameters, make_weights = True):
+
+    training_features = _getEvents(nTraining)
+    if make_weights:
+        return training_features, _getWeights(training_features, eft=eft)
+    else:
+        return training_features
 
 Nbins = 20
 plot_options = {

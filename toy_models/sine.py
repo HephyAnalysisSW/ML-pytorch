@@ -39,17 +39,17 @@ feature_names =  ['x']
 def getEvents(N_events_requested):
 
     #x = 0.5*np.ones(N_events_requested) 
-    x = np.random.rand(N_events_requested) 
+    x = 2*pi*np.random.rand(N_events_requested) 
 
     return np.transpose(np.array( [x] ))
 
 def getWeights(features, eft=default_eft_parameters):
 
-    #dsigma/dx = 1 + (1-theta1)**2 = 1 + 1 - 2*theta1 + theta1**2 = 2-2*theta1+theta1**2
+    #dsigma/dx = (1+theta*sin(x))**2 
 
-    weights = { tuple():     2*np.ones(len(features)),
-               ('theta1',): -2*np.ones(len(features)), 
-               ('theta1','theta1'): 2*np.ones(len(features)),
+    weights = { tuple():     np.ones(len(features)),
+               ('theta1',):  2*np.sin(features[:,0]), 
+               ('theta1','theta1'): 2*np.sin(features[:,0])**2,
     }
     #for key in list(weights.keys()):
     #    if key==(): continue

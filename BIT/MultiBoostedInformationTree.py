@@ -25,7 +25,6 @@ class MultiBoostedInformationTree:
 
     def __init__( self, training_features, training_weights, **kwargs ):
 
-
         # make cfg and node_cfg from the kwargs keys known by the Node
         self.cfg = default_cfg
         self.cfg.update( kwargs )
@@ -203,10 +202,10 @@ class MultiBoostedInformationTree:
 
 if __name__=='__main__':
 
-    #import models.ZH_Nakamura as model
+    #import toy_models.ZH_Nakamura as model
     #coefficients = sorted(['cHW', 'cHWtil'])
 
-    import models.analytic as model
+    import toy_models.analytic as model
     coefficients = sorted(['theta1'])
 
     base_points = []

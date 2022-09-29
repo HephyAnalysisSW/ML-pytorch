@@ -357,13 +357,13 @@ class ResultNode:
 
 if __name__=='__main__':
 
-    #import models
+    #import toy_models
     #model = VH_models.ZH_Nakamura_debug
     #coefficients = sorted(['cHW', 'cHWtil', 'cHQ3'])
     #nTraining    = 50000
 
-    import models.analytic as model
-    #model = models.analytic
+    import toy_models.analytic as model
+    #model = toy_models.analytic
     coefficients = sorted(['theta1'])
     nTraining    = 10000 
 
