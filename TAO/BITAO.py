@@ -13,9 +13,23 @@ default_cfg = {
     "max_iter":     500,
 }
 
+import sys
+sys.path.append('..')
+
 import LeafNode
 import DecisionNode
 import BasePoints 
+import NodeBase
+import helpers
+
+import argparse
+argParser = argparse.ArgumentParser(description = "Argument parser")
+argParser.add_argument('--logLevel',           action='store',      default='INFO',          nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
+args = argParser.parse_args()
+
+#Logger
+import tools.logger as logger
+logger = logger.get_logger(args.logLevel, logFile = None )
 
 class DecisionTree:
 
@@ -37,8 +51,7 @@ class DecisionTree:
         self.lasso   = linear_model.Lasso(alpha=self.cfg['alpha'], fit_intercept=True)
 
         # root node    
-        self.nodes = [LeafNode.LeafNode(features, weights, base_points, **self.leaf_node_cfg)]
-        self.nodes[-1].depth=0
+        self.nodes = [ LeafNode.LeafNode.root(features, weights, base_points, **self.leaf_node_cfg)]
    
         # Initialization: split all nodes and replace with parent and right/left children 
         #if self.cfg["init"]=="axisaligned":
@@ -49,6 +62,8 @@ class DecisionTree:
                 if type(node)==LeafNode.LeafNode:
                     parent       = node.split_even()
                     if parent is not None:
+                        if hasattr(node, "parent"):
+                            parent.parent=node.parent
                         if node.depth>0:
                             if node.parent.left == node:
                                 node.parent.left = parent
@@ -69,7 +84,9 @@ class DecisionTree:
 
             self.nodes += new_elements
 
-        self.root = self.nodes[0]
+    @property
+    def root( self ):
+        return self.nodes[0]
 
     @property
     def leafnodes(self):
@@ -78,31 +95,83 @@ class DecisionTree:
     def print_tree( self ):
         self.root.print_tree() 
 
-    def fit_iteration( self ):
-
+    def fitall( self ):
         if self.cfg["strategy"] == "rBFS":       
         
             # fit all leaf nodes
-            print ("Fitting all leaf nodes...")
+            logger.info ("Fitting all leaf nodes...")
             n_leaf_nodes=0
             for node in self.nodes:
                 if type( node ) == LeafNode.LeafNode:
                     node.fit( self.lasso )
                     n_leaf_nodes+=1
-            print ("Fitted %i all leaf nodes." % n_leaf_nodes)
+                    logger.debug ("Fit LeafNode %r: w0: %s w1: %s", node, str(np.round(node.w0.tolist(),2)).replace("\n", ""), str(np.round(node.w1.tolist(),2)).replace("\n", ""))
+            logger.info ("Fitted %i all leaf nodes." % n_leaf_nodes)
 
             # fit all nodes
             for depth in reversed(range(self.cfg['max_depth'])):
                 for node in filter( lambda node_: node_.depth==depth and type(node_)==DecisionNode.DecisionNode, self.nodes ):
-                    print ("At depth %i: Working on Node %r"%(depth, node))
+                    logger.info ("At depth %i: Working on Node %r"%(depth, node))
                     node.fit( self.log_reg )
+        else:
+            raise NotImplementedError
+        
+
+    def refill( self ):
+        for node in self.nodes:
+            node.indices = []
+        for index, node in enumerate( self.root.get_leaf_node(self.root.features) ):
+            node.indices.append(index)
+
+        # prune
+    def prune (self ):
+        while True:
+            changed         = False
+            to_be_skipped   = []
+            for node in self.nodes:
+                # find DecisionNodes with empty dauther-Leafnodes
+                if type(node)==DecisionNode.DecisionNode:
+                    if  type(node.left)==LeafNode.LeafNode and len(node.left.indices)==0:
+                        changed = True
+                        # two nodes have to be removed: the empty leaf (we recall that) and the current node 
+                        to_be_skipped.append( node.left )
+                        to_be_skipped.append( node )
+                        helpers.reduce_depth( node.right )                
+
+                        # determine where the current node comes from
+                        print (node)
+                        if hasattr( node.parent, "left") and node.parent.left==node:
+                            node.parent.left  = node.right
+                            node.right.parent = node.parent
+                        if hasattr( node.parent, "right") and node.parent.right==node:
+                            node.parent.right = node.right
+                            node.right.parent = node.parent
+ 
+                    elif type(node.right)==LeafNode.LeafNode and len(node.right.indices)==0:
+                        changed = True
+                        # two nodes have to be removed: the empty leaf (we recall that) and the current node 
+                        to_be_skipped.append( node.right )
+                        to_be_skipped.append( node )
+                        helpers.reduce_depth( node.left )                
+                            
+                        # determine where the current node comes from
+                        print (node)
+                        if hasattr( node.parent, "left") and node.parent.left==node:
+                            node.parent.left  = node.left
+                            node.left.parent = node.parent
+                        if hasattr( node.parent, "right") and node.parent.right==node:
+                            node.parent.right = node.left
+                            node.left.parent = node.parent
+
+            if not changed: break
+            self.nodes = [ n for n in self.nodes if n not in to_be_skipped ]
 
     def predict( self, features ):
-        return self.root.predict( features )
+        return self.root.predict( features=features )
  
 if __name__ == "__main__":
     import itertools
-
+    import training_plot
     import sys
     sys.path.append('..')
 
@@ -116,38 +185,31 @@ if __name__ == "__main__":
 
     base_points = BasePoints.BasePoints( coefficients, base_points_ )
 
-    features = model.getEvents(N_events_requested)
-    weights  = model.getWeights(features)
+    training_features = model.getEvents(N_events_requested)
+    training_weights  = model.getWeights(training_features)
 
-    d = DecisionTree( features, weights, base_points )
+    test_features = model.getEvents(N_events_requested)
+    test_weights  = model.getWeights(test_features)
 
-    d.fit_iteration()
-    # try to fit this node
-    node = d.nodes[-3]
+    d = DecisionTree( training_features, training_weights, base_points )
 
-    _indices = np.concatenate((node.left._indices, node.right._indices))
-    features = np.concatenate((node.left.features, node.right.features))
-    weights  = {k:np.concatenate((node.left.weights[k], node.right.weights[k])) for k in node.left.weights.keys()}
-
-    delta_loss  = node.left.loss( features, weights = weights) - node.right.loss( features, weights = weights)
-    # best loss
-
-    y_target_new = np.sign(delta_loss).astype('int')
-    y_weight     = np.abs( delta_loss )
-    
-    res = d.log_reg.fit( features, y_target_new, sample_weight = y_weight ) 
-
-    # predict
-    from sklearn.utils.extmath import safe_sparse_dot
-    scores = safe_sparse_dot(features, res.coef_.T, dense_output=True) + res.intercept_
-    indices = (scores > 0).astype(int)
-    pred = res.classes_[indices]
-
-    #loss_terms_left =
-
-    #for C in [0.001, 0.01, 0.1, 1, 10, 100, 100]:
-    #    for i in range(100):
-    #        print (i, "C",C)
-    #        lr = linear_model.LogisticRegression(penalty='l1', solver='liblinear', C=C, max_iter=500)
-    #        node.fit(lr)
-    #        print (node.coef_, node.intercept_) 
+    iteration = 0
+    while True:
+        print ("At iteration %i" % iteration)
+        logger.info("Before fit")
+        d.print_tree()
+        logger.info("Now fitting.")
+        d.fitall()
+        logger.info("After fit.")
+        d.print_tree()
+        logger.info("Now filling." )
+        d.refill()
+        logger.info("After fill.")
+        d.print_tree()
+        logger.info("Now pruning")
+        d.prune()
+        logger.info("After pruning = before the fit")
+        iteration+=1
+        break
+       
+    training_plot( model, plot_directory, training_features, training_weights, test_features, test_weights, label = None) 
