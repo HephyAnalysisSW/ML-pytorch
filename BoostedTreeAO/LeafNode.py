@@ -1,4 +1,5 @@
 from sklearn import linear_model
+
 from BasePoints import BasePoints
 import numpy as np
 
@@ -6,19 +7,14 @@ default_cfg = {
     "min_size" : 50,
 }
 
-import logging
-logger = logging.getLogger(__name__)
+if not __name__=="__main__":
+    import logging
+    logger = logging.getLogger('ML')
 
 import DecisionNode
 from NodeBase     import NodeBase
 
 class LeafNode(NodeBase):
-
-    #def __init__( self, features, weights, base_points, _indices = None, **kwargs):
-
-    @classmethod
-    def fromIndices( cls, indices, **kwargs):
-        return cls(indices=indices, **kwargs)
 
     @classmethod
     def root( cls, features, weights, base_points, **kwargs):
@@ -112,7 +108,7 @@ class LeafNode(NodeBase):
 
     def print_tree(self, _depth=0):
         if hasattr(self, "w0"):
-            fit_str = "w0: %s w1: %s" %( str(np.round(self.w0.tolist(),2)).replace("\n", ""), str(np.round(self.w1.tolist(),2)).replace("\n", ""))
+            fit_str = "w0: %s w1: %s" %( str(np.round(self.w0.tolist(),4)).replace("\n", ""), str(np.round(self.w1.tolist(),4)).replace("\n", ""))
         else:
             fit_str = " (not fit)"
         if hasattr(self, "indices"):
@@ -133,7 +129,7 @@ if __name__ == "__main__":
     import toy_models.quadratic as model
     N_events_requested=10000
 
-    coefficients = ['theta1']
+    coefficients = model.wilson_coefficients
     base_points_ = []
     for comb in list(itertools.combinations_with_replacement(coefficients,1))+list(itertools.combinations_with_replacement(coefficients,2)):
         base_points_.append( {c:comb.count(c) for c in coefficients} )
@@ -144,7 +140,6 @@ if __name__ == "__main__":
     weights  = model.getWeights(features)
 
     l = LeafNode.root( features, weights, base_points_)
-
 
     lasso = linear_model.Lasso(alpha=0.01, fit_intercept=True)
 

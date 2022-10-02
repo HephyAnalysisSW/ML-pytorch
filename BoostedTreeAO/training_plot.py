@@ -5,14 +5,14 @@ import numpy as np
 import os, sys
 sys.path.insert(0, '..')
 
+import tools.syncer as syncer
+
 # RootTools
 dir_path = os.path.dirname(os.path.realpath(__file__))
 ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../tools/scripts/tdrstyle.C"))
 ROOT.setTDRStyle()
 
 from   tools import helpers
-
-import tools.syncer as syncer
 
 #    c1 = ROOT.TCanvas("c1");
 #
@@ -22,18 +22,17 @@ import tools.syncer as syncer
 #    l.SetShadowColor(ROOT.kWhite)
 #    l.SetBorderSize(0)
 #
-#    # GIF animation
-#    tex = ROOT.TLatex()
-#    tex.SetNDC()
-#    tex.SetTextSize(0.06)
+tex = ROOT.TLatex()
+tex.SetNDC()
+tex.SetTextSize(0.06)
 
-def training_plot( model, plot_directory, training_features, training_weights, test_features, test_weights, label = None):
+def training_plot( model, plot_directory, features, weights, predictions, label = None):
     stuff = []
 
     # colors
     color = {}
     i_lin, i_diag, i_mixed = 0,0,0
-    derivatives = list( [ k for k in training_weights.keys() if k is not tuple() ] )
+    derivatives = model.derivatives[1:]
     for i_der, der in enumerate(derivatives):
         if len(der)==1:
             color[der] = ROOT.kAzure + i_lin
@@ -45,7 +44,7 @@ def training_plot( model, plot_directory, training_features, training_weights, t
             color[der] = ROOT.kGreen + i_mixed
             i_mixed+=1
 
-    w0 = test_weights[()]
+    w0 = weights[()]
     h_w0, h_ratio_prediction, h_ratio_truth, lin_binning = {}, {}, {}, {}
     for i_feature, feature in enumerate(model.feature_names):
         # root style binning
@@ -53,13 +52,13 @@ def training_plot( model, plot_directory, training_features, training_weights, t
         # linspace binning
         lin_binning[feature] = np.linspace(binning[1], binning[2], binning[0]+1)
         # digitize feature
-        binned      = np.digitize(test_features[:,i_feature], lin_binning[feature] )
-        # for each digit, create a mask to select the corresponding event in the bin (e.g. test_features[mask[0]] selects features in the first bin
+        binned      = np.digitize(features[:,i_feature], lin_binning[feature] )
+        # for each digit, create a mask to select the corresponding event in the bin (e.g. features[mask[0]] selects features in the first bin
         mask        = np.transpose( binned.reshape(-1,1)==range(1,len(lin_binning[feature])) )
 
         h_w0[feature]           = np.array([  w0[m].sum() for m in mask])
-        h_derivative_prediction = np.array([ (w0.reshape(-1,1)*test_predictions)[m].sum(axis=0) for m in mask])
-        h_derivative_truth      = np.array([ (np.transpose(np.array([test_weights[der] for der in derivatives])))[m].sum(axis=0) for m in mask])
+        h_derivative_prediction = np.array([ (w0.reshape(-1,1)*predictions)[m].sum(axis=0) for m in mask])
+        h_derivative_truth      = np.array([ (np.transpose(np.array([weights[der] for der in derivatives])))[m].sum(axis=0) for m in mask])
 
         h_ratio_prediction[feature] = h_derivative_prediction/h_w0[feature].reshape(-1,1) 
         h_ratio_truth[feature]      = h_derivative_truth/h_w0[feature].reshape(-1,1)
@@ -146,7 +145,7 @@ def training_plot( model, plot_directory, training_features, training_weights, t
         c1.cd(len(model.feature_names)+1)
         l.Draw()
 
-        lines = [ (0.29, 0.9, 'N_{B} =%5i'%( max_n_tree )) ]
+        lines = [ (0.29, 0.9, label ) ]
         drawObjects = [ tex.DrawLatex(*line) for line in lines ]
         for o in drawObjects:
             o.Draw()
@@ -160,4 +159,3 @@ def training_plot( model, plot_directory, training_features, training_weights, t
         helpers.copyIndexPHP( plot_directory_ )
         c1.Print( os.path.join( plot_directory_, "training_%s.png"%(label) ) )
         syncer.makeRemoteGif(plot_directory_, pattern="training_*.png", name="training" )
-    syncer.sync()

@@ -1,9 +1,10 @@
 from sklearn.utils.extmath import safe_sparse_dot
+
 import numpy as np
 
 from NodeBase import NodeBase
 import LeafNode
-import helpers
+import BoostedTreeAO.helpers as helpers
 
 class DecisionNode(NodeBase):
 
@@ -15,7 +16,7 @@ class DecisionNode(NodeBase):
 
     def print_tree(self, _depth=0):
         if hasattr( self, "coef_"):
-            fit_str = "w=%s, intercept=%s"%( str( np.round( self.coef_,2).tolist()).replace('\n',''), str( np.round( self.intercept_,2).tolist()).replace('\n','') )
+            fit_str = "w=%s, intercept=%s"%( str( np.round( self.coef_,4).tolist()).replace('\n',''), str( np.round( self.intercept_,4).tolist()).replace('\n','') )
         else:
             fit_str = "(not fit)"
         if hasattr(self, "indices"):
@@ -28,6 +29,7 @@ class DecisionNode(NodeBase):
         for node in [self.left, self.right]:
             node.print_tree(_depth = _depth+1)
 
+    
     def fit( self, log_reg ):
         self.indices = np.concatenate((self.left.indices, self.right.indices))
 

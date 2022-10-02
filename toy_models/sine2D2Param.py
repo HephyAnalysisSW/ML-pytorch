@@ -12,14 +12,14 @@ import os
 import array
 
 # EFT settings, parameters, defaults
-wilson_coefficients    = ['theta1']
-tex                    = {"theta1":"#theta_{1}"}
+wilson_coefficients    = ['theta1', 'theta2']
+tex                    = {"theta1":"#theta_{1}", "theta2":"#theta_{2}"}
 
 default_eft_parameters = { 'Lambda':1000. }
 default_eft_parameters.update( {var:0. for var in wilson_coefficients} )
 
-first_derivatives = [('theta1',)]
-second_derivatives= [('theta1','theta1')]
+first_derivatives = [('theta1',), ('theta2',)]
+second_derivatives= [('theta1','theta1'), ('theta1','theta2'), ('theta2', 'theta2')]
 derivatives       = [tuple()] + first_derivatives + second_derivatives
 
 def make_eft(**kwargs):
@@ -34,41 +34,43 @@ def make_eft(**kwargs):
 random_eft = make_eft(**{v:random.random() for v in wilson_coefficients} )
 sm         = make_eft()
 
-feature_names =  ['x']
+feature_names =  ['x', 'y']
 
 def getEvents(N_events_requested):
 
     #x = 0.5*np.ones(N_events_requested) 
     x = 2*pi*np.random.rand(N_events_requested) 
+    y = 2*pi*np.random.rand(N_events_requested) 
 
-    return np.transpose(np.array( [x] ))
+    return np.transpose(np.array( [x, y] ))
 
 def getWeights(features, eft=default_eft_parameters):
 
-    #dsigma/dx = (1+theta*sin(x))**2 
+    #dsigma/dx = (1+theta1*sin(x)+theta2*cos(x))**2 = 1 + 2 theta1 sin(x) + 2 theta 2 cos(y) + theta1**2 sin(x)**2 + theta2**2 cos(y)**2 + 2 theta1 theta2 sin(x) cos(y) 
 
     weights = { tuple():     np.ones(len(features)),
-               ('theta1',):  2*np.sin(features[:,0]), 
+               ('theta1',):         2*np.sin(features[:,0]), 
                ('theta1','theta1'): 2*np.sin(features[:,0])**2,
+               ('theta2',):         2*np.cos(features[:,1]), 
+               ('theta2','theta2'): 2*np.cos(features[:,1])**2,
+               ('theta1','theta2'): 2*np.sin(features[:,0])*np.cos(features[:,1]),
     }
-    #for key in list(weights.keys()):
-    #    if key==(): continue
-    #    weights[key][features[:,0]<0.5]=0.
 
     return weights
 
 plot_options = {
     'x': {'binning':[50,0,2*pi],      'tex':"x",},
+    'y': {'binning':[50,0,2*pi],      'tex':"y",},
     }
 
 eft_plot_points = [
     {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
-    {'color':ROOT.kMagenta+2,   'eft':make_eft(theta1=-2),'tex':"#theta_{1} = -2"},
-    {'color':ROOT.kMagenta-4,   'eft':make_eft(theta1=+2), 'tex':"#theta_{1} = +2"},
     {'color':ROOT.kBlue+2,      'eft':make_eft(theta1=-1),  'tex':"#theta_{1} = -1"},
     {'color':ROOT.kBlue-4,      'eft':make_eft(theta1=+1),  'tex':"#theta_{1} = +1"},
-    {'color':ROOT.kGreen+2,     'eft':make_eft(theta1=-0.5),'tex':"#theta_{1} =-.5"},
-    {'color':ROOT.kGreen-4,     'eft':make_eft(theta1=0.5), 'tex':"#theta_{1} =+.5"},
+    {'color':ROOT.kMagenta+2,   'eft':make_eft(theta2=-1),'tex':"#theta_{2} = -1"},
+    {'color':ROOT.kMagenta-4,   'eft':make_eft(theta2=+1), 'tex':"#theta_{2} = +1"},
+#    {'color':ROOT.kGreen+2,     'eft':make_eft(theta1=-0.5),'tex':"#theta_{1} =-.5"},
+#    {'color':ROOT.kGreen-4,     'eft':make_eft(theta1=0.5), 'tex':"#theta_{1} =+.5"},
 ]
 
 multi_bit_cfg = {'n_trees': 250,
