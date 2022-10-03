@@ -11,9 +11,11 @@ class DecisionNode(NodeBase):
     def __del__(self):
         NodeBase.remove_instance(self)
 
-    def __init__( self ):
+    def __init__( self, save_history=False):
         NodeBase.add_instance(self)
+        self.save_history = save_history
 
+    # print this node
     def print_tree(self, _depth=0):
         if hasattr( self, "coef_"):
             fit_str = "w=%s, intercept=%s"%( str( np.round( self.coef_,4).tolist()).replace('\n',''), str( np.round( self.intercept_,4).tolist()).replace('\n','') )
@@ -35,18 +37,31 @@ class DecisionNode(NodeBase):
 
         weights     = helpers.sel( self.weights, self.indices)
         features    = self.features[self.indices]
-        delta_loss  = self.left.loss( self.indices ) - self.right.loss( self.indices )
-        # best loss
 
+        # compute the loss per-event and use as weight (aka TAO regression)
+        delta_loss  = self.left.loss( self.indices ) - self.right.loss( self.indices )
         y_target_new = np.sign(delta_loss).astype('int')
         y_weight     = np.abs( delta_loss )
 
+        # perform the actual fit (log-regression/decision)
         res = log_reg.fit( features, y_target_new, sample_weight = y_weight )
+        self.is_updated = True
 
+        # this is all the data that is needed for recomputing the prediction
         self.coef_      = res.coef_.T
         self.intercept_ = res.intercept_
         self.classes_   = res.classes_
-        self.is_updated = True
+
+        # recall history
+        if self.save_history:
+            if not hasattr(self, "history"):
+                self.history = [(self.coef_, self.intercept_)]
+            else:
+                self.history.append((self.coef_, self.intercept_))
+
+    # recall an earlier state
+    def set_history( self, history=-1 ):
+        self.coef_, self.intercept_ = self.history[history]
 
     # returns the decision on where the events should go (left or right)
     def predict_daughter( self, indices = None, features = None):
@@ -83,7 +98,6 @@ class DecisionNode(NodeBase):
         else:
             raise RuntimeError ("Need either indices or features but not both (or none of them)" )
 
-
         if len(res_left)==0 and not len(res_right)==0:
             return res_right
         elif len(res_right)==0 and not len(res_left)==0:
@@ -96,6 +110,7 @@ class DecisionNode(NodeBase):
             res[pred==+1]=res_right
             return res
 
+    # recursively compute the leaf node for each feature
     def get_leaf_node( self, features ):
         pred = self.predict_daughter( features=features ).reshape(-1)
         res_left  = self.left.get_leaf_node ( features=features[pred==-1] )

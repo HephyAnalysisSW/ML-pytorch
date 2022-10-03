@@ -1,10 +1,13 @@
 ''' Base class to carry class attributes'''
 
+import logging
+logger = logging.getLogger('ML')
+
 class NodeBase:
     def set_class_attrs( self, **kwargs ):
         for key, val in kwargs.items():
             if hasattr( self.__class__, key ):
-                print ("Warning! Overwriting global NodeBase attribute: %s"%key)
+                logger.debug ("Warning! Overwriting global NodeBase attribute: %s. We do this after a boosting iteration. "%key)
             setattr( NodeBase, key, val )
             #print ("Set global attribute", NodeBase, key, val)
 

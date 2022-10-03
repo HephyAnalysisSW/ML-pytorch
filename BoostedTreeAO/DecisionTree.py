@@ -77,7 +77,7 @@ import BoostedTreeAO.helpers as helpers
 
 class DecisionTree:
 
-    def __init__( self, features, weights,  base_points, **kwargs):
+    def __init__( self, features, weights,  base_points, save_history = False, **kwargs):
 
         self.cfg = default_cfg
         self.leaf_node_cfg = LeafNode.default_cfg
@@ -89,30 +89,35 @@ class DecisionTree:
             else:
                 raise RuntimeError( "Got unexpected keyword arg: %s:%r" %( key, val ) )
 
+        self.save_history = save_history
+
         # root node    
-        self.nodes = [ LeafNode.LeafNode.root(features, weights, base_points, **self.leaf_node_cfg)]
+        self.nodes = [ LeafNode.LeafNode.root(
+            features, weights, base_points, 
+            save_history = self.save_history, 
+            **self.leaf_node_cfg,
+            )]
    
-        # Initialization: split all nodes and replace with parent and right/left children 
+        # Initialization: split all nodes and replace with parent and right/left children until desired depth is reached 
         #if self.cfg["init"]=="axisaligned":
         for depth in range(0, self.cfg['max_depth'] ):
             new_elements = []
             discard = []
             for node in self.nodes:
                 if type(node)==LeafNode.LeafNode:
-                    parent       = node.split_even()
+                    parent = node.split_even()
                     if parent is not None:
                         if hasattr(node, "parent"):
                             parent.parent=node.parent
                         if node.depth>0:
-                            if node.parent.left == node:
+                            if node.parent.left  == node:
                                 node.parent.left = parent
                             if node.parent.right == node:
-                                node.parent.right = parent
+                                node.parent.right= parent
 
-                        parent.depth = node.depth
-
-                        parent.right.depth=node.depth+1
-                        parent.left.depth=node.depth+1
+                        parent.depth       = node.depth
+                        parent.right.depth = node.depth+1
+                        parent.left.depth  = node.depth+1
 
                         new_elements += [parent, parent.left, parent.right]
                         discard.append( node )
@@ -134,6 +139,10 @@ class DecisionTree:
     def print_tree( self ):
         self.root.print_tree() 
 
+    def set_history( self, history=-1):
+        for node in self.nodes:
+            node.set_history( history )
+
     def fit_nodes( self, lasso, log_reg):
         if self.cfg["strategy"] == "rBFS":       
         
@@ -144,7 +153,9 @@ class DecisionTree:
                 if type( node ) == LeafNode.LeafNode:
                     node.fit( lasso )
                     n_leaf_nodes+=1
-                    logger.debug ("Fit LeafNode %r: w0: %s w1: %s", node, str(np.round(node.w0.tolist(),4)).replace("\n", ""), str(np.round(node.w1.tolist(),4)).replace("\n", ""))
+                    logger.debug ("Fit LeafNode %r: w0: %s w1: %s", node, 
+                        str(np.round(node.w0.tolist(),4)).replace("\n", ""), 
+                        str(np.round(node.w1.tolist(),4)).replace("\n", ""))
             logger.debug ("Fitted %i all leaf nodes." % n_leaf_nodes)
 
             # fit all nodes
@@ -163,12 +174,11 @@ class DecisionTree:
             # filling leaf nodes
             for index, node in enumerate( self.root.get_leaf_node(self.root.features) ):
                 node.indices.append(index)
-        # this is the case where the root note is a leaf node, so all events are in there
+        # this is the case where the root note is a leaf node, so all events must be in there
         elif type(self.root)==LeafNode.LeafNode:
             node.indices = np.array( range(len(node.features)) ) 
             
-        # FIXME: We could fill the indices of the decision nodes
-
+        # FIXME: We could fill the indices of the decision nodes, but it's not algorithmically needed. The print_tree is confusing though.
 
     # pruning the tree
     def prune (self ):
@@ -176,8 +186,8 @@ class DecisionTree:
         while True:
             logger.debug( "Pruning iteration %i", pruning_iteration )
 
-            self.print_tree()
-            logger.info("Now start to prune")
+            if logger.level<=logging.DEBUG: self.print_tree()
+            logger.debug("Now start to prune")
 
             changed         = False
             to_be_skipped   = []
@@ -260,7 +270,6 @@ class DecisionTree:
         return self.root.predict( features=features )
  
 if __name__ == "__main__":
-
     import itertools
     import training_plot
 

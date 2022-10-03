@@ -17,17 +17,19 @@ from NodeBase     import NodeBase
 class LeafNode(NodeBase):
 
     @classmethod
-    def root( cls, features, weights, base_points, **kwargs):
-        root = cls(indices=None,  features=features, weights=weights, base_points=base_points, **kwargs)
+    def root( cls, features, weights, base_points, save_history=False, **kwargs):
+        root = cls(indices=None, features=features, weights=weights, base_points=base_points, save_history=save_history, **kwargs)
         root.depth = 0
         return root
 
     def __del__(self):
         NodeBase.remove_instance(self)
 
-    def __init__( self, indices = None, features = None, weights = None, base_points = None, **kwargs):
+    def __init__( self, indices=None, features=None, weights=None, base_points=None, save_history=False, **kwargs):
 
         NodeBase.add_instance(self)
+
+        self.save_history=save_history
 
         # set features for ALL instances of ALL classes deriving from NodeBase (!)
         # this is the root node
@@ -36,23 +38,31 @@ class LeafNode(NodeBase):
             if features is None or weights is None or base_points is None:
                 raise RuntimeError( "Need features AND weights AND base_points OR indices!")
 
-            coefficients = list(set(sum( map( list, weights.keys() ), [] )))
+            # make a BasePoint class that stores the linalg matrices
+            coefficients = list(set(sum(map(list, weights.keys()),[])))
             coefficients.sort()
             base_points = base_points if type(base_points) == BasePoints else BasePoints(coefficients, base_points)
 
-            super().set_class_attrs( features = features, weights = weights, base_points = base_points, coefficients=coefficients)
+            # We store the training data as a class attribute of a common super class (NodeBase) of all the Node classes. 
+            super().set_class_attrs(
+                features     = features, 
+                weights      = weights, 
+                base_points  = base_points, 
+                coefficients = coefficients
+                )
             
             self.indices = np.array( range(len(self.features)) )
             if indices is not None:
                 raise RuntimeError( "Do not know what to do with indices in root node" )
+
         # this is not the root node
         elif indices is not None:
             self.indices = indices 
+
         else:
             raise RuntimeError( "Need features AND weights AND base_points OR indices!")
 
         self.left, self.right = None, None 
-
         self.cfg = default_cfg
         self.cfg.update( kwargs )
         for (key, val) in kwargs.items():
@@ -69,14 +79,14 @@ class LeafNode(NodeBase):
         # only split when we have 2x min_node_size
         if len(self.indices)>2*self.cfg['min_size']:
 
-            parent = DecisionNode.DecisionNode()
+            parent = DecisionNode.DecisionNode(save_history=self.save_history)
 
             # get threshold
             threshold = np.quantile( self.features[self.indices][:, i_feature], .5) 
             mask      = self.features[self.indices][:, i_feature] > threshold
 
-            parent.right = LeafNode( indices = self.indices[mask],  **self.cfg)
-            parent.left  = LeafNode( indices = self.indices[~mask], **self.cfg)
+            parent.right = LeafNode( indices = self.indices[mask],  save_history=self.save_history, **self.cfg)
+            parent.left  = LeafNode( indices = self.indices[~mask], save_history=self.save_history, **self.cfg)
 
             parent.right.parent = parent
             parent.left.parent  = parent
@@ -89,23 +99,41 @@ class LeafNode(NodeBase):
             logger.warning("Warning! Do not split because node is too small.")
 
     def fit( self, lasso):
-        lasso = lasso.fit( self.features[self.indices], self.base_points.L.dot( np.array( [ self.weights[c][self.indices]/self.weights[()][self.indices] for c in self.base_points.combinations ] ) ).transpose(), sample_weight = self.weights[()][self.indices] ) 
+        # actual lasso fit in Leaf node
+        lasso = lasso.fit( 
+            self.features[self.indices], 
+            self.base_points.L.dot( np.array( [ self.weights[c][self.indices]/self.weights[()][self.indices] for c in self.base_points.combinations ] ) ).transpose(), 
+            sample_weight = self.weights[()][self.indices] 
+            ) 
 
+        # recall parameters
         self.w0 = self.base_points.Linv.dot(lasso.intercept_.reshape(-1,1))
         self.w1 = self.base_points.Linv.dot(lasso.coef_)
+        
+        # recall history
+        if self.save_history:
+            if not hasattr(self, "history"):
+                self.history = [(self.w0, self.w1)]
+            else:
+                self.history.append((self.w0, self.w1))
 
-        #print ("Const: %r linear: %r" %(self.w0, self.w1))
+    # recall an earlier state
+    def set_history( self, history=-1 ):
+        self.w0, self.w1 = self.history[history]
 
     def predict( self, features ):
         return features.dot(self.w1.transpose()) + self.w0.transpose()
         #return self.base_points.Linv.dot(self.lasso.predict(features).transpose()).transpose()
 
+    # the leaf node of the leaf node is the ... leaf node
     def get_leaf_node( self, features ):
         return self
 
+    # compute loss
     def loss( self, indices ):
         return  self.weights[()][indices]*np.sum( self.base_points.L.dot( np.array( [ self.weights[c][indices]/self.weights[()][indices] for c in self.base_points.combinations ]  - self.predict(self.features[indices]).transpose() ) )**2, axis=0)
 
+    # print this node
     def print_tree(self, _depth=0):
         if hasattr(self, "w0"):
             fit_str = "w0: %s w1: %s" %( str(np.round(self.w0.tolist(),4)).replace("\n", ""), str(np.round(self.w1.tolist(),4)).replace("\n", ""))
