@@ -9,7 +9,7 @@ import sys
 sys.path.append('..')
 from tools import helpers
         
-device        = 'cuda' if torch.cuda.is_available() else 'cpu'
+device  = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 default_cfg = {
     "hidden_layers" : [32, 32, 32, 32],
@@ -180,7 +180,7 @@ if __name__ == '__main__':
     nEvents = 30000 
 
     model.feature_names = model.feature_names[0:6] # restrict features
-    features   = model.getEvents(nEvents)[:,0:6]
+    features       = model.getEvents(nEvents)[:,0:6]
     feature_names  = model.feature_names
     plot_options   = model.plot_options
     plot_vars      = model.feature_names
