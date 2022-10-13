@@ -3,7 +3,9 @@
 Created on Wed Oct  5 10:37:43 2022
 
 @author: Lena
-"""
+########################################
+#GENERATE DATA CALLED LOCALDATA WITH JUPYTER NOTEBOOK Load_data_to_local_file.ipynb and Event_properties.txt
+########################################
 
 import torch
 import math
