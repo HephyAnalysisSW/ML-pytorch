@@ -4,6 +4,9 @@ Created on Wed Oct  5 10:37:43 2022
 
 @author: Lena
 """
+#########################################
+#Equally weighted samples
+#########################################
 
 import torch
 import math
