@@ -81,6 +81,7 @@ feature_names = model.feature_names
 # directory for plots
 plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.model )
 
+
 if not os.path.isdir(plot_directory):
     try:
         os.makedirs( plot_directory )
@@ -88,6 +89,7 @@ if not os.path.isdir(plot_directory):
         pass
 
 training_data_filename = os.path.join(user.data_directory, args.model, "training_%i"%args.nTraining)+'.pkl'
+
 if args.overwrite in ["all", "data"] or not os.path.exists(training_data_filename):
     training_features, training_weights = model.getEvents(args.nTraining)
     print ("Created data set of size %i" % len(training_features) )
@@ -106,8 +108,8 @@ if args.auto_clip is not None:
     training_features, training_weights = helpers.clip_quantile(training_features, args.auto_clip, training_weights )
     print ("Auto clip efficiency (training) %4.3f is %4.3f"%( args.auto_clip, len(training_features)/len_before ) )
 
-print "training_features", training_features
-print "training_weights", training_weights
+print ("training_features", training_features)
+print ("training_weights", training_weights)
 
 print ("Printing first 5 events")
 for i_event in range(5):

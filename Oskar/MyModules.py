@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from torch.optim.lr_scheduler import StepLR
+from torch.utils import Dataset
 import math
 import numpy as np
 from matplotlib import pyplot as plt
@@ -28,6 +29,19 @@ def data_generation(n_data=1000, input_nfeatures = 10, data_range=None, target_f
     y_train = torch.from_numpy(y).float().to(device)
 
     return x_train, y_train, input_nfeatures, target_nfeatures
+
+# join the data and the labels in a jointdataset
+class JointDataset(Dataset):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __len__(self):
+        return len(self.x)
+
+    def __getitem__(self, idx):
+        return self.x[idx], self.y[idx]
+
 
 
 
