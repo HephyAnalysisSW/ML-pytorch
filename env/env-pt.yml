@@ -18,6 +18,7 @@ dependencies:
   - awkward
   - h5py
   - jupyter
+  - jupyterlab
 #  - root_numpy
 
 

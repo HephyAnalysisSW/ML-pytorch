@@ -145,16 +145,15 @@ def drawObjects( offset=0 ):
 ## Plot Model #
 ###############
 
+stuff = []
 if args.feature_plots and hasattr( model, "eft_plot_points"):
     h    = {}
-    h_lin= {}
-    h_rw = {}
-    h_rw_lin = {}
     for i_eft, eft_plot_point in enumerate(model.eft_plot_points):
         eft = eft_plot_point['eft']
 
         if i_eft == 0:
             eft_sm     = eft
+
         name = ''
         name= '_'.join( [ (wc+'_%3.2f'%eft[wc]).replace('.','p').replace('-','m') for wc in model.wilson_coefficients if wc in eft ])
         tex_name = eft_plot_point['tex'] 
@@ -204,12 +203,10 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
                 for eft_plot_point in model.eft_plot_points:
                     _h[eft_plot_point['eft']['name']][feature].Scale(1./norm) 
 
-        histos = [h[eft_plot_point['eft']['name']][feature] for eft_plot_point in reversed(model.eft_plot_points)]
-
-        max_ = max( map( lambda h:h.GetMaximum(), histos ))
+        histos = [h[eft_plot_point['eft']['name']][feature] for eft_plot_point in model.eft_plot_points]
+        max_   = max( map( lambda h:h.GetMaximum(), histos ))
 
         for logY in [True, False]:
-
 
             c1 = ROOT.TCanvas("c1");
             l = ROOT.TLegend(0.2,0.68,0.9,0.91)
@@ -217,7 +214,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
             l.SetFillStyle(0)
             l.SetShadowColor(ROOT.kWhite)
             l.SetBorderSize(0)
-            for i_histo, histo in enumerate(histos):
+            for i_histo, histo in enumerate(reversed(histos)):
                 histo.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
                 histo.GetYaxis().SetTitle("1/#sigma_{SM}d#sigma/d%s"%model.plot_options[feature]['tex'])
                 if i_histo == 0:
@@ -231,6 +228,44 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
             l.Draw()
 
             plot_directory_ = os.path.join( plot_directory, "feature_plots", "nTraining_%i"%args.nTraining, "log" if logY else "lin" )
+            helpers.copyIndexPHP( plot_directory_ )
+            c1.Print( os.path.join( plot_directory_, feature+'.png' ))
+
+        # Norm all shapes to 1
+        for i_histo, histo in enumerate(histos):
+            norm = histo.Integral()
+            if norm>0:
+                histo.Scale(1./histo.Integral())
+
+        # Divide all shapes by the SM
+        ref = histos[0].Clone()
+        for i_histo, histo in enumerate(histos):
+            histo.Divide(ref)
+
+        # Now plot shape differences
+        for logY in [True, False]:
+            c1 = ROOT.TCanvas("c1");
+            l = ROOT.TLegend(0.2,0.68,0.9,0.91)
+            l.SetNColumns(2)
+            l.SetFillStyle(0)
+            l.SetShadowColor(ROOT.kWhite)
+            l.SetBorderSize(0)
+
+            c1.SetLogy(logY)
+            for i_histo, histo in enumerate(reversed(histos)):
+                histo.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                histo.GetYaxis().SetTitle("shape wrt. SM")
+                if i_histo == 0:
+                    histo.Draw('hist')
+                    histo.GetYaxis().SetRangeUser( (0.01 if logY else 0), (10 if logY else 2))
+                    histo.Draw('hist')
+                else:
+                    histo.Draw('histsame')
+                l.AddEntry(histo, histo.legendText)
+                c1.SetLogy(logY)
+            l.Draw()
+
+            plot_directory_ = os.path.join( plot_directory, "shape_plots", "nTraining_%i"%args.nTraining, "log" if logY else "lin" )
             helpers.copyIndexPHP( plot_directory_ )
             c1.Print( os.path.join( plot_directory_, feature+'.png' ))
 
@@ -327,12 +362,10 @@ if args.debug:
     l.SetShadowColor(ROOT.kWhite)
     l.SetBorderSize(0)
 
-
     training_losses.GetXaxis().SetTitle("N_{B}")
     training_losses.GetYaxis().SetTitle("Loss")
     l.AddEntry(training_losses, "train")
     l.AddEntry(test_losses, "test")
-
 
     test_losses.SetLineWidth(2)
     test_losses.SetLineColor(ROOT.kRed+2)
@@ -355,6 +388,20 @@ if args.debug:
     tex.SetNDC()
     tex.SetTextSize(0.06)
 
+    # colors
+    color = {}
+    i_lin, i_diag, i_mixed = 0,0,0
+    for i_der, der in enumerate(bit.derivatives):
+        if len(der)==1:
+            color[der] = ROOT.kAzure + i_lin
+            i_lin+=1
+        elif len(der)==2 and len(set(der))==1:
+            color[der] = ROOT.kRed + i_diag
+            i_diag+=1
+        elif len(der)==2 and len(set(der))==2:
+            color[der] = ROOT.kGreen + i_mixed
+            i_mixed+=1
+
     # Which iterations to plot
     plot_iterations = list(range(1,10))+list(range(10,bit.n_trees+1,10))
     # Add plot iterations from command line, if provided
@@ -365,45 +412,160 @@ if args.debug:
             plot_iterations = args.plot_iterations
         plot_iterations.sort()
 
+
+#    for max_n_tree in plot_iterations:
+#        if max_n_tree==0: max_n_tree=1
+#        test_predictions = bit.vectorized_predict(test_features, max_n_tree = max_n_tree)
+#
+#
+#        w0 = test_weights[()]
+#        h_w0, h_ratio_prediction, h_ratio_truth, lin_binning = {}, {}, {}, {}
+#        for i_feature, feature in enumerate(model.feature_names):
+#            # root style binning
+#            binning     = model.plot_options[feature]['binning']
+#            # linspace binning
+#            lin_binning[feature] = np.linspace(binning[1], binning[2], binning[0]+1)
+#            #digitize feature
+#            binned      = np.digitize(test_features[:,i_feature], lin_binning[feature] )
+#            # for each digit, create a mask to select the corresponding event in the bin (e.g. test_features[mask[0]] selects features in the first bin
+#            mask        = np.transpose( binned.reshape(-1,1)==range(1,len(lin_binning[feature])) )
+#
+#            h_w0[feature]           = np.array([  w0[m].sum() for m in mask])
+#            h_derivative_prediction = np.array([ (w0.reshape(-1,1)*test_predictions)[m].sum(axis=0) for m in mask])
+#            h_derivative_truth      = np.array([ (np.transpose(np.array([test_weights[der] for der in bit.derivatives])))[m].sum(axis=0) for m in mask])
+#
+#            h_ratio_prediction[feature] = h_derivative_prediction/h_w0[feature].reshape(-1,1) 
+#            h_ratio_truth[feature]      = h_derivative_truth/h_w0[feature].reshape(-1,1)
+#
+#        n_pads = len(model.feature_names)+1
+#        n_col  = min(4, n_pads)
+#        n_rows = n_pads//n_col
+#        if n_rows*n_col<n_pads: n_rows+=1
+#
+#        for logY in [False, True]:
+#            c1 = ROOT.TCanvas("c1","multipads",500*n_col,500*n_rows);
+#            c1.Divide(n_col,n_rows)
+#
+#            l = ROOT.TLegend(0.2,0.1,0.9,0.85)
+#            stuff.append(l)
+#            l.SetNColumns(2)
+#            l.SetFillStyle(0)
+#            l.SetShadowColor(ROOT.kWhite)
+#            l.SetBorderSize(0)
+#
+#            for i_feature, feature in enumerate(model.feature_names):
+#
+#                th1d_yield       = helpers.make_TH1F( (h_w0[feature], lin_binning[feature]) )
+#                c1.cd(i_feature+1)
+#                ROOT.gStyle.SetOptStat(0)
+#                th1d_ratio_pred  = { der: helpers.make_TH1F( (h_ratio_prediction[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
+#                th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
+#
+#                stuff.append(th1d_yield)
+#                stuff.append(th1d_ratio_truth)
+#                stuff.append(th1d_ratio_pred)
+#
+#                th1d_yield.SetLineColor(ROOT.kGray+2)
+#                th1d_yield.SetMarkerColor(ROOT.kGray+2)
+#                th1d_yield.SetMarkerStyle(0)
+#                th1d_yield.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+#                th1d_yield.SetTitle("")
+#
+#                th1d_yield.Draw("hist")
+#
+#                for i_der, der in enumerate(bit.derivatives):
+#                    th1d_ratio_truth[der].SetTitle("")
+#                    th1d_ratio_truth[der].SetLineColor(color[der])
+#                    th1d_ratio_truth[der].SetMarkerColor(color[der])
+#                    th1d_ratio_truth[der].SetMarkerStyle(0)
+#                    th1d_ratio_truth[der].SetLineWidth(2)
+#                    th1d_ratio_truth[der].SetLineStyle(ROOT.kDashed)
+#                    th1d_ratio_truth[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+#
+#                    th1d_ratio_pred[der].SetTitle("")
+#                    th1d_ratio_pred[der].SetLineColor(color[der])
+#                    th1d_ratio_pred[der].SetMarkerColor(color[der])
+#                    th1d_ratio_pred[der].SetMarkerStyle(0)
+#                    th1d_ratio_pred[der].SetLineWidth(2)
+#                    th1d_ratio_pred[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+#
+#                    tex_name = "%s"%(",".join( der ))
+# 
+#                    if i_feature==0:
+#                        l.AddEntry( th1d_ratio_truth[der], "R("+tex_name+")")
+#                        l.AddEntry( th1d_ratio_pred[der],  "#hat{R}("+tex_name+")")
+#
+#                if i_feature==0:
+#                    l.AddEntry( th1d_yield, "yield (SM)")
+#
+#                max_ = max( map( lambda h:h.GetMaximum(), th1d_ratio_truth.values() ))
+#                max_ = 10**(1.5)*max_ if logY else 1.5*max_
+#                min_ = min( map( lambda h:h.GetMinimum(), th1d_ratio_truth.values() ))
+#                min_ = 0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_)
+#
+#                th1d_yield_min = th1d_yield.GetMinimum()
+#                th1d_yield_max = th1d_yield.GetMaximum()
+#                for bin_ in range(1, th1d_yield.GetNbinsX() ):
+#                    th1d_yield.SetBinContent( bin_, (th1d_yield.GetBinContent( bin_ ) - th1d_yield_min)/th1d_yield_max*(max_-min_)*0.95 + min_  )
+#
+#                #th1d_yield.Scale(max_/th1d_yield.GetMaximum())
+#                th1d_yield   .Draw("hist")
+#                ROOT.gPad.SetLogy(logY)
+#                th1d_yield   .GetYaxis().SetRangeUser(min_, max_)
+#                th1d_yield   .Draw("hist")
+#                for h in list(th1d_ratio_truth.values()) + list(th1d_ratio_pred.values()):
+#                    h .Draw("hsame")
+#
+#            c1.cd(len(model.feature_names)+1)
+#            l.Draw()
+#
+#            lines = [ (0.29, 0.9, 'N_{B} =%5i'%( max_n_tree )) ]
+#            drawObjects = [ tex.DrawLatex(*line) for line in lines ]
+#            for o in drawObjects:
+#                o.Draw()
+#
+#            plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logY else "lin" )
+#            if not os.path.isdir(plot_directory_):
+#                try:
+#                    os.makedirs( plot_directory_ )
+#                except IOError:
+#                    pass
+#            helpers.copyIndexPHP( plot_directory_ )
+#            c1.Print( os.path.join( plot_directory_, "epoch_%05i.png"%(max_n_tree) ) )
+#            syncer.makeRemoteGif(plot_directory_, pattern="epoch_*.png", name="epoch" )
+#        syncer.sync()
+#
+#    # binning from truth
+#    derivative_binning = {der: [50]+list(np.quantile(test_weights[der]/test_weights[()],(0.005,0.995))) for der in bit.derivatives }
+#
     for max_n_tree in plot_iterations:
         if max_n_tree==0: max_n_tree=1
-        stuff = []
+
         test_predictions = bit.vectorized_predict(test_features, max_n_tree = max_n_tree)
 
-        # colors
-        color = {}
-        i_lin, i_diag, i_mixed = 0,0,0
-        for i_der, der in enumerate(bit.derivatives):
-            if len(der)==1:
-                color[der] = ROOT.kAzure + i_lin
-                i_lin+=1
-            elif len(der)==2 and len(set(der))==1:
-                color[der] = ROOT.kRed + i_diag
-                i_diag+=1
-            elif len(der)==2 and len(set(der))==2:
-                color[der] = ROOT.kGreen + i_mixed
-                i_mixed+=1
+        ## binning from the prediction
+        derivative_binning = {der: np.quantile(test_weights[der]/test_weights[()],np.linspace(0.005,.995,21)) for der in bit.derivatives }
 
         w0 = test_weights[()]
         h_w0, h_ratio_prediction, h_ratio_truth, lin_binning = {}, {}, {}, {}
-        for i_feature, feature in enumerate(model.feature_names):
+        for i_derivative, derivative in enumerate(bit.derivatives):
             # root style binning
-            binning     = model.plot_options[feature]['binning']
+            #binning     = derivative_binning[derivative] 
             # linspace binning
-            lin_binning[feature] = np.linspace(binning[1], binning[2], binning[0]+1)
+            lin_binning[derivative] = derivative_binning[derivative] 
             #digitize feature
-            binned      = np.digitize(test_features[:,i_feature], lin_binning[feature] )
+            binned      = np.digitize(test_predictions[:,i_derivative], lin_binning[derivative] )
             # for each digit, create a mask to select the corresponding event in the bin (e.g. test_features[mask[0]] selects features in the first bin
-            mask        = np.transpose( binned.reshape(-1,1)==range(1,len(lin_binning[feature])) )
+            mask        = np.transpose( binned.reshape(-1,1)==range(1,len(lin_binning[derivative])) )
 
-            h_w0[feature]           = np.array([  w0[m].sum() for m in mask])
-            h_derivative_prediction = np.array([ (w0.reshape(-1,1)*test_predictions)[m].sum(axis=0) for m in mask])
+            h_w0[derivative]        = np.array([  w0[m].sum() for m in mask])
+            #h_derivative_prediction = np.array([ (w0.reshape(-1,1)*test_predictions)[m].sum(axis=0) for m in mask])
             h_derivative_truth      = np.array([ (np.transpose(np.array([test_weights[der] for der in bit.derivatives])))[m].sum(axis=0) for m in mask])
 
-            h_ratio_prediction[feature] = h_derivative_prediction/h_w0[feature].reshape(-1,1) 
-            h_ratio_truth[feature]      = h_derivative_truth/h_w0[feature].reshape(-1,1)
+            #h_ratio_prediction[derivative] = h_derivative_prediction/h_w0[derivative].reshape(-1,1) 
+            h_ratio_truth[derivative]      = h_derivative_truth/h_w0[derivative].reshape(-1,1)
 
-        n_pads = len(model.feature_names)+1
+        n_pads = len(bit.derivatives)+1
         n_col  = min(4, n_pads)
         n_rows = n_pads//n_col
         if n_rows*n_col<n_pads: n_rows+=1
@@ -419,22 +581,22 @@ if args.debug:
             l.SetShadowColor(ROOT.kWhite)
             l.SetBorderSize(0)
 
-            for i_feature, feature in enumerate(model.feature_names):
+            for i_derivative, derivative in enumerate(bit.derivatives):
 
-                th1d_yield       = helpers.make_TH1F( (h_w0[feature], lin_binning[feature]) )
-                c1.cd(i_feature+1)
+                th1d_yield       = helpers.make_TH1F( (h_w0[derivative], lin_binning[derivative]) )
+                c1.cd(i_derivative+1)
                 ROOT.gStyle.SetOptStat(0)
-                th1d_ratio_pred  = { der: helpers.make_TH1F( (h_ratio_prediction[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
-                th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
+                th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[derivative][:,i_der], lin_binning[derivative])) for i_der, der in enumerate( bit.derivatives ) }
 
                 stuff.append(th1d_yield)
                 stuff.append(th1d_ratio_truth)
-                stuff.append(th1d_ratio_pred)
+
+                texX = "BIT_{%s}"%(",".join( derivative ))
 
                 th1d_yield.SetLineColor(ROOT.kGray+2)
                 th1d_yield.SetMarkerColor(ROOT.kGray+2)
                 th1d_yield.SetMarkerStyle(0)
-                th1d_yield.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                th1d_yield.GetXaxis().SetTitle(texX)
                 th1d_yield.SetTitle("")
 
                 th1d_yield.Draw("hist")
@@ -446,22 +608,14 @@ if args.debug:
                     th1d_ratio_truth[der].SetMarkerStyle(0)
                     th1d_ratio_truth[der].SetLineWidth(2)
                     th1d_ratio_truth[der].SetLineStyle(ROOT.kDashed)
-                    th1d_ratio_truth[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                    th1d_ratio_truth[der].GetXaxis().SetTitle(texX)
 
-                    th1d_ratio_pred[der].SetTitle("")
-                    th1d_ratio_pred[der].SetLineColor(color[der])
-                    th1d_ratio_pred[der].SetMarkerColor(color[der])
-                    th1d_ratio_pred[der].SetMarkerStyle(0)
-                    th1d_ratio_pred[der].SetLineWidth(2)
-                    th1d_ratio_pred[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                    #tex_name = "_{%s}"%(",".join([model.tex[c].lstrip("C_{")[:-1] if model.tex[c].startswith('C_') else model.tex[c] for c in der]))
+                    tex_name = "%s"%(",".join( der ))
+                    if i_derivative==0:
+                        l.AddEntry( th1d_ratio_truth[der], tex_name)
 
-                    tex_name = "_{%s}"%(",".join([model.tex[c].lstrip("C_{")[:-1] if model.tex[c].startswith('C_') else model.tex[c] for c in der]))
-
-                    if i_feature==0:
-                        l.AddEntry( th1d_ratio_truth[der], "R"+tex_name)
-                        l.AddEntry( th1d_ratio_pred[der],  "#hat{R}"+tex_name)
-
-                if i_feature==0:
+                if i_derivative==0:
                     l.AddEntry( th1d_yield, "yield (SM)")
 
                 max_ = max( map( lambda h:h.GetMaximum(), th1d_ratio_truth.values() ))
@@ -471,7 +625,7 @@ if args.debug:
 
                 th1d_yield_min = th1d_yield.GetMinimum()
                 th1d_yield_max = th1d_yield.GetMaximum()
-                for bin_ in range(1, th1d_yield.GetNbinsX() ):
+                for bin_ in range(1, th1d_yield.GetNbinsX()+1 ):
                     th1d_yield.SetBinContent( bin_, (th1d_yield.GetBinContent( bin_ ) - th1d_yield_min)/th1d_yield_max*(max_-min_)*0.95 + min_  )
 
                 #th1d_yield.Scale(max_/th1d_yield.GetMaximum())
@@ -479,10 +633,10 @@ if args.debug:
                 ROOT.gPad.SetLogy(logY)
                 th1d_yield   .GetYaxis().SetRangeUser(min_, max_)
                 th1d_yield   .Draw("hist")
-                for h in list(th1d_ratio_truth.values()) + list(th1d_ratio_pred.values()):
+                for h in list(th1d_ratio_truth.values()):# + list(th1d_ratio_pred.values()):
                     h .Draw("hsame")
 
-            c1.cd(len(model.feature_names)+1)
+            c1.cd(len(bit.derivatives)+1)
             l.Draw()
 
             lines = [ (0.29, 0.9, 'N_{B} =%5i'%( max_n_tree )) ]
@@ -497,6 +651,6 @@ if args.debug:
                 except IOError:
                     pass
             helpers.copyIndexPHP( plot_directory_ )
-            c1.Print( os.path.join( plot_directory_, "epoch_%05i.png"%(max_n_tree) ) )
-            syncer.makeRemoteGif(plot_directory_, pattern="epoch_*.png", name="epoch" )
+            c1.Print( os.path.join( plot_directory_, "BIT_epoch_%05i.png"%(max_n_tree) ) )
+            syncer.makeRemoteGif(plot_directory_, pattern="BIT_epoch_*.png", name="BIT_epoch" )
         syncer.sync()

@@ -6,118 +6,133 @@ from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 import torch.nn as nn
 import os
 
-
 ######################### import training data ########################
-my_file = open("Event_properties.txt", "r")
+# In the following, it would be much better to have a 'config.py' with all the hard-coded definitons and import it. E.g. 'import tttt as config' -> then use config.content_list
+my_file = open("Event_properties.txt", "r") 
 content = my_file.read()
-content_list = content.split('\n')
+content_list = list(filter( lambda c:len(c)>0, content.split('\n') )) # there was an empty string at the end. 
 my_file.close()
 
 print("I. content list read")
 
-array1 = uproot.concatenate( ['/eos/vbc/group/cms/robert.schoefbeck/TMB/training-ntuples-tttt-v2/MVA-training/tttt_2l/TTTT/TTTT.root'], content_list )
-array2 = uproot.concatenate( ['/eos/vbc/group/cms/robert.schoefbeck/TMB/training-ntuples-tttt-v2/MVA-training/tttt_2l/TTLep_bb/TTLep_bb.root'], content_list )
-array3 = uproot.concatenate( ['/eos/vbc/group/cms/robert.schoefbeck/TMB/training-ntuples-tttt-v2/MVA-training/tttt_2l/TTLep_cc/TTLep_cc.root'], content_list )
-array4 = uproot.concatenate( ['/eos/vbc/group/cms/robert.schoefbeck/TMB/training-ntuples-tttt-v2/MVA-training/tttt_2l/TTLep_other/TTLep_other.root'], content_list )
+samples   = ["TTTT", "TTLep_bb", "TTLep_cc", "TTLep_other"] # -> samples and directory should also go to a config because they are training specific. Always separate the algorithm from the data+config
+directory = "/eos/vbc/group/cms/robert.schoefbeck/TMB/training-ntuples-tttt-v2/MVA-training/tttt_2l/"
 
-print("II. data read")
+# load events in dictionary of np.array (the 2nd line reduces memory consumption ... not dramatically though) You hardly need a data generator if you load all the data at once. But OK for this problem
+x = { sample: uproot.concatenate( os.path.join( directory, "{sample}/{sample}.root".format(sample=sample))) for sample in samples }
+x = { sample: np.array( [ getattr( array, branch ) for branch in content_list ] ).transpose() for sample, array in x.items() }
 
-data1 = array1.to_numpy()
-data2 = array2.to_numpy()
-data3 = array3.to_numpy()
-data4 = array4.to_numpy()
+# weight wrt to largest sample
+n_max_events= max(map( len, x.values() ))
+w = {sample:n_max_events/len(x[sample]) for sample in samples}
 
-
-np.savetxt("localdata1.txt", data1)
-np.savetxt("localdata2.txt", data2)
-np.savetxt("localdata3.txt", data3)
-np.savetxt("localdata4.txt", data4)
-
-print("III. data converted")
 #######################################################################
-
-
-
-
 
 ###################### general parameters #############################
 batches = 10000
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 learning_rate = 0.001
 n_epochs= 10
-input_size = 35
-hidden_size = 2*input_size
+input_size = len(content_list) # no need to hard-code
+hidden_size = 2*input_size     # could be a list in a config
 #hidden_size2 = 4*input_size
 #hidden_size3 = input_size+5
-output_size = 4
+output_size = len(samples)     # no need to hard-code
 #######################################################################
 
+# I understand you can write a class, but np & python offer so much flexibility with arrays and data that it is not really needed
+# For now we can just do:
+#(I start counting at zero as is common)
+y = {sample:i_sample*np.ones(len(x[sample])) for i_sample, sample in enumerate(samples)}
 
+#class NewDataset(Dataset):
+#
+#    def __init__(self, data, number):
+#        xy = data
+#        self.n_samples = xy.shape[0]
+#        self.x_data = torch.from_numpy(xy[:]) 
+#        self.y_data = torch.from_numpy(xy[:, [0,0,0,0]]) #size [n_samples, 4]
+#        for i in range (self.n_samples):
+#            self.y_data[i][:] = 0
+#            self.y_data[i][number-1] = int(1)
+#            
+#    def __getitem__(self, index):
+#        return self.x_data[index], self.y_data[index]
+#
+#    def __len__(self):
+#        return self.n_samples
+#
+#    def __givey__(self):
+#        return self.y_data
+#
+#
+#
+#class NewDataset(Dataset):
+#
+#    def __init__(self, number):
+#        path = './localdata'+str(number)+'.txt' 
+#        xy = np.loadtxt(path, delimiter=None, dtype=np.float32, skiprows=0)
+#        self.n_samples = xy.shape[0]
+#        self.x_data = torch.from_numpy(xy[:, :]) 
+#        self.y_data = torch.from_numpy(xy[:, [0,0,0,0]]) #size [n_samples, 4]
+#        for i in range (self.n_samples):
+#            self.y_data[i][:] = 0
+#            self.y_data[i][number-1] = int(1)
+#            
+#    def __getitem__(self, index):
+#        return self.x_data[index], self.y_data[index]
+#
+#    def __len__(self):
+#        return self.n_samples
+#    
+#    def __givey__(self):
+#        return self.y_data
+#
+#
+#
+#
+################################ 1. DATA PREPARATION ###############################
+## create datasets
+#dataset0 = NewDataset(1)
+#dataset1 = NewDataset(2)
+#dataset2 = NewDataset(3)
+#dataset3 = NewDataset(4)
+#l0 = len(dataset0)
+#l1 = len(dataset1)
+#l2 = len(dataset2)
+#l3 = len(dataset3)
+#num = l0+l1+l2+l3
+#
+#print("IV. number of training events: ", num)
+#
+#x0, y0 = dataset0[:]
+#x1, y1 = dataset1[:]
+#x2, y2 = dataset2[:]
+#x3, y3 = dataset3[:]
+#
+#datadef = torch.utils.data.ConcatDataset([dataset0,dataset1,dataset2,dataset3])
+#y_full = torch.cat([y0, y1, y2, y3], dim=0, out=None)
+#x_full = torch.cat([x0, x1, x2, x3], dim=0, out=None)
+#
+#weight = []
+#for i in range (l0):
+#    weight.append(1/l0)
+#for i in range (l1):
+#    weight.append(1/l1)
+#for i in range (l2):
+#    weight.append(2.5/l2)
+#for i in range (l3):
+#    weight.append(4/l3)    
+#weight = np.array(weight)
 
-
-
-class NewDataset(Dataset):
-
-    def __init__(self, number):
-        path = './localdata'+str(number)+'.txt' 
-        xy = np.loadtxt(path, delimiter=None, dtype=np.float32, skiprows=0)
-        self.n_samples = xy.shape[0]
-        self.x_data = torch.from_numpy(xy[:, :]) 
-        self.y_data = torch.from_numpy(xy[:, [0,0,0,0]]) #size [n_samples, 4]
-        for i in range (self.n_samples):
-            self.y_data[i][:] = 0
-            self.y_data[i][number-1] = int(1)
-            
-    def __getitem__(self, index):
-        return self.x_data[index], self.y_data[index]
-
-    def __len__(self):
-        return self.n_samples
-    
-    def __givey__(self):
-        return self.y_data
-
-
-
-
-############################### 1. DATA PREPARATION ###############################
-# create datasets
-dataset0 = NewDataset(1)
-dataset1 = NewDataset(2)
-dataset2 = NewDataset(3)
-dataset3 = NewDataset(4)
-l0 = len(dataset0)
-l1 = len(dataset1)
-l2 = len(dataset2)
-l3 = len(dataset3)
-num = l0+l1+l2+l3
-
-print("IV. number of training events: ", num)
-
-x0, y0 = dataset0[:]
-x1, y1 = dataset1[:]
-x2, y2 = dataset2[:]
-x3, y3 = dataset3[:]
-
-datadef = torch.utils.data.ConcatDataset([dataset0,dataset1,dataset2,dataset3])
-y_full = torch.cat([y0, y1, y2, y3], dim=0, out=None)
-x_full = torch.cat([x0, x1, x2, x3], dim=0, out=None)
-
-weight = []
-for i in range (l0):
-    weight.append(1/l0)
-for i in range (l1):
-    weight.append(1/l1)
-for i in range (l2):
-    weight.append(2.5/l2)
-for i in range (l3):
-    weight.append(4/l3)    
-weight = np.array(weight)
-
-samples_weight = torch.from_numpy(weight)
+# make weights. This wastes some memory, but OK.
+samples_weight = np.concatenate([ [w[sample]]*len(x[sample]) for sample in samples]) 
 sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
 
-train_loader = DataLoader(dataset=datadef,
+#It is time to concatenate
+x = torch.Tensor(np.concatenate( [x[sample] for sample in samples] ))
+y = torch.Tensor(np.concatenate( [y[sample] for sample in samples] ))
+train_loader = DataLoader(np.hstack((x,y.reshape(-1,1))), # we make the label the last column
                           batch_size=batches,
                           sampler=sampler,
                           num_workers=0)
@@ -125,6 +140,8 @@ print("V. sampled shuffled train loader ready")
 
 
 ######################## 2. SET UP NN ##########################################
+
+# This is good ->
 class NeuralNet(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super(NeuralNet, self).__init__()
@@ -154,18 +171,26 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 losses = []
 print('VI. model ready, training set has {} instances'.format(len(train_loader)))
 
-script_dir = os.path.dirname(__file__)
-results_dir = os.path.join(script_dir, 'Results/')
-print('VII. plot directory ready, starting training')
+# This is not so nice. __file__ does not exist interactively. Also, it writes files wherever your algorithm is coded. Better to have it configurable. 
+# script_dir = os.path.dirname(__file__)
+# For now, we can use ".", i.e., the local directory 
+results_dir = './Results/'
+if not os.path.exists( results_dir ): # Let's not have the user create the directory
+    os.makedirs( results_dir )
 
+print('VII. plot directory ready, starting training')
 
 ############################## 3. TRAINING THE MODEL #############################
 for epoch in range(n_epochs):
     print("		epoch: ", epoch+1 , " of ", n_epochs)
     for i, data in enumerate(train_loader):
-        inputs, labels = data
-        z=model(inputs)
-        loss=criterion(z,labels)
+        inputs = data[:,:-1] # N-1 columns
+        labels = data[:,-1].int()  # last column
+        training_labels = torch.zeros( (len(inputs), len(samples)))
+        for i_sample in range(len(samples)):
+            training_labels[:,i_sample][labels==i_sample]=1
+        z=model(inputs.float()) # The runtimerror I got was: "expected scalar type Double but found Float" Not sure why I have to convert *to* float. Was expecting the opposite.
+        loss=criterion(z,training_labels)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -173,14 +198,15 @@ for epoch in range(n_epochs):
         
         if (i % (len(train_loader)-1))==0:
                with torch.no_grad():
-                    z=model(x_full)
+                    z=model(x)
                     yhat = torch.max(z.data, 1) 
-                    y_testtrue = torch.max(y_full,1)
+                    y_testtrue = y.int() #torch.max(y,1)
                     y_testpred = yhat.indices.numpy()
-                    y_testtrue = y_testtrue.indices.numpy()
+                    #y_testtrue = y_testtrue.indices.numpy()
                     histodata = np.zeros((4,4))
                     bins = [0, 1, 2, 3]
-                    for j in range (len(y_full)):
+                    # this takes excessively long! Use np.histogram
+                    for j in range (len(y)):
                         histodata[y_testtrue[j]][y_testpred[j]]+=1
                     fig, az = plt.subplots(figsize = (7,7))
                     sample_file_name = "epoch="+str(epoch+1)+".png"
