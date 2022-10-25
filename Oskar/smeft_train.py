@@ -14,6 +14,7 @@ from tqdm import trange, tqdm
 
 import os
 import sys
+import pickle
 
 # from tools import syncer 
 # from tools import user
@@ -37,13 +38,16 @@ class MLP(nn.Module):
         del layers[-1:]
         self.mlp = nn.Sequential(*layers)
 
+        self.losses=[]
+        self.epoch=0
+
     def forward(self, x):
         return self.mlp(x)
 
 
 
 
-def learn_lin_weight(model, data_loader, n_epoch=10, learning_rate=1e-3, print_every=1, scheduler=None):
+def learn_lin_weight(model, data_loader, n_epoch=10, learning_rate=1e-3, print_every=1, save_every=None, save_dir=None, scheduler=None):
 
     def loss_fn(pred, w0, w1_0):
         return (w0 * (w1_0 - pred)**2).sum()
@@ -54,7 +58,7 @@ def learn_lin_weight(model, data_loader, n_epoch=10, learning_rate=1e-3, print_e
     if scheduler is not None:
         scheduler = StepLR(optimizer=optimizer, step_size=plot_every, gamma=0.9, verbose=False)
 
-    losses = []
+    #losses = []
     # accuracies = []
     batch_size = data_loader.batch_size
     n_samples = len(data_loader.dataset)
@@ -84,17 +88,24 @@ def learn_lin_weight(model, data_loader, n_epoch=10, learning_rate=1e-3, print_e
             # add batch loss to current epoch loss
             epoch_loss += loss.item()
 
-        losses.append(epoch_loss)
+        model.losses.append(epoch_loss)
+        model.epoch+=1
 
-        if epoch % print_every == 0:
-            print(f'################ epoch: {epoch}, loss: {epoch_loss}')
+        if epoch % print_every == 0 or epoch+1 == n_epoch:
+            print(f'################ epoch: {model.epoch}, loss: {epoch_loss}')
+
+        if save_every is not None and (epoch % save_every == 0 or epoch+1 == n_epoch):
+            file_name = f'epoch_{model.epoch}.pkl'
+            if save_dir is not None
+            with open(file_name, 'wb') as f:
+                pickle.dump(model, f)
 
         if scheduler is not None:
             scheduler.step()
             scheduler.get_last_lr()
 
     # plot loss and accuracy over epochs
-    plt.plot(losses)
+    plt.plot(model.losses)
     plt.title('loss')
     # plt.savefig(os.path.join( user.plot_directory, "loss.png" ) )
     plt.show(block=False)

@@ -45,11 +45,10 @@ w.set_order(2)
 
 # read from root files and filter, specify eft coefficients
 coefficients = ['ctWRe',]
-file_names = '/scratch-cbe/users/robert.schoefbeck/TMB/postprocessed/gen/v2/tschRefPointNoWidthRW/tschRefPointNoWidthRW_0.root'
+file_names = '/scratch-cbe/users/robert.schoefbeck/TMB/postprocessed/gen/v2/tschRefPointNoWidthRW/tschRefPointNoWidthRW_0.root:Events'
 selection = '(genJet_pt>500) & (genJet_SDmass>0) & (abs(dR_genJet_maxQ1Q2b)<0.6) & (genJet_SDsubjet1_mass>=0)'
 def load_data(file_names=file_names, selection=selection, coefficients=coefficients):
 	# get branch names and fromat file names
-	file_names = file_names+':Events'
 	scalar_branches, vector_branches = get_branch_names()
 	# load scalar and vector branches as awkward arrays
 	scalar_events = uproot.concatenate(file_names, cut=selection, branches=scalar_branches)							
@@ -119,7 +118,7 @@ def plot_eft_hists(data, branch_list, weights, bins=50, theta=(-1.0,1.0)):
 		plt.title(branch)
 		plt.legend()
 	plt.savefig(os.path.join(plot_directory,'hists.png'))
-	print(f'saved file to {os.path.join(plot_directory,"hists.png")}')
+
 
 
 
