@@ -193,9 +193,9 @@ for epoch in range(n_epochs):
                     plt.xticks([])
                     lab = "epoch = "+str(epoch+1)
                     plt.title(lab)
-			  plt.show(block=False)
+		    #plt.show(block=False)
                     plt.savefig(results_dir + sample_file_name)
-                    plt.pause(.1)
+                    #plt.pause(.1)
         
         
         
