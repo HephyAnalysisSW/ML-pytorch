@@ -14,7 +14,7 @@ directory = config.directory
 batches = 10000
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 learning_rate = 0.001
-n_epochs= 10
+n_epochs= 1
 input_size = len(content_list) 
 hidden_size = 2*input_size
 output_size = len(samples)
@@ -91,7 +91,7 @@ for epoch in range(n_epochs):
         optimizer.step()
         losses.append(loss.data)
         
-        if (i % (len(train_loader)-1))==0:
+        if (i % (len(train_loader)))==0:
                with torch.no_grad():
                     z = model(x)
                     y_testpred = torch.max(z.data, 1).indices.numpy() 
@@ -121,25 +121,24 @@ plt.savefig(results_dir + sample_file_name)
 
 ############################### test the model #####################################
 with torch.no_grad():
-    z = model(x)
-    y_testpred = torch.max(z.data, 1).indices.numpy() 
-    y_testtrue = y.int()
-    hist1 = []; hist2 = []; hist3 = []; hist4 = []
-    bins = [0, 1, 2, 3, 4]
-    for j in range (len(y)):
-        if (y_testtrue[j] == 0): hist1.append(y_testpred[j])
-        if (y_testtrue[j] == 1): hist2.append(y_testpred[j])
-        if (y_testtrue[j] == 2): hist3.append(y_testpred[j])
-        if (y_testtrue[j] == 3): hist4.append(y_testpred[j])
-    fig, az = plt.subplots(2, 1, figsize = (7,7))
-    plt.xticks([])
-    plt.title("Model vs. Test")
-    az[0].hist([hist1, hist2, hist3, hist4], bins, stacked = True,label = ["TTTT", "TTLep_bb","TTLep_cc","TTLep_other"]) 
-    plt.xticks([])
-    az[1].hist(y_testtrue, bins) 
-    sample_file_name = "final_dnn_output.png"
-    plt.savefig(results_dir + sample_file_name)
-    plt.show()
-
-
-torch.onnx.export(model, x, "./model.onnx")   
+    #z = model(x)
+    #y_testpred = torch.max(z.data, 1).indices.numpy() 
+    #y_testtrue = y.int()
+    #hist1 = []; hist2 = []; hist3 = []; hist4 = []
+    #bins = [0, 1, 2, 3, 4]
+    #for j in range (len(y)):
+     #   if (y_testtrue[j] == 0): hist1.append(y_testpred[j])
+      #  if (y_testtrue[j] == 1): hist2.append(y_testpred[j])
+       # if (y_testtrue[j] == 2): hist3.append(y_testpred[j])
+        #if (y_testtrue[j] == 3): hist4.append(y_testpred[j])
+    #fig, az = plt.subplots(2, 1, figsize = (7,7))
+    #plt.xticks([])
+    #plt.title("Model vs. Test")
+    #az[0].hist([hist1, hist2, hist3, hist4], bins, stacked = True,label = ["TTTT", "TTLep_bb","TTLep_cc","TTLep_other"]) 
+    #plt.xticks([])
+    #az[1].hist(y_testtrue, bins) 
+    #sample_file_name = "final_dnn_output.png"
+    #plt.savefig(results_dir + sample_file_name)
+    #plt.show()
+    dummyx = x[0,:].reshape(1,len(content_list))
+    torch.onnx.export(model, dummyx, "./model.onnx")   
