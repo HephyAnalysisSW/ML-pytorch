@@ -2,7 +2,7 @@ import sys
 sys.path.insert(0, '..')
 
 import os
-plot_directory = '/groups/hephy/cms/oskar.rothbacher/www/pytorch/genTops/genTops'
+
 
 import numpy as np
 import awkward as ak
@@ -13,11 +13,10 @@ from torch.utils.data import DataLoader
 import uproot
 from tools.WeightInfo    import WeightInfo
 
-import matplotlib.pyplot as plt
 
 
 
-# specify whichobservables to plot
+# specify which observables to plot
 def get_branch_names():
 	from branches import branches
 	with uproot.open('/scratch-cbe/users/robert.schoefbeck/TMB/postprocessed/gen/v2/tschRefPointNoWidthRW/tschRefPointNoWidthRW_0.root:Events') as f:
@@ -79,6 +78,7 @@ def weight_theta(weights, theta):
                                     )
     return weight_theta
 
+
 # join the data and the labels in a jointdataset
 class JointDataset(Dataset):
     def __init__(self, x, y):
@@ -91,45 +91,41 @@ class JointDataset(Dataset):
     def __getitem__(self, idx):
         return self.x[idx], *tuple(y[idx] for y in self.y)
 
-# class JointDataset(Dataset):
-#     def __init__(self, x1, x2, y):
-#         self.x1 = x1
-#         self.x2 = x2
-#         self.y = y
 
-#     def __len__(self):
-#         return len(self.x1)
+# https://stackoverflow.com/questions/21844024/weighted-percentile-using-numpy
+def weighted_quantile(values, quantiles, sample_weight=None,
+                      values_sorted=False, old_style=False):
+    """ Very close to numpy.percentile, but supports weights.
+    NOTE: quantiles should be in [0, 1]!
+    :param values: numpy.array with data
+    :param quantiles: array-like with many quantiles needed
+    :param sample_weight: array-like of the same length as `array`
+    :param values_sorted: bool, if True, then will avoid sorting of
+        initial array
+    :param old_style: if True, will correct output to be consistent
+        with numpy.percentile.
+    :return: numpy.array with computed quantiles.
+    """
+    values = np.array(values)
+    quantiles = np.array(quantiles)
+    if sample_weight is None:
+        sample_weight = np.ones(len(values))
+    sample_weight = np.array(sample_weight)
+    assert np.all(quantiles >= 0) and np.all(quantiles <= 1), \
+        'quantiles should be in [0, 1]'
 
-#     def __getitem__(self, idx):
-#         return self.x1[idx], self.x2[idx], self.y[idx]
+    if not values_sorted:
+        sorter = np.argsort(values)
+        values = values[sorter]
+        sample_weight = sample_weight[sorter]
 
-
-# plot function
-def plot_eft_hists(data, branch_list, weights, bins=50, theta=(-1.0,1.0)):
-	n_plots = int(np.ceil(np.sqrt(len(branch_list))))
-	plt.subplots(figsize=[10*n_plots,10*n_plots])
-	for n, branch in enumerate(branch_list):
-		plt.subplot(n_plots,n_plots,n+1)
-		plt.hist(data[:,n], bins=bins, weights=weights[:,0],
-					histtype='step', color='black', label='ctW=0', density=True)
-		for th in theta:
-			plt.hist(data[:,n], bins=bins, weights=weight_theta(weights, th),
-						histtype='step', label=f'ctW={th}', density=True)
-		plt.title(branch)
-		plt.legend()
-	plt.savefig(os.path.join(plot_directory,'hists.png'))
-
-
-
-
-
-
-
-
-
-
-
-# # get the features from the branches of interest
-# # features = np.stack([events[branch].to_numpy() for branch in branches], axis = 1)
-
+    weighted_quantiles = np.cumsum(sample_weight) - 0.5 * sample_weight
+    if old_style:
+        # To be convenient with numpy.percentile
+        weighted_quantiles -= weighted_quantiles[0]
+        weighted_quantiles /= weighted_quantiles[-1]
+    else:
+        weighted_quantiles /= np.sum(sample_weight)
+    return np.interp(quantiles, weighted_quantiles, values)
+   
 
