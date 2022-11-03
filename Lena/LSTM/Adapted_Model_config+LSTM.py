@@ -14,7 +14,7 @@ directory = config.directory
 batches = 10000
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 learning_rate = 0.001
-n_epochs= 10
+n_epochs= 1
 input_size = len(content_list) 
 hidden_size = 2*input_size
 hidden_size2 = input_size + 5
@@ -148,7 +148,9 @@ criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) 
 losses = []
 
-results_dir = './Results/'
+dir_name = 'Results'
+if (LSTM): dir_name = dir_name +  '_LSTM'
+results_dir = './'+dir_name+'/'
 if not os.path.exists( results_dir ): 
     os.makedirs( results_dir )
 
@@ -165,7 +167,7 @@ for epoch in range(n_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print(loss.data)
+        #print(loss.data)
         
     with torch.no_grad():
         z = model(X, V)
@@ -182,7 +184,7 @@ for epoch in range(n_epochs):
         plt.xticks([])
         plt.hist([hist1, hist2, hist3, hist4], bins, stacked = True,label = ["TTTT", "TTLep_bb","TTLep_cc","TTLep_other"]) 
         plt.legend()
-        lab = "epoch = "+str(epoch)+"   batch = " + str(i)
+        lab = "epoch = "+str(epoch)
         plt.title(lab)
         sample_file_name = "epoch="+str(epoch+1)+".png"
         plt.savefig(results_dir + sample_file_name)
@@ -196,6 +198,12 @@ plt.savefig(results_dir + sample_file_name)
 
 ############################### test the model #####################################
 with torch.no_grad():
-    v = V[0,:].reshape(1,len(content_list))
-    x = X[0,:].reshape(max_timestep,len(vector_branches))
-    torch.onnx.export(model, (x,v), "./model_probe.onnx")   
+    x = X[0,:].reshape(1,len(content_list))
+    if (LSTM):
+        v = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
+        name = "./model_lstm.onnx"
+    else: 
+        v = V[0].reshape(1,1)
+        name = "./model.onnx"       
+    torch.onnx.export(model,args=(x, v),f=name,input_names=["input1", "input2"],output_names=["output1"]) 
+  
