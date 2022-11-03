@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import os
 import sys
 sys.path.append('..')
+sys.path.insert(0, '../..')
 #from tools import syncer 
 from tools import user
 
