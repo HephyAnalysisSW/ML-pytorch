@@ -45,6 +45,7 @@ def make_eft(**kwargs):
 random_eft = make_eft(**{v:random.random() for v in w.variables} )
 sm         = make_eft()
 
+wilson_coefficients = w.variables 
 feature_names = [   "genJet_pt", "genJet_mass", "genJet_nConstituents",
                     "genJet_SDmass", "genJet_SDsubjet0_deltaEta", "genJet_SDsubjet0_deltaPhi", "genJet_SDsubjet0_deltaR",
                     "genJet_SDsubjet0_mass", "genJet_SDsubjet1_deltaEta", "genJet_SDsubjet1_deltaPhi",
@@ -67,8 +68,7 @@ def make_combinations( coefficients ):
 
 def getEvents( nTraining ):
     data_generator.load(-1, small=nTraining )
-    coefficients = ['ctWRe', 'ctWIm']
-    combinations = make_combinations( coefficients )
+    combinations = make_combinations( wilson_coefficients )
     coeffs = data_generator.vector_branch('p_C')
     return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,w.combinations.index(comb)] for comb in combinations}
 
