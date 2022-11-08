@@ -1,3 +1,4 @@
+
 # Tasks
 
 ## Open
@@ -10,12 +11,26 @@
 * technical test of the ParticlNet 
 * implement and train a dnn for ctWRe in pytorch
 
-
     
 # Journal
 
-### 31.01 - 04.11
+<!---
+this is a template for a week entry
+
+<details><summary><font size="4">
+    07.11 - 11.11
+</font></summary>
+    
+</details>
+
+-->
+
+<details><summary><font size="4">
+    31.01 - 04.11 
+</font></summary><p>
+    
 ***
+    
 * made my train and plot scripts executable in the console
 * start to replicate the training in weaver (without weights)
 
@@ -39,3 +54,11 @@
 **histogram of the dnn output with weighted quantiled bins corresponding to ctWRE=0 (sm)**
 
 ![estimator_hist](https://orothbac.web.cern.ch/Journal/3101_0411_22/eft_dnn_plots/estimator_hist.png)
+    
+</p></details>
+
+<details><summary><font size="4">
+    07.11 - 11.11
+</font></summary>
+    
+</details>
