@@ -20,7 +20,11 @@ this is a template for a week entry
 <details><summary><font size="4">
     07.11 - 11.11
 </font></summary>
-    
+
+***
+
+*text
+
 </details>
 
 -->
@@ -60,5 +64,9 @@ this is a template for a week entry
 <details><summary><font size="4">
     07.11 - 11.11
 </font></summary>
+
+***
+
+* there are nan s in some branches
     
 </details>
