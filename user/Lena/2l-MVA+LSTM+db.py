@@ -7,6 +7,8 @@ import torch.nn as nn
 import os
 import argparse
 
+
+
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--batches',       action='store',      default='20000',  help="batch size", type=int)
 argParser.add_argument('--n_epochs',      action='store',      default = '500',  help='number of epochs in training', type=int)
@@ -18,9 +20,11 @@ argParser.add_argument('--LSTM_out',      action='store',      default= '10',   
 argParser.add_argument('--db',            action='store_true', default=False,    help='add doubleB info?')
 args = argParser.parse_args()
 
-###################### general parameters #############################
+
 import config_lstm as config
 
+
+# set hyperparameters
 content_list     = config.content_list
 samples          = config.samples
 directory        = config.directory
@@ -41,6 +45,7 @@ if (args.LSTM):
     hidden_size_lstm = args.LSTM_out
     num_layers = args.num_layers
 
+# print hyperparameters
 print("\n------------Parameters for training--------------")
 print("Number of epochs:                        ",n_epochs)
 print("Batch size:                              ",batches)
@@ -55,7 +60,8 @@ if (args.LSTM):
     print("          Number of features, LSTM:      ", len(vector_branches))
 print("-------------------------------------------------",'\n')
 
-######################### import training data ########################
+
+# import training data
 x = { sample: uproot.concatenate( os.path.join( directory, "{sample}/{sample}.root".format(sample=sample))) for sample in samples }
 x = { sample: np.array( [ getattr( array, branch ) for branch in content_list ] ).transpose() for sample, array in x.items() }
 
@@ -66,23 +72,22 @@ w = {sample:n_max_events/len(x[sample]) for sample in samples}
 y = {sample:i_sample*np.ones(len(x[sample])) for i_sample, sample in enumerate(samples)}
 # Note to myself: y... "TTTT":0,0,0..., "TTbb":1,1,1... 
 
-# make weights. This wastes some memory, but OK.
+# make weights
 samples_weight = np.concatenate([ [w[sample]]*len(x[sample]) for sample in samples]) 
 sampler = WeightedRandomSampler(samples_weight, len(samples_weight))
 
-#It is time to concatenate
+# concatenate
 X = torch.Tensor(np.concatenate( [x[sample] for sample in samples] ))
 y = torch.Tensor(np.concatenate( [y[sample] for sample in samples] ))
 Y = torch.zeros( (len(X), len(samples)))
 for i_sample in range(len(samples)):
     Y[:,i_sample][y.int()==i_sample]=1
-
 V = np.zeros((len(Y)))
 
-#############################################################################
+
+# add lstm if needed
 if (args.LSTM):
     vec_br_f  = {}
-
     for i_training_sample, training_sample in enumerate(samples):
         upfile_name = os.path.join(os.path.expandvars(directory), training_sample, training_sample+'.root')
         with uproot.open(upfile_name) as upfile:
@@ -91,18 +96,16 @@ if (args.LSTM):
                 for i in range (branch.shape[0]):
                     branch[i]=np.pad(branch[i][:max_timestep], (0, max_timestep - len(branch[i][:max_timestep])))
                 vec_br_f[i_training_sample][name] = branch
-                #print(name)
-
+                
     vec_br = {name: np.concatenate( [vec_br_f[i_training_sample][name] for i_training_sample in range(len(samples))] ) for name in vector_branches}
 
     # put columns side by side and transpose the innermost two axis
     V = np.column_stack( [np.stack(vec_br[name]) for name in vector_branches] ).reshape( len(Y), len(vector_branches), max_timestep).transpose((0,2,1))
     V = np.nan_to_num(V)
-
 V = torch.Tensor(V)
 
 
-
+# new dataset for handing data to the MVA
 class NewDataset(Dataset):
 
     def __init__(self, X,V,Y):
@@ -126,7 +129,7 @@ train_loader = DataLoader(dataset=dataset,
                           sampler = sampler,
                           num_workers=0)
 
-######################## set up nn ##########################################
+# set up NN
 class NeuralNet(nn.Module):
     def __init__(self, input_size, hidden_size, hidden_size2, output_size, input_size_lstm, hidden_size_lstm, num_layers):
         super(NeuralNet, self).__init__()
@@ -139,7 +142,6 @@ class NeuralNet(nn.Module):
         if (args.LSTM):
             self.num_layers = num_layers
             self.hidden_size_lstm = hidden_size_lstm
-            #self.batchn2 = nn.BatchNorm2d(input_size_lstm)
             self.lstm = nn.LSTM(input_size_lstm, hidden_size_lstm, num_layers, batch_first=True)
             self.linear3 = nn.Linear(hidden_size2+hidden_size_lstm, output_size)
         else:
@@ -148,13 +150,13 @@ class NeuralNet(nn.Module):
         
         
     def forward(self, x, y):
-        #Linear nn
+        # set linear layers
         x1 = self.batchn(x)
         x1 = self.linear1(x1)
         x1 = self.relu(x1)
         x1 = self.linear2(x1)
         
-        #LSTM
+        # add lstm
         if (args.LSTM):
             h0 = torch.zeros(self.num_layers, y.size(0), self.hidden_size_lstm).to(device) 
             c0 = torch.zeros(self.num_layers, y.size(0), self.hidden_size_lstm).to(device) 
@@ -177,6 +179,7 @@ criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) 
 losses = []
 
+# set up directory and model names
 dir_name = 'model_b-'+str(batches)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
 if (args.LSTM): 
     if (args.db): dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)+_db'
@@ -186,7 +189,7 @@ if not os.path.exists( results_dir ):
     os.makedirs( results_dir )
 
 
-############################## training the model #############################
+# train the model
 for epoch in range(n_epochs):
     print("		epoch: ", epoch+1 , " of ", n_epochs)
     for i, data in enumerate(train_loader):
@@ -197,16 +200,15 @@ for epoch in range(n_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        #print(loss.data)
-        
- 
+              
+# plot losses 
 fig, ay = plt.subplots()        
 plt.plot(losses)
 plt.title("Losses over epoch")
 sample_file_name = str(dir_name)+"_losses.png"
 plt.savefig(results_dir + sample_file_name)
 
-############################### test the model #####################################
+# plot the model classification histograms
 with torch.no_grad():
     z = model(X, V)
     y_testpred = torch.max(z.data, 1).indices.numpy() 
@@ -227,6 +229,7 @@ with torch.no_grad():
     sample_file_name = str(dir_name)+".png"
     plt.savefig(results_dir + sample_file_name)
 
+    # save model
     x = X[0,:].reshape(1,len(content_list))
     if (args.LSTM):
         v = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
