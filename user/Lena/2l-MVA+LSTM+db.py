@@ -17,7 +17,7 @@ argParser.add_argument('--hs2_add',       action='store',      default= '5',    
 argParser.add_argument('--LSTM',          action='store_true', default=False,    help='add LSTM?')
 argParser.add_argument('--num_layers',    action='store',      default='1',      help='number of LSTM layers', type=int)
 argParser.add_argument('--LSTM_out',      action='store',      default= '10',    help='output size of LSTM', type=int)
-argParser.add_argument('--db',            action='store_true', default=False,    help='add doubleB info?')
+argParser.add_argument('--DoubleB',       action='store_true', default=False,    help='add doubleB info?')
 args = argParser.parse_args()
 
 
@@ -38,8 +38,8 @@ hidden_size2     = input_size + args.hs2_add
 output_size      = len(samples)
 
 if (args.LSTM):
-    if (args.db): vector_branches = ["mva_Jet_%s" % varname for varname in config.lstm_jetVarNames_db]
-    if not (args.db): vector_branches = ["mva_Jet_%s" % varname for varname in config.lstm_jetVarNames]
+    if (args.DoubleB): vector_branches = ["mva_Jet_%s" % varname for varname in config.lstm_jetVarNames_db]
+    if not (args.DoubleB): vector_branches = ["mva_Jet_%s" % varname for varname in config.lstm_jetVarNames]
     max_timestep = config.lstm_jets_maxN
     input_size_lstm = len(vector_branches)
     hidden_size_lstm = args.LSTM_out
@@ -56,7 +56,7 @@ print("LSTM:                                    ",args.LSTM)
 if (args.LSTM):
     print("          Number of LSTM layers:         ", num_layers)
     print("          Output size of LSTM:           ", hidden_size_lstm)
-    print("          DoubleB:                       ", args.db)
+    print("          DoubleB:                       ", args.DoubleB)
     print("          Number of features, LSTM:      ", len(vector_branches))
 print("-------------------------------------------------",'\n')
 
@@ -182,7 +182,7 @@ losses = []
 # set up directory and model names
 dir_name = 'model_b-'+str(batches)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
 if (args.LSTM): 
-    if (args.db): dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)+'_db'
+    if (args.DoubleB): dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)+'_DoubleB'
     else: dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
 results_dir = './'+dir_name+'/'
 if not os.path.exists( results_dir ): 
