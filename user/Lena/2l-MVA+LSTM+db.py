@@ -182,7 +182,7 @@ losses = []
 # set up directory and model names
 dir_name = 'model_b-'+str(batches)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
 if (args.LSTM): 
-    if (args.db): dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)+_db'
+    if (args.db): dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)+'_db'
     else: dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
 results_dir = './'+dir_name+'/'
 if not os.path.exists( results_dir ): 
