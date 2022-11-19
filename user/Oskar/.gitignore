@@ -1,2 +1,5 @@
 # ignore symlink to plot directory
 www
+
+#ignore jupyter .virtual_documents directory
+.virtual_documents/

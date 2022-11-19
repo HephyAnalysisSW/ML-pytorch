@@ -19,11 +19,11 @@ from smeft_data import *
 
 
 MODEL_PATH = 'model_24_10_22'
-MODEL_NAME = 'epoch_1.pkl'
+MODEL_NAME = 'epoch_621.pkl'
 
 OUT_PATH = 'test'
 
-TEST_FILE_RANGE = (50,51)
+TEST_FILE_RANGE = (50,100)
 
 HIST_BINS = 25
 HIST_THETA = (-0.5, 0.5)
