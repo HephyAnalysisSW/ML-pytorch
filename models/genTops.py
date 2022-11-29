@@ -30,22 +30,22 @@ data_generator =  DataGenerator(
     )
 
 reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/ParticleNet/t-sch-RefPoint-noWidthRW_reweight_card.pkl'
-w = WeightInfo(reweight_pkl)
-w.set_order(2)
-default_eft_parameters = {p:0 for p in w.variables}
+weightInfo = WeightInfo(reweight_pkl)
+weightInfo.set_order(2)
+default_eft_parameters = {p:0 for p in weightInfo.variables}
 def make_eft(**kwargs):
     result = { key:val for key, val in default_eft_parameters.items() }
     for key, val in kwargs.items():
-        if not key in w.variables+["Lambda"]:
+        if not key in weightInfo.variables+["Lambda"]:
             raise RuntimeError ("Wilson coefficient not known.")
         else:
             result[key] = float(val)
     return result
 
-random_eft = make_eft(**{v:random.random() for v in w.variables} )
+random_eft = make_eft(**{v:random.random() for v in weightInfo.variables} )
 sm         = make_eft()
 
-wilson_coefficients = w.variables 
+wilson_coefficients = weightInfo.variables 
 feature_names = [   "genJet_pt", "genJet_mass", "genJet_nConstituents",
                     "genJet_SDmass", "genJet_SDsubjet0_deltaEta", "genJet_SDsubjet0_deltaPhi", "genJet_SDsubjet0_deltaR",
                     "genJet_SDsubjet0_mass", "genJet_SDsubjet1_deltaEta", "genJet_SDsubjet1_deltaPhi",
@@ -56,7 +56,7 @@ feature_names = [   "genJet_pt", "genJet_mass", "genJet_nConstituents",
 
 def make_combinations( coefficients ):
     combinations = []
-    for comb in w.combinations:
+    for comb in weightInfo.combinations:
         good = True
         for k in comb:
             if k not in coefficients:
@@ -70,7 +70,7 @@ def getEvents( nTraining ):
     data_generator.load(-1, small=nTraining )
     combinations = make_combinations( wilson_coefficients )
     coeffs = data_generator.vector_branch('p_C')
-    return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,w.combinations.index(comb)] for comb in combinations}
+    return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
 
 tex = {"ctWRe":"C_{tW}^{Re}", "ctWIm":"C_{tW}^{Im}", "ctBIm":"C_{tB}^{Im}", "ctBRe":"C_{tB}^{Re}", "cHt":"C_{Ht}", 'cHtbRe':'C_{Htb}^{Re}', 'cHtbIm':'C_{Htb}^{Im}', 'cHQ3':'C_{HQ}^{(3)}'}
 
@@ -135,4 +135,57 @@ plot_options =  {
 multi_bit_cfg = {'n_trees': 100,
                  'max_depth': 4,
                  'learning_rate': 0.20,
-                 'min_size': 15 } 
+                 'min_size': 15 }
+
+if __name__=="__main__":
+   
+    # load some events and their weights 
+    x, w = getEvents(1000)
+
+    # x are a list of feature-vectors such that x[0] are the features of the first event. Their branch-names are stored in feature_names.
+    # w are a dictionary with the weight-coefficients. The key tuple(), i.e., the empty n-tuple, is the constant term. The key ('ctWRe', ), i.e., the coefficient 
+    # that is an tuple of length one is the linear derivative (in this case wrt to ctWRe). The quadratic derivatives are stored in the keys ('ctWRe', 'ctWRe') etc.
+    # The list of Wilson coefficients is in: weightInfo.variables
+    # The list of all derivatives (i.e., the list of all combiations of all variables up to length 2) is weightInfo.combinations. It includes the zeroth derivative, i.e., the constant term.
+
+    # Let us scale all the weights to reasonable numbers. They come out of MG very small because the cross section of the process I used to genereate the top quarks is so small: s-channel single-top
+    # Let us add up the constant terms of all events and normalize the sample to the number of events. (Arbitrary choice)
+    const = (len(w[()])/w[()].sum())
+    for k in w.keys():
+        w[k] *= const 
+
+    #let's remove the most extreme weight derivatives ... cosmetics for the propaganda plots
+    from   tools import helpers 
+    len_before = len(x)
+    auto_clip = 0.001
+    x, w = helpers.clip_quantile(x, auto_clip, weights = w )
+    print ("Auto clip efficiency (training) %4.3f is %4.3f"%( auto_clip, len(x)/len_before ) )
+
+    print ("Wilson coefficients:", weightInfo.variables )
+    print ("Features of the first event:\n" + "\n".join( ["%25s = %4.3f"%(name, value) for name, value in zip(feature_names, x[0])] ) )
+    prstr = {0:'constant', 1:'linear', 2:'quadratic'}
+    print ("Weight coefficients(!) of the first event:\n"+"\n".join( ["%30s = %4.3E"%( prstr[len(comb)] + " " +",".join(comb), w[comb][0]) for comb in weightInfo.combinations] ) )
+
+    # Let us compute the quadratic weight for ctWRe=1:
+    import copy
+    eft_sm  = make_eft()
+    eft_bsm = make_eft(ctWRe=1)
+    # constant term
+    reweight = copy.deepcopy(w[()])
+    # linear term
+    for param1 in wilson_coefficients:
+        reweight += (eft_bsm[param1]-eft_sm[param1])*w[(param1,)] 
+    # quadratic term
+    for param1 in wilson_coefficients:
+        if eft_bsm[param1]-eft_sm[param1] ==0: continue
+        for param2 in wilson_coefficients:
+            if eft_bsm[param2]-eft_sm[param2] ==0: continue
+            reweight += .5*(eft_bsm[param1]-eft_sm[param1])*(eft_bsm[param2]-eft_sm[param2])*w[tuple(sorted((param1,param2)))]
+
+    print ("w(ctWRe=1) for the first event is: ", reweight[0])
+
+    # Let us compute the weight ratio we can use for the training:
+    target_ctWRe        = w[('ctWRe',)]/w[()]
+    target_ctWRe_ctWRe  = w[('ctWRe','ctWRe')]/w[()]
+
+    # NOTE!! These "target" branches are already written to the training data! No need to compute
