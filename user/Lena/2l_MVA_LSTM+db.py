@@ -180,7 +180,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 losses = []
 
 # set up directory and model names
-dir_name = 'model_b-'+str(batches)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
+dir_name = 'model_b-'+str(batches)+'_e-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
 if (args.LSTM): 
     if (args.DoubleB): dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)+'_DoubleB'
     else: dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
