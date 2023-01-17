@@ -2,7 +2,7 @@
 data_path: /scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v5/tschRefPointNoWidthRW/tschRefPointNoWidthRW_{}.root:Events
 cut: (genJet_pt>500) & (genJet_SDmass>0) & (abs(dR_genJet_maxq1q2b)<0.6) & (genJet_SDsubjet1_mass>=0)
 
-weights_info: data/t-sch-RefPoint-noWidthRW_reweight_card.json
+weights_info: t-sch-RefPoint-noWidthRW_reweight_card.json
 
 branches:
   weight_coeff: 

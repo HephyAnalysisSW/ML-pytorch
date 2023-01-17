@@ -7,7 +7,6 @@ import yaml
 import os
 from typing import Any
 
-import awkward as ak
 import click
 import uproot
 import matplotlib.pyplot as plt

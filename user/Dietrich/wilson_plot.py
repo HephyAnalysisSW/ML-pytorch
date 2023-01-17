@@ -1,9 +1,10 @@
 #! /usr/bin/env python
-
+"""Effect of wilson copefficients."""
 import pathlib
 import json
 import logging
 import yaml
+import os
 import sys
 
 import itertools
@@ -22,9 +23,12 @@ logging.basicConfig(
     level=logging.INFO,
 )
 log = logging.getLogger(__name__)
-DEFAULT_CONFIG = "weighted_plots.yaml"
-DEFAULT_OUTPUT = "plots/weighted_plots.pdf"
+
 BASE_DIR = pathlib.Path(__file__).parent.resolve()
+SCRATCH_DIR = pathlib.Path("/scratch-cbe/users") / os.getlogin()
+
+DEFAULT_CONFIG = BASE_DIR / "wilson_plot.yaml"
+DEFAULT_OUTPUT = SCRATCH_DIR / "wilson_plot.pdf"
 
 
 @click.command
@@ -34,7 +38,13 @@ BASE_DIR = pathlib.Path(__file__).parent.resolve()
     default=DEFAULT_CONFIG,
     type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
 )
-@click.option("-r", "--data-range", default=10)
+@click.option(
+    "-n",
+    "--nr-files",
+    default=10,
+    type=click.IntRange(0, 100, clamp=True),
+    help="Number of files to read.",
+)
 @click.option(
     "-o",
     "--output",
@@ -45,9 +55,9 @@ BASE_DIR = pathlib.Path(__file__).parent.resolve()
 )
 @click.option("--debug/--no-debug", default=False, help="Enable DEBUG output.")
 def main(
-    config_file: pathlib.Path, data_range: int, output: pathlib.Path, debug: bool
+    config_file: pathlib.Path, nr_files: int, output: pathlib.Path, debug: bool
 ) -> None:
-
+    """Effect of wilson coefficients."""
     if debug:
         log.setLevel(logging.DEBUG)
 
@@ -55,9 +65,9 @@ def main(
     with open(config_file, "r") as c:
         config = yaml.safe_load(c)
 
-    eft_weights = EFTWeights(config["weights_info"])
+    eft_weights = EFTWeights(BASE_DIR / config["weights_info"])
 
-    data_files = [config["data_path"].format(i) for i in range(data_range)]
+    data_files = [config["data_path"].format(i) for i in range(nr_files)]
 
     branches = config["branches"]
     all_branches = list(itertools.chain.from_iterable(branches.values()))
@@ -73,13 +83,6 @@ def main(
 
     weights0 = eft_weights(weight_coeff)
     weights1 = eft_weights(weight_coeff, ctWRe=1.0)
-    # weights2 = eft_weights(weight_coeff, ctBRe=1.0)
-    # weights3 = eft_weights(weight_coeff, cHQ3=1.0)
-    # weights4 = eft_weights(weight_coeff, cHt=1.0)
-    # weights5 = eft_weights(weight_coeff, cHtbRe=1.0)
-    # weights6 = eft_weights(weight_coeff, ctWIm=1.0)
-    # weights7 = eft_weights(weight_coeff, ctBIm=1.0)
-    # weights8 = eft_weights(weight_coeff, cHtbIm=1.0)
     log.debug("Sum of weights SM %f", np.sum(weights0))
     log.debug("Sum of weights ctWRe=1 %f", np.sum(weights1))
 
@@ -89,67 +92,37 @@ def main(
             d = data[name][mask]
             w0 = weights0[mask]
             w1 = weights1[mask]
-            # w2 = weights2[mask]
-            # w3 = weights3[mask]
-            # w4 = weights4[mask]
-            # w5 = weights5[mask]
-            # w6 = weights6[mask]
-            # w7 = weights7[mask]
-            # w8 = weights8[mask]
-            fig, ax = plt.subplots(1, 2, layout="tight")
+            fig, ax = plt.subplot_mosaic(
+                [["A1", "B1"], ["A1", "B1"], ["A2", "B2"]], layout="tight"
+            )
             h0, bins = np.histogram(d, bins=100, weights=w0)
             h1, bins = np.histogram(d, bins=bins, weights=w1)
-            # h2, bins = np.histogram(d, bins=bins, weights=w2)
-            # h3, bins = np.histogram(d, bins=bins, weights=w3)
-            # h4, bins = np.histogram(d, bins=bins, weights=w4)
-            # h5, bins = np.histogram(d, bins=bins, weights=w5)
-            # h6, bins = np.histogram(d, bins=bins, weights=w6)
-            # h7, bins = np.histogram(d, bins=bins, weights=w7)
-            # h8, bins = np.histogram(d, bins=bins, weights=w8)
-            ax[0].stairs(h0, bins, label="SM")
-            ax[0].stairs(h1, bins, label="ctRWRe=1")
-            # ax[0].stairs(h2, bins, label="ctBRe=1")
-            # ax[0].stairs(h3, bins, label="cHQ3=1")
-            # ax[0].stairs(h4, bins, label="cHt=1")
-            # ax[0].stairs(h5, bins, label="cHtbRe=1")
-            # ax[0].stairs(h6, bins, label="ctWIm=1")
-            # ax[0].stairs(h7, bins, label="ctBIm=1")
-            # ax[0].stairs(h8, bins, label="cHtbIm=1")
-            ax[0].legend()
-            ax[0].set_xlabel(name)
+            ax["A1"].stairs(h0, bins, label="SM")
+            ax["A1"].stairs(h1, bins, label="ctRWRe=1")
+            ax["A1"].legend()
+            ax["A1"].set_xlabel(name)
+            ax["A1"].set_yscale("log")
+
+            hr = h1 / h0
+            ax["A2"].plot((bins[:-1] + bins[1:]) / 2.0, hr, "bo", markersize=1)
+            ax["A2"].set_ylim((0.5, 1.5))
 
             d_name = name.replace("genJet_", "delphesJet_")
             mask = ~np.isnan(data[d_name])
             d = data[d_name][mask]
             w0 = weights0[mask]
             w1 = weights1[mask]
-            # w2 = weights2[mask]
-            # w3 = weights3[mask]
-            # w4 = weights4[mask]
-            # w5 = weights5[mask]
-            # w6 = weights6[mask]
-            # w7 = weights7[mask]
-            # w8 = weights8[mask]
             h0, bins = np.histogram(d, bins=100, weights=w0)
             h1, bins = np.histogram(d, bins=bins, weights=w1)
-            # h2, bins = np.histogram(d, bins=bins, weights=w2)
-            # h3, bins = np.histogram(d, bins=bins, weights=w3)
-            # h4, bins = np.histogram(d, bins=bins, weights=w4)
-            # h5, bins = np.histogram(d, bins=bins, weights=w5)
-            # h6, bins = np.histogram(d, bins=bins, weights=w6)
-            # h7, bins = np.histogram(d, bins=bins, weights=w7)
-            # h8, bins = np.histogram(d, bins=bins, weights=w8)
-            ax[1].stairs(h0, bins, label="SM")
-            ax[1].stairs(h1, bins, label="ctRWRe=1")
-            # ax[1].stairs(h2, bins, label="ctBRe=1")
-            # ax[1].stairs(h3, bins, label="cHQ3=1")
-            # ax[1].stairs(h4, bins, label="cHt=1")
-            # ax[1].stairs(h5, bins, label="cHtbRe=1")
-            # ax[1].stairs(h6, bins, label="ctWIm=1")
-            # ax[1].stairs(h7, bins, label="ctBIm=1")
-            # ax[1].stairs(h8, bins, label="cHtbIm=1")
-            ax[1].legend()
-            ax[1].set_xlabel(d_name)
+            ax["B1"].stairs(h0, bins, label="SM")
+            ax["B1"].stairs(h1, bins, label="ctRWRe=1")
+            ax["B1"].legend()
+            ax["B1"].set_xlabel(d_name)
+            ax["B1"].set_yscale("log")
+
+            hr = h1 / h0
+            ax["B2"].plot((bins[:-1] + bins[1:]) / 2.0, hr, "bo", markersize=1)
+            ax["B2"].set_ylim((0.5, 1.5))
 
             pdf.savefig()
             plt.close()
