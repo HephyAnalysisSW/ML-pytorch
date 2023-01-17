@@ -8,7 +8,7 @@ branches =[   "genJet_pt", "genJet_nConstituents",
                     "genJet_ecfM2beta2", "genJet_ecfM3beta2", "genJet_ecfN1", "genJet_ecfN2", "genJet_ecfN3", "genJet_ecfN1beta2",
                     "genJet_ecfN2beta2", "genJet_ecfN3beta2", "genJet_ecfU1", "genJet_ecfU2", "genJet_ecfU3", "genJet_ecfU1beta2",
                     "genJet_ecfU2beta2", "genJet_ecfU3beta2",
-                    # "genJet_mass",
+                    "genJet_mass"
                     ]
 branches1 = [
            # 'target_ctWRe',
