@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 80
+max-complexity = 12
+
+extend-ignore = E501
+extend-select = B950
