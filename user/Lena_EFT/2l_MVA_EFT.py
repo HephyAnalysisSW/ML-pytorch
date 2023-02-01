@@ -1,6 +1,7 @@
 
 
 import torch
+from torch import Tensor
 import uproot
 import numpy as np
 from matplotlib import pyplot as plt
@@ -9,6 +10,7 @@ import torch.nn as nn
 import os
 import argparse
 
+from WeightInfo import WeightInfo
 
 
 argParser = argparse.ArgumentParser(description = "Argument parser")
@@ -23,6 +25,8 @@ argParser.add_argument('--hs2_add',            action='store',      default= '5'
 argParser.add_argument('--LSTM',               action='store_true', default=False,    help='add LSTM?')
 argParser.add_argument('--num_layers',         action='store',      default='1',      help='number of LSTM layers', type=int)
 argParser.add_argument('--LSTM_out',           action='store',      default= '1',     help='output size of LSTM', type=int)
+argParser.add_argument('--EFTCoefficients',    action='store',      default='ctt',    help="Training vectors for particle net")
+
 args = argParser.parse_args()
 
 
@@ -30,6 +34,11 @@ import ttbb_2l_python3 as config
 
 import logging
 logger = logging.getLogger(__name__)
+
+# adding hard coded reweight_pkl because of ML-pytorch
+if (args.sample == "TTTT_MS"): reweight_pkl = "/eos/vbc/group/cms/robert.schoefbeck/gridpacks/4top/TTTT_MS_reweight_card.pkl" 
+if (args.sample == "TTbb_MS"): reweight_pkl = "/eos/vbc/group/cms/robert.schoefbeck/gridpacks/4top/TTbb_MS_reweight_card.pkl" 
+
 
 
 # set hyperparameters
@@ -42,7 +51,7 @@ n_epochs         = args.n_epochs
 input_size       = len(mva_variables) 
 hidden_size      = input_size * args.hs1_mult
 hidden_size2     = input_size + args.hs2_add
-output_size      = 1
+output_size      = 2    # hard coded: lin, quad
 
 if (args.LSTM):
     vector_branches = ["mva_Jet_%s" % varname for varname in config.lstm_jetVarNames] #Achtung
@@ -65,17 +74,35 @@ if (args.LSTM):
     print("          Number of features, LSTM:      ", len(vector_branches))
 print("-------------------------------------------------",'\n')
 
+
+# set weights 
+weightInfo = WeightInfo( reweight_pkl ) 
+weightInfo.set_order( 2 ) 
+index_lin  = weightInfo.combinations.index((args.EFTCoefficients,)) 
+index_quad = weightInfo.combinations.index((args.EFTCoefficients,args.EFTCoefficients))
+
 # import training data
-x = uproot.open( os.path.join( args.input_directory, sample, sample+".root")) 
-x = x["Events"].arrays(mva_variables, library = "np")
-x = np.array( [ x[branch] for branch in mva_variables ] ).transpose() 
-y = np.zeros((len(x),1)) 
+upfile_name = os.path.join(args.input_directory, sample, sample+".root")
+x      = uproot.open( upfile_name ) 
+xx     = x["Events"].arrays(mva_variables, library = "np")
+x      = np.array( [ xx[branch] for branch in mva_variables ] ).transpose() 
+x_eval = np.array (xx['jet0_pt'])
+
+weigh = {}
+with uproot.open(upfile_name) as upfile:
+    for name, branch in upfile["Events"].arrays("p_C", library = "np").items(): 
+        weigh = [(branch[i][0], branch[i][index_lin], branch[i][index_quad]) for i in  range (branch.shape[0])]
+        # make small check
+        assert len(weightInfo.combinations) == branch[0].shape[0] , "got p_C wrong: found %i weights but need %i" %(branch[0].shape[0], len(weightInfo.combinations ))
+    y = np.asarray(weigh)
+    
 
 
+x = np.nan_to_num(x)    
+y = np.nan_to_num(y)
 X = torch.Tensor(x)
 Y = torch.Tensor(y)
-V = np.zeros((len(y)))
-
+V = np.zeros((len(y[:,0])))
 
 # add lstm if needed
 if (args.LSTM):
@@ -114,7 +141,7 @@ class NewDataset(Dataset):
 
 dataset = NewDataset(X,V,Y)
 train_loader = DataLoader(dataset=dataset,
-                          batch_size=batches,
+                          batch_size=len(dataset),
                           num_workers=0)
 
 # set up NN
@@ -158,12 +185,56 @@ class NeuralNet(nn.Module):
         return x1
 
 
+class LossLikelihoodFree(torch.nn.L1Loss):
+    __constants__ = ['reduction']
+
+    def __init__(self, reduction: str = 'sum') -> None:
+        super(LossLikelihoodFree, self).__init__(None, None, reduction)
+
+        self.base_points = [1,2] # hardcoded
+
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
+        #print ("input")
+        #print (input)
+        #print ("target")
+        #print (target)
+        # fit the linear term only for now (the network has just one output anyways)#hä?
+        weight      = target[:,0] # this is the weight
+        target_lin  = target[:,1] # this is the linear term
+        target_quad = target[:,2] # this is the quadratic term
+
+        #loss = weight*( self.base_points[0]*(target_lin/weight-input[:,0]) + .5*self.base_points[0]**2*(target_quad/weight-input[:,1]) )**2
+        #print (loss)
+        loss = 0
+        for theta_base in self.base_points: #two base-points: 1,2
+         #   print (self.base_points[1:])
+            loss += weight*( theta_base*(target_lin/weight-input[:,0]) + .5*theta_base**2*(target_quad/weight-input[:,1]) )**2
+        #print (loss)
+        #print ( loss )    
+        #print ("weight") 
+        #print (weight) 
+        #print ("target_lin") 
+        #print (target_lin) 
+        #print ("loss") 
+        #print (loss) 
+
+        if self.reduction == 'none':
+            return loss
+        elif self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+
+def get_loss( **kwargs):
+    return LossLikelihoodFree()
+    #return torch.nn.MSELoss() 
+
 if (args.LSTM==False):    
     model = NeuralNet(input_size, hidden_size,hidden_size2, output_size, input_size_lstm=0, hidden_size_lstm=0, num_layers=0).to(device)    
 else:
     model = NeuralNet(input_size, hidden_size, hidden_size2, output_size, input_size_lstm, hidden_size_lstm, num_layers).to(device) 
     
-criterion = nn.MSELoss()
+criterion = get_loss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) 
 losses = []
 
@@ -189,21 +260,42 @@ for epoch in range(n_epochs):
         loss.backward()
         optimizer.step()
               
-## plot losses 
-# fig, ay = plt.subplots()        
-# plt.plot(losses)
-# plt.title("Losses over epoch")
-# sample_file_name = str(dir_name)+"_losses.png"
-# plt.savefig(sample_file_name)
+# plot losses 
+fig, ay = plt.subplots()        
+plt.plot(losses)
+plt.title("Losses over epoch")
+sample_file_name = str(dir_name)+"_losses.png"
+plt.savefig(sample_file_name)
 
-# save model
 with torch.no_grad():
-    x = X[0,:].reshape(1,len(mva_variables))
-    if (args.LSTM):
-        v = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
-        name = str(dir_name)+".onnx"
-    else: 
-        v = V[0].reshape(1,1)
-        name = str(dir_name)+".onnx"      
-    torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
+    z = np.array(model(X, V))
+    hist, bins = np.histogram(x_eval, bins=30, range=(0,600))
+    truth  = np.zeros((len(bins),1))
+    train = np.zeros((len(bins),1))
+    count = 0
+    for b in range (1,len(bins)-1):
+        for ind in range (x_eval.shape[0]):
+            val = x_eval[ind]
+            if (val > bins[b-1] and val<= bins[b]):
+                truth[b]+=y[ind,1]
+                train[b]+=y[ind,0]*z[ind,0]
+                count+=1
+    print (count)
+    fig, ay = plt.subplots()        
+    plt.plot(bins,truth[:,0])
+    plt.plot(bins,train[:,0])
+    #plt.hist(x=x_eval, bins=bins)
+    sample_file_name = str(dir_name)+"_lin.png"
+    plt.savefig(sample_file_name)
+    
+# save model
+# with torch.no_grad():
+    # x = X[0,:].reshape(1,len(mva_variables))
+    # if (args.LSTM):
+        # v = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
+        # name = str(dir_name)+".onnx"
+    # else: 
+        # v = V[0].reshape(1,1)
+        # name = str(dir_name)+".onnx"      
+    # torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
   
