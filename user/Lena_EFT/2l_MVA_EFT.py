@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 import torch.nn as nn
 import os
 import argparse
-
+import matplotlib.animation as manimation 
 from WeightInfo import WeightInfo
 
 
@@ -33,7 +33,8 @@ args = argParser.parse_args()
 import ttbb_2l_python3 as config
 
 import logging
-logger = logging.getLogger(__name__)
+logging.basicConfig(filename=None,  format='%(asctime)s %(message)s', level=logging.INFO)
+
 
 # adding hard coded reweight_pkl because of ML-pytorch
 if (args.sample == "TTTT_MS"): reweight_pkl = "/eos/vbc/group/cms/robert.schoefbeck/gridpacks/4top/TTTT_MS_reweight_card.pkl" 
@@ -61,18 +62,18 @@ if (args.LSTM):
     num_layers = args.num_layers
 
 # print hyperparameters
-print("\n------------Parameters for training--------------")
-print("Number of epochs:                        ",n_epochs)
-print("Batch size:                              ",batches)
-print("Number of features,linear layer:         ",input_size)
-print("Size of first hidden layer:              ",hidden_size)
-print("Size of second hidden layer:             ",hidden_size2)
-print("LSTM:                                    ",args.LSTM)
+logging.info("------------Parameters for training----------------")
+logging.info("  Number of epochs:                        %i",n_epochs)
+logging.info("  Batch size:                              %i",batches)
+logging.info("  Number of features,linear layer:         %i",input_size)
+logging.info("  Size of first hidden layer:              %i",hidden_size)
+logging.info("  Size of second hidden layer:             %i",hidden_size2)
+logging.info("  LSTM:                                    %r",args.LSTM)
 if (args.LSTM):
-    print("          Number of LSTM layers:         ", num_layers)
-    print("          Output size of LSTM:           ", hidden_size_lstm)
-    print("          Number of features, LSTM:      ", len(vector_branches))
-print("-------------------------------------------------",'\n')
+    logging.info("          Number of LSTM layers:         %i", num_layers)
+    logging.info("          Output size of LSTM:           %i", hidden_size_lstm)
+    logging.info("          Number of features, LSTM:      %i", len(vector_branches))
+logging.info("---------------------------------------------------\n")
 
 
 # set weights 
@@ -86,7 +87,7 @@ upfile_name = os.path.join(args.input_directory, sample, sample+".root")
 x      = uproot.open( upfile_name ) 
 xx     = x["Events"].arrays(mva_variables, library = "np")
 x      = np.array( [ xx[branch] for branch in mva_variables ] ).transpose() 
-x_eval = np.array (xx['jet0_pt'])
+x_eval = np.array (xx['l1_eta'])
 
 weigh = {}
 with uproot.open(upfile_name) as upfile:
@@ -247,55 +248,73 @@ results_dir = args.output_directory
 if not os.path.exists( results_dir ): 
     os.makedirs( results_dir )
 
+# Define the meta data for the movie
+GifWriter = manimation.writers['pillow']
+writer = manimation.PillowWriter(fps=2, metadata=None)
+
+#assert False
+# Initialize the movie
+fig = plt.figure()
+
+#plot what is always there
+hist, bins = np.histogram(x_eval, bins=20, range=(-3,3))
+truth_lin  = np.zeros((len(bins),1))
+truth_quad  = np.zeros((len(bins),1))
+for b in range (1,len(bins)-1):
+    for ind in range (x_eval.shape[0]):
+        val = x_eval[ind]
+        if (val > bins[b-1] and val<= bins[b]):
+            truth_lin[b]+=y[ind,1]
+            truth_quad[b]+=y[ind,2]
+true1, = plt.plot(bins,truth_lin[:,0], label = "lin truth", linestyle = 'dotted', color='blue')
+true2, = plt.plot(bins,truth_quad[:,0], label = "quad truth",  linestyle = 'dotted', color='green')           
+train1, = plt.plot([], [], label =  "lin train", color='blue')
+train2, = plt.plot([], [], label = "quad train", color='green')
+plt.xlabel('$ {l1}_{\eta}$ / GeV')
+plt.legend()
 
 # train the model
-for epoch in range(n_epochs):
-    print("		epoch: ", epoch+1 , " of ", n_epochs)
-    for i, data in enumerate(train_loader):
-        inputs1,inputs2, labels = data
-        z = model(inputs1, inputs2)
-        loss=criterion(z,labels)
-        losses.append(loss.data)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-              
+with writer.saving(fig, dir_name+".gif", 100):
+    for epoch in range(n_epochs):
+        logging.info("		epoch: %i of %i ", epoch+1, n_epochs)
+        for i, data in enumerate(train_loader):
+            inputs1,inputs2, labels = data
+            z = model(inputs1, inputs2)
+            loss=criterion(z,labels)
+            losses.append(loss.data)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            with torch.no_grad():
+                z = np.array(model(X, V))
+                train_lin = np.zeros((len(bins),1))
+                train_quad = np.zeros((len(bins),1))
+                for b in range (1,len(bins)-1):
+                    for ind in range (x_eval.shape[0]):
+                        val = x_eval[ind]
+                        if (val > bins[b-1] and val<= bins[b]):
+                            train_lin[b]+=y[ind,0]*z[ind,0]
+                            train_quad[b]+=y[ind,0]*z[ind,1]
+                train1.set_data(bins, train_lin[:,0])               
+                train2.set_data(bins, train_quad[:,0]) 
+                writer.grab_frame()
+            
+logging.info("Done with training, plotting losses")           
 # plot losses 
 fig, ay = plt.subplots()        
 plt.plot(losses)
 plt.title("Losses over epoch")
 sample_file_name = str(dir_name)+"_losses.png"
 plt.savefig(sample_file_name)
-
-with torch.no_grad():
-    z = np.array(model(X, V))
-    hist, bins = np.histogram(x_eval, bins=30, range=(0,600))
-    truth  = np.zeros((len(bins),1))
-    train = np.zeros((len(bins),1))
-    count = 0
-    for b in range (1,len(bins)-1):
-        for ind in range (x_eval.shape[0]):
-            val = x_eval[ind]
-            if (val > bins[b-1] and val<= bins[b]):
-                truth[b]+=y[ind,1]
-                train[b]+=y[ind,0]*z[ind,0]
-                count+=1
-    print (count)
-    fig, ay = plt.subplots()        
-    plt.plot(bins,truth[:,0])
-    plt.plot(bins,train[:,0])
-    #plt.hist(x=x_eval, bins=bins)
-    sample_file_name = str(dir_name)+"_lin.png"
-    plt.savefig(sample_file_name)
     
 # save model
-# with torch.no_grad():
-    # x = X[0,:].reshape(1,len(mva_variables))
-    # if (args.LSTM):
-        # v = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
-        # name = str(dir_name)+".onnx"
-    # else: 
-        # v = V[0].reshape(1,1)
-        # name = str(dir_name)+".onnx"      
-    # torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
-  
+with torch.no_grad():
+    x = X[0,:].reshape(1,len(mva_variables))
+    if (args.LSTM):
+        v = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
+        name = str(dir_name)+".onnx"
+    else: 
+        v = V[0].reshape(1,1)
+        name = str(dir_name)+".onnx"      
+    torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
+    logging.info("Saved model to %s", os.path.join(results_dir, name)) 
