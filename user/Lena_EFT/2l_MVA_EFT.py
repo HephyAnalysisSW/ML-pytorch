@@ -87,7 +87,7 @@ upfile_name = os.path.join(args.input_directory, sample, sample+".root")
 x      = uproot.open( upfile_name ) 
 xx     = x["Events"].arrays(mva_variables, library = "np")
 x      = np.array( [ xx[branch] for branch in mva_variables ] ).transpose() 
-x_eval = np.array (xx['l1_eta'])
+x_eval = np.array (xx['jet0_pt'])
 
 weigh = {}
 with uproot.open(upfile_name) as upfile:
@@ -250,7 +250,7 @@ if not os.path.exists( results_dir ):
 
 # Define the meta data for the movie
 GifWriter = manimation.writers['pillow']
-writer = manimation.PillowWriter(fps=2, metadata=None)
+writer = manimation.PillowWriter(fps=10, metadata=None)
 
 #assert False
 # Initialize the movie
@@ -266,15 +266,15 @@ for b in range (1,len(bins)-1):
         if (val > bins[b-1] and val<= bins[b]):
             truth_lin[b]+=y[ind,1]
             truth_quad[b]+=y[ind,2]
-true1, = plt.plot(bins,truth_lin[:,0], label = "lin truth", linestyle = 'dotted', color='blue')
-true2, = plt.plot(bins,truth_quad[:,0], label = "quad truth",  linestyle = 'dotted', color='green')           
-train1, = plt.plot([], [], label =  "lin train", color='blue')
-train2, = plt.plot([], [], label = "quad train", color='green')
-plt.xlabel('$ {l1}_{\eta}$ / GeV')
+true1, = plt.plot(bins,truth_lin[:,0], label = "lin truth",   drawstyle='steps'  ,linestyle = 'dotted', color='blue')
+true2, = plt.plot(bins,truth_quad[:,0], label = "quad truth", drawstyle='steps'  ,linestyle = 'dotted', color='green')           
+train1, = plt.plot([], [], drawstyle='steps', label =  "lin train", color='blue')
+train2, = plt.plot([], [], drawstyle='steps', label = "quad train", color='green')
+plt.xlabel('jet0_pt / GeV')
 plt.legend()
 
 # train the model
-with writer.saving(fig, dir_name+".gif", 100):
+with writer.saving(fig, dir_name+"_jet0_pt.gif", 100):
     for epoch in range(n_epochs):
         logging.info("		epoch: %i of %i ", epoch+1, n_epochs)
         for i, data in enumerate(train_loader):
@@ -295,8 +295,8 @@ with writer.saving(fig, dir_name+".gif", 100):
                         if (val > bins[b-1] and val<= bins[b]):
                             train_lin[b]+=y[ind,0]*z[ind,0]
                             train_quad[b]+=y[ind,0]*z[ind,1]
-                train1.set_data(bins, train_lin[:,0])               
-                train2.set_data(bins, train_quad[:,0]) 
+                train1.set_data(bins, train_lin[:,0]  )               
+                train2.set_data(bins, train_quad[:,0] ) 
                 writer.grab_frame()
             
 logging.info("Done with training, plotting losses")           
