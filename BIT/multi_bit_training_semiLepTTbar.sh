@@ -1,0 +1,1 @@
+python multi_bit_training.py --plot_directory multiBIT_semiLepTTbar --prefix v1 --model genTops --modelFile models --nTraining -1 --coefficients ctGRe --loss CrossEntropy --debug --n_trees 200 --auto_clip 0.001 --feature_plots
