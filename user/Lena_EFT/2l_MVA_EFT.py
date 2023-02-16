@@ -22,7 +22,7 @@ argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',                   default='INFO', nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
 argParser.add_argument('--sample',             action='store',      type=str,    default='TTTT_MS')
 argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models/')
-argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt/MVA-training/ttbb_2l_dilep-met30-njet4p-btag2p/')
+argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v4/MVA-training/ttbb_2l_dilep-met30-njet4p-btag2p/')
 argParser.add_argument('--n_epochs',           action='store',      type=int,    default = '500',  help='number of epochs in training')
 argParser.add_argument('--hs1_mult',           action='store',      type=int,    default = '2',    help='hidden size 1 = #features * mult')
 argParser.add_argument('--hs2_add',            action='store',      type=int,    default= '5',     help='hidden size 2 = #features + add')
@@ -31,16 +31,13 @@ argParser.add_argument('--num_layers',         action='store',      type=int,   
 argParser.add_argument('--LSTM_out',           action='store',      type=int,    default= '1',     help='output size of LSTM')
 argParser.add_argument('--nbins',              action='store',      type=int,    default='20',     help='number of bins')
 argParser.add_argument('--EFTCoefficients',    action='store',                   default='ctt',    help="Training vectors for particle net")
-argParser.add_argument('--animate_step',       action='store',      type=int,    default= '10',    help="plot every ? epochs")
+argParser.add_argument('--animate_step',       action='store',      type=int,    default= '10',    help="plot every n epochs")
 argParser.add_argument('--animate_fps' ,       action='store',      type=int,    default= '10',    help="frames per second in animation")
+argParser.add_argument('--animate' ,           action='store_true',              default= False,   help="make an animation?")
 args = argParser.parse_args()
 
 
 logging.basicConfig(filename=None,  format='%(asctime)s %(message)s', level=logging.INFO)
-# plt.rcParams.update({
-    # "text.usetex": True,
-    # "font.family": "Helvetica"
-# })
 
 
 # adding hard coded reweight_pkl because of ML-pytorch
@@ -126,13 +123,6 @@ X = torch.Tensor( x )
 Y = torch.Tensor( y )
 V = torch.Tensor( V )
 
-logging.info("setting up animation...")
-# for debug: warning: conflict with animation frame every 10 epochs <-> n_epochs < 10
-assert n_epochs >= args.animate_step, " n_epochs = %i is not sufficient for animating, required > %i " %( n_epochs, args.animate_step )
-# Define the meta data for the movie
-GifWriter = manimation.writers['pillow']
-writer = manimation.PillowWriter( fps=args.animate_fps, metadata=None )
-logging.info("       gif's duration will be %s second(s)", n_epochs / args.animate_step / args.animate_fps)
 
 # Define steps for evaluation 
 def eval_train ( var_evaluation ):
@@ -171,16 +161,27 @@ def eval_truth ( var_evaluation ):
  
 
 # Initialize the movie
-nbins = 20
-index = list(itertools.product(list(range(0, 4)), list(range(0, 5))))
-plotvars=list(config.plot_mva_variables.keys())
-plots = {}   
-logging.info("       plotting truth for all %i variables ", len(plotvars))
-fig, ax = plt.subplots(4,5, figsize=(15,12), tight_layout=True)  # plot max 20 vars
-for i in range (len(plotvars)):
-    eval_truth(plotvars[i])
-logging.info("...done")
+if (args.animate):
+    logging.info("setting up animation...")
+    # for debug: warning: conflict with animation frame every 10 epochs <-> n_epochs < 10
+    assert n_epochs >= args.animate_step, " n_epochs = %i is not sufficient for animating, required > %i " %( n_epochs, args.animate_step )
+    # Define the meta data for the movie
+    GifWriter = manimation.writers['pillow']
+    writer = manimation.PillowWriter( fps=args.animate_fps, metadata=None )
+    logging.info("       gif's duration will be %s second(s)", n_epochs / args.animate_step / args.animate_fps)
 
+    nbins = 20
+    index = list(itertools.product(list(range(0, 4)), list(range(0, 5))))
+    plotvars=list(config.plot_mva_variables.keys())
+    plots = {}   
+    logging.info("       plotting truth for %i variables ", len(plotvars))
+    fig, ax = plt.subplots(4,5, figsize=(15,12), tight_layout=True)  # plot max 20 vars
+    for i in range (len(plotvars)):
+        eval_truth(plotvars[i])
+    logging.info("...done")
+
+if not (args.animate):
+    logging.info("skipping animation set up")
 
 
 # new dataset for handing data to the MVA
@@ -284,7 +285,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 losses = []
 
 # set up directory and model names
-dir_name = 'eft_e-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
+dir_name = str(args.sample)+'-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
 if ( args.LSTM ): 
     dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
 
@@ -294,7 +295,24 @@ if not os.path.exists( results_dir ):
 
 # train the model
 logging.info("starting training") 
-with writer.saving(fig, dir_name+'_'+"all"+".gif", 100):
+if (args.animate):
+    with writer.saving(fig, dir_name+'_'+"all"+".gif", 100):
+        for epoch in range(n_epochs):
+            logging.info("		epoch: %i of %i ", epoch+1, n_epochs)
+            for i, data in enumerate(train_loader):
+                inputs1,inputs2, labels = data
+                z = model(inputs1, inputs2)
+                loss=criterion(z,labels)
+                losses.append(loss.data)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                if (epoch%args.animate_step==0):
+                    with torch.no_grad():
+                        for i in range (len(plotvars)):
+                            eval_train(plotvars[i])
+                        writer.grab_frame()
+if not (args.animate):
     for epoch in range(n_epochs):
         logging.info("		epoch: %i of %i ", epoch+1, n_epochs)
         for i, data in enumerate(train_loader):
@@ -304,12 +322,7 @@ with writer.saving(fig, dir_name+'_'+"all"+".gif", 100):
             losses.append(loss.data)
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()
-            if (epoch%args.animate_step==0):
-                with torch.no_grad():
-                    for i in range (len(plotvars)):
-                        eval_train(plotvars[i])
-                    writer.grab_frame()
+            optimizer.step()                    
            
 logging.info("done with training, plotting losses") 
           
@@ -320,36 +333,6 @@ plt.title("Losses over epoch")
 sample_file_name = str(dir_name)+"_losses.png"
 plt.savefig(sample_file_name)
 
-# plot learned weights
-fig, az = plt.subplots(1,2, figsize = (10,6), tight_layout=True) 
-with torch.no_grad():
-    z = np.array( model(X, V) )
-hist_lin,  bins_lin  = np.histogram( z[:,0], bins=30 )
-hist_quad, bins_quad = np.histogram( z[:,1], bins=30 )
-train_lin  = np.zeros( (len(bins_lin),1) )
-train_quad = np.zeros( (len(bins_quad),1) )
-truth_lin  = np.zeros( (len(bins_lin),1) )
-truth_quad = np.zeros( (len(bins_quad),1) )
-for b in range ( 1,len(bins_lin)-1 ):
-    for ind in range ( z.shape[0] ):
-        val_lin  = z[ind, 0]
-        val_quad = z[ind, 1]
-        if ( val_lin > bins_lin[b-1] and val_lin<= bins_lin[b] ):
-            train_lin[b] += z[ind,0]
-            truth_lin[b] += y[ind,1]/y[ind,0]
-        if ( val_quad > bins_quad[b-1] and val_quad<= bins_quad[b] ):
-            train_quad[b] += z[ind,1]
-            truth_quad[b] += y[ind,2]/y[ind,0]    
-az[0].plot(bins_lin,  train_lin[:,0],  drawstyle='steps', label = "lin train",   color='red' )
-az[0].plot(bins_lin,  truth_lin[:,0],  drawstyle='steps', label = "lin truth",   color='black'    ,linestyle = 'dotted' )
-az[0].legend()
-az[0].set_yscale('symlog')
-az[1].plot(bins_quad, train_quad[:,0], drawstyle='steps', label = "quad train",  color='orange' )
-az[1].plot(bins_quad, truth_quad[:,0], drawstyle='steps', label = "quad truth",  color='black'    ,linestyle = 'dotted' )
-az[1].legend()
-az[1].set_yscale('symlog')
-sample_file_name = str(dir_name)+"_lin_quad.png"
-plt.savefig(sample_file_name)
 
 # save model
 with torch.no_grad():
@@ -359,6 +342,7 @@ with torch.no_grad():
         name = str(dir_name)+".onnx"
     else: 
         v = V[0].reshape(1,1)
-        name = str(dir_name)+".onnx"      
+        name = str(dir_name)+".onnx" 
+    torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
     torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
     logging.info("Saved model to %s", os.path.join(results_dir, name)) 
