@@ -29,7 +29,7 @@ lepVars          = ['pt/F','eta/F','phi/F','pdgId/I','isolationVar/F', 'isolatio
 lepVarNames      = [x.split('/')[0] for x in lepVars]
 
 lstm_jets_maxN   = 10
-lstm_jetVars     = ['pt/F', 'eta/F', 'bTagPhys/I']
+lstm_jetVars     = ['pt/F', 'eta/F', 'phi/F', 'bTag/F']
 lstm_jetVarNames = [x.split('/')[0] for x in lstm_jetVars]
 
 # Training variables
