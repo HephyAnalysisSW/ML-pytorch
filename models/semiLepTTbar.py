@@ -1,7 +1,7 @@
 import pickle
 import random
 import ROOT
-
+from math import pi
 if __name__=="__main__":
     import sys
     sys.path.append('..')
@@ -9,8 +9,7 @@ if __name__=="__main__":
 from tools.DataGenerator import DataGenerator
 from tools.WeightInfo    import WeightInfo
 
-selection = lambda ar: (ar.genJet_pt>500) & (ar.genJet_SDmass>0) & (abs(ar.dR_genJet_maxQ1Q2b)<0.6) & (ar.genJet_SDsubjet1_mass>=0)
-# -> https://schoef.web.cern.ch/schoef/pytorch/choleskyNN/genTops/training_plots/choleskyNN_genTops_ctWRe_nTraining_519075/lin/epoch.gif
+selection = lambda ar: (ar.nrecoLep>=1) & (ar.delphesJet_dR_hadTop_maxq1q2b<0.8) & (ar.parton_hadTop_pt<1000) & (ar.parton_lepTop_b_pt<400)
 
 data_generator =  DataGenerator(
     input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v8/TT01jDebug/TT01jDebug_*.root"],
@@ -19,6 +18,7 @@ data_generator =  DataGenerator(
         selection   = selection,
         branches = [
             "p_C",
+            "nrecoLep", "recoLep_pt", "delphesJet_dR_hadTop_maxq1q2b", "nrecoJet", "nBTag",
             "parton_hadTop_decayAngle_theta", "parton_hadTop_decayAngle_phi", 
             "parton_hadTop_pt", "parton_hadTop_eta", "parton_hadTop_phi", "parton_hadTop_q1_pt", "parton_hadTop_q1_eta", "parton_hadTop_q2_pt", "parton_hadTop_q2_eta", "parton_hadTop_b_pt", "parton_hadTop_b_eta", "parton_hadTop_W_pt", "parton_hadTop_W_eta", 
             "parton_lepTop_pt", "parton_lepTop_eta", "parton_lepTop_phi", "parton_lep_pt", "parton_lep_eta", "parton_lep_phi", "parton_nu_pt", "parton_nu_eta", "parton_nu_phi", "parton_lepTop_b_pt", "parton_lepTop_b_eta", "parton_lepTop_b_phi", "parton_lepTop_W_pt", "parton_lepTop_W_eta", "parton_lepTop_W_phi", 
@@ -84,76 +84,68 @@ eft_plot_points = [
     {'color':ROOT.kBlue+2,      'eft':make_eft(ctGIm=1),   'tex':"Im(c_{tG})=1",  },
     ]
 
-            "parton_hadTop_pt", "parton_hadTop_eta", "parton_hadTop_phi",
-            "parton_lepTop_pt", "parton_lepTop_eta", "parton_lepTop_phi", "parton_lep_pt", "parton_lep_eta", "parton_lep_phi", "parton_nu_pt", "parton_nu_eta", "parton_nu_phi", "parton_lepTop_b_pt", "parton_lepTop_b_eta", "parton_lepTop_b_phi", "parton_lepTop_W_pt", "parton_lepTop_W_eta", "parton_lepTop_W_phi",
-
-            "parton_hadTop_decayAngle_theta", "parton_hadTop_decayAngle_phi",
-            "parton_hadTop_q1_pt", "parton_hadTop_q1_eta", "parton_hadTop_q2_pt", "parton_hadTop_q2_eta", "parton_hadTop_b_pt", "parton_hadTop_b_eta", "parton_hadTop_W_pt",
-            "parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k", "parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star",
-            "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab",
-
 plot_options =  {
-    "parton_hadTop_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(t)'},
-    "parton_hadTop_eta" :{'binning':[50,-5,5], 'tex':'#eta(t)'},
-    "parton_hadTop_phi" :{'binning':[50,-pi,pi], 'tex':'#phi(t)'},
-    "parton_lepTop_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(t lep)'},
-    "parton_lepTop_eta" :{'binning':[50,-5,5], 'tex':'#eta(t lep)'},
-    "parton_lepTop_phi" :{'binning':[50,-pi,pi], 'tex':'#phi(t lep)'},
-    "parton_lep_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(l (t lep))'},
-    "parton_lep_eta" :{'binning':[50,-5,5], 'tex':'#eta(l(t lep))'},
-    "parton_lep_phi" :{'binning':[50,-pi,pi], 'tex':'#phi(l(t lep))'},
-    "parton_nu_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(#nu (t lep))'},
-    "parton_nu_eta" :{'binning':[50,-5,5], 'tex':'#eta(#nu(t lep))'},
-    "parton_nu_phi" :{'binning':[50,-pi,pi], 'tex':'#phi(#nu(t lep))'},
-    "parton_lepTop_b_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(b (t lep))'},
-    "parton_lepTop_b_eta" :{'binning':[50,-5,5], 'tex':'#eta(b(t lep))'},
-    "parton_lepTop_b_phi" :{'binning':[50,-pi,pi], 'tex':'#phi(b(t lep))'},
-    "parton_lepTop_W_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(W (t lep))'},
-    "parton_lepTop_W_eta" :{'binning':[50,-5,5], 'tex':'#eta(W(t lep))'},
-    "parton_lepTop_W_phi" :{'binning':[50,-pi,pi], 'tex':'#phi(W(t lep))'},
+    "parton_hadTop_pt" :{'binning':[50,0,1500], 'tex':'p_{T}(t)'},
+    "parton_hadTop_eta" :{'binning':[30,-3,3], 'tex':'#eta(t)'},
+    "parton_hadTop_phi" :{'binning':[30,-pi,pi], 'tex':'#phi(t)'},
+    "parton_lepTop_pt" :{'binning':[30,0,800], 'tex':'p_{T}(t lep)'},
+    "parton_lepTop_eta" :{'binning':[30,-3,3], 'tex':'#eta(t lep)'},
+    "parton_lepTop_phi" :{'binning':[30,-pi,pi], 'tex':'#phi(t lep)'},
+    "parton_lep_pt" :{'binning':[30,0,800], 'tex':'p_{T}(l (t lep))'},
+    "parton_lep_eta" :{'binning':[30,-3,3], 'tex':'#eta(l(t lep))'},
+    "parton_lep_phi" :{'binning':[30,-pi,pi], 'tex':'#phi(l(t lep))'},
+    "parton_nu_pt" :{'binning':[30,0,800], 'tex':'p_{T}(#nu (t lep))'},
+    "parton_nu_eta" :{'binning':[30,-3,3], 'tex':'#eta(#nu(t lep))'},
+    "parton_nu_phi" :{'binning':[30,-pi,pi], 'tex':'#phi(#nu(t lep))'},
+    "parton_lepTop_b_pt" :{'binning':[50,0,800], 'tex':'p_{T}(b (t lep))'},
+    "parton_lepTop_b_eta" :{'binning':[30,-3,3], 'tex':'#eta(b(t lep))'},
+    "parton_lepTop_b_phi" :{'binning':[30,-pi,pi], 'tex':'#phi(b(t lep))'},
+    "parton_lepTop_W_pt" :{'binning':[30,0,1000], 'tex':'p_{T}(W (t lep))'},
+    "parton_lepTop_W_eta" :{'binning':[30,-3,3], 'tex':'#eta(W(t lep))'},
+    "parton_lepTop_W_phi" :{'binning':[30,-pi,pi], 'tex':'#phi(W(t lep))'},
 
 
     "parton_hadTop_decayAngle_theta" :{'binning':[30,0,pi], 'tex':'#theta(t had)'},
     "parton_hadTop_decayAngle_phi"   :{'binning':[30,-pi,pi], 'tex':'#phi(t had)'},
 
-    "parton_hadTop_q1_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(q_{1}(t had))'},
-    "parton_hadTop_q1_eta" :{'binning':[50,-5,5], 'tex':'#eta(q_{1}(t had))'},
-    "parton_hadTop_q2_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(q_{2}(t had))'},
-    "parton_hadTop_q2_eta" :{'binning':[50,-5,5], 'tex':'#eta(q_{2}(t had))'},
-    "parton_hadTop_b_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(b(t had))'},
-    "parton_hadTop_b_eta" :{'binning':[50,-5,5], 'tex':'#eta(b(t had))'},
-    "parton_hadTop_W_pt" :{'binning':[50,500,2000], 'tex':'p_{T}(W(t had))'},
-    "parton_hadTop_W_eta" :{'binning':[50,-5,5], 'tex':'#eta(W(t had))'},
+    "parton_hadTop_q1_pt" :{'binning':[30,0,800], 'tex':'p_{T}(q_{1}(t had))'},
+    "parton_hadTop_q1_eta" :{'binning':[30,-3,3], 'tex':'#eta(q_{1}(t had))'},
+    "parton_hadTop_q2_pt" :{'binning':[30,0,800], 'tex':'p_{T}(q_{2}(t had))'},
+    "parton_hadTop_q2_eta" :{'binning':[30,-3,3], 'tex':'#eta(q_{2}(t had))'},
+    "parton_hadTop_b_pt" :{'binning':[30,0,800], 'tex':'p_{T}(b(t had))'},
+    "parton_hadTop_b_eta" :{'binning':[30,-3,3], 'tex':'#eta(b(t had))'},
+    "parton_hadTop_W_pt" :{'binning':[30,0,800], 'tex':'p_{T}(W(t had))'},
+    "parton_hadTop_W_eta" :{'binning':[30,-3,3], 'tex':'#eta(W(t had))'},
 
-    "parton_cosThetaPlus_n"     :{'binning':[50,-1,1], 'tex':'cos#theta^{+}_n'},
-    "parton_cosThetaMinus_n"    :{'binning':[50,-1,1], 'tex':'cos#theta^{-}_n'},
-    "parton_cosThetaPlus_r"     :{'binning':[50,-1,1], 'tex':'cos#theta^{+}_r'},
-    "parton_cosThetaMinus_r"    :{'binning':[50,-1,1], 'tex':'cos#theta^{-}_r'},
-    "parton_cosThetaPlus_k"     :{'binning':[50,-1,1], 'tex':'cos#theta^{+}_k'},
-    "parton_cosThetaMinus_k"    :{'binning':[50,-1,1], 'tex':'cos#theta^{-}_k'},
-    "parton_cosThetaPlus_r_star"    :{'binning':[50,-1,1], 'tex':'cos#theta^{+*}_n'},
-    "parton_cosThetaMinus_r_star"   :{'binning':[50,-1,1], 'tex':'cos#theta^{-*}_n'},
-    "parton_cosThetaPlus_k_star"    :{'binning':[50,-1,1], 'tex':'cos#theta^{+*}_k'},
-    "parton_cosThetaMinus_k_star"   :{'binning':[50,-1,1], 'tex':'cos#theta^{-*}_k'},
-    "parton_xi_nn"              :{'binning':[50,-1,1], 'tex':'#xi_{nn}'},
-    "parton_xi_rr"              :{'binning':[50,-1,1], 'tex':'#xi_{rr}'},
-    "parton_xi_kk"              :{'binning':[50,-1,1], 'tex':'#xi_{kk}'},
-    "parton_xi_nr_plus"         :{'binning':[50,-1,1], 'tex':'#xi_{nr}^{+}'},
-    "parton_xi_nr_minus"        :{'binning':[50,-1,1], 'tex':'#xi_{nr}^{-}'},
-    "parton_xi_rk_plus"         :{'binning':[50,-1,1], 'tex':'#xi_{rk}^{+}'},
-    "parton_xi_rk_minus"        :{'binning':[50,-1,1], 'tex':'#xi_{rk}^{-}'},
-    "parton_xi_nk_plus"         :{'binning':[50,-1,1], 'tex':'#xi_{nk}^{+}'},
-    "parton_xi_nk_minus"        :{'binning':[50,-1,1], 'tex':'#xi_{nk}^{-}'},
-    "parton_cos_phi"            :{'binning':[50,-1,1], 'tex':'cos(#phi)'},
-    "parton_cos_phi_lab"        :{'binning':[50,-1,1], 'tex':'cos(#phi lab)'},
-    "parton_abs_delta_phi_ll_lab":{'binning':[50,-pi,pi], 'tex':'|#Delta(#phi(l,l))|'},
+    "parton_cosThetaPlus_n"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{n}'},
+    "parton_cosThetaMinus_n"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{n}'},
+    "parton_cosThetaPlus_r"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{r}'},
+    "parton_cosThetaMinus_r"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{r}'},
+    "parton_cosThetaPlus_k"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{k}'},
+    "parton_cosThetaMinus_k"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{k}'},
+    "parton_cosThetaPlus_r_star"    :{'binning':[30,-1,1], 'tex':'cos#theta^{+*}_{n}'},
+    "parton_cosThetaMinus_r_star"   :{'binning':[30,-1,1], 'tex':'cos#theta^{-*}_{n}'},
+    "parton_cosThetaPlus_k_star"    :{'binning':[30,-1,1], 'tex':'cos#theta^{+*}_{k}'},
+    "parton_cosThetaMinus_k_star"   :{'binning':[30,-1,1], 'tex':'cos#theta^{-*}_{k}'},
+    "parton_xi_nn"              :{'binning':[30,-1,1], 'tex':'#xi_{nn}'},
+    "parton_xi_rr"              :{'binning':[30,-1,1], 'tex':'#xi_{rr}'},
+    "parton_xi_kk"              :{'binning':[30,-1,1], 'tex':'#xi_{kk}'},
+    "parton_xi_nr_plus"         :{'binning':[30,-1,1], 'tex':'#xi_{nr}^{+}'},
+    "parton_xi_nr_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{nr}^{-}'},
+    "parton_xi_rk_plus"         :{'binning':[30,-1,1], 'tex':'#xi_{rk}^{+}'},
+    "parton_xi_rk_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{rk}^{-}'},
+    "parton_xi_nk_plus"         :{'binning':[30,-1,1], 'tex':'#xi_{nk}^{+}'},
+    "parton_xi_nk_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{nk}^{-}'},
+    "parton_cos_phi"            :{'binning':[30,-1,1], 'tex':'cos(#phi)'},
+    "parton_cos_phi_lab"        :{'binning':[30,-1,1], 'tex':'cos(#phi lab)'},
+    "parton_abs_delta_phi_ll_lab":{'binning':[30,0,pi], 'tex':'|#Delta(#phi(l,l))|'},
 
 }
 
-multi_bit_cfg = {'n_trees': 100,
+multi_bit_cfg = {'n_trees': 300,
                  'max_depth': 4,
                  'learning_rate': 0.20,
-                 'min_size': 15 }
+                 'min_size': 25 }
 
 if __name__=="__main__":
    

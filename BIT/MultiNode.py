@@ -13,13 +13,12 @@ import functools
 default_cfg = {
     "max_depth":        4,
     "min_size" :        50,
-    "max_n_split":      -1,
-    "positive_score":   False,
+    "max_n_split":      -1,     # similar to TMVA: test only max_n_split values in the node-split search. (Not thoroughly tested yet and usually not needed.)
     "base_points":      None,
     "feature_names":    None,
-    "positive":         False,
-    "min_node_size_neg_adjust": False,
-    "loss" : "MSE", # or "CrossEntropy" 
+    "positive":         False,  # only perform node split when the resulting yields are positive definite. I do not recommend this, the bias-variance tradeoff is not favourable.
+    "min_node_size_neg_adjust": False, # Increase the min_size parameter by (1+f)/(1-f) where f is n-/n+ where n- (n+) are the number of events with negative (positive) weight 
+    "loss" : "MSE", # or "CrossEntropy" # MSE for toys is fine, in real life CrossEntropy is a bit more stable against outliers 
 }
 
 class MultiNode:
@@ -40,7 +39,7 @@ class MultiNode:
         if self.cfg['loss'] not in ["MSE", "CrossEntropy"]:
             raise RuntimeError( "Unknown loss. Should be 'MSE' or 'CrossEntropy'." ) 
 
-        # Master node: Split format
+        # Master node: We expect a dict  
         if type(training_weights)==dict:
             self.coefficients            = sorted(list(set(sum(map(list,training_weights.keys()),[]))))
 
@@ -51,6 +50,7 @@ class MultiNode:
             self.training_weights   = {tuple(sorted(key)):val for key,val in training_weights.items()}
 
             assert ('base_points' in kwargs) and kwargs['base_points'] is not None, "Must provide base_points in cfg"
+            assert all( [ key in self.training_weights for key in self.derivatives ]), "Incomplete list of keys in training_weights?"
 
             # precoumputed base_point_const
             self.base_points      = kwargs['base_points']
@@ -74,7 +74,7 @@ class MultiNode:
             self.cfg['feature_names'] = None if not ('feature_names' in kwargs) else kwargs['feature_names'] 
             self.feature_names      = self.cfg['feature_names']
             self.training_weights   = np.array([training_weights[der] for der in self.derivatives]).transpose().astype('float')
-        # inside tree
+        # inside tree -> we need not re-compute the base-point consts, we copy them
         else:
             self.training_weights           = training_weights
             self.base_point_const           = kwargs['base_point_const']

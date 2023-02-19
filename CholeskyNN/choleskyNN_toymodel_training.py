@@ -236,7 +236,7 @@ if args.coefficients is not None:
         if not all( [k in args.coefficients for k in key]):
             del training_weights[key]
 
-from CholeskyNN import CholeskyNN
+from CholeskyNN.CholeskyNN import CholeskyNN
 
 filename = os.path.join(user.model_directory, cnn_name)+'.pkl'
 if not args.overwrite in ["all", "training"]:
