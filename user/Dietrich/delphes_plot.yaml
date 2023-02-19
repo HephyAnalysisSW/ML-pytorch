@@ -1,0 +1,112 @@
+---
+data_path: /scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v5/tschRefPointNoWidthRW/tschRefPointNoWidthRW_{}.root:Events
+cut: (genJet_pt>500) & (genJet_SDmass>0) & (abs(dR_genJet_maxq1q2b)<0.6) & (genJet_SDsubjet1_mass>=0)
+
+branches:
+  - name: delphesJet_pt
+    range: [0., 1000.]
+    drange: 100.
+  - name: delphesJet_eta
+    drange: 0.1
+  - name: delphesJet_phi
+    drange: 0.1
+  - name: delphesJet_mass
+    drange: 50.
+  - name: delphesJet_nConstituents
+  - name: delphesJet_SDmass
+    range: [0.,300.]
+    drange: 100
+  - name: delphesJet_SDsubjet0_eta
+    drange: 0.1
+  - name: delphesJet_SDsubjet0_deltaEta
+    drange: 0.1
+  - name: delphesJet_SDsubjet0_phi
+    drange: 0.5
+  - name: delphesJet_SDsubjet0_deltaPhi
+    drange: 0.1
+  - name: delphesJet_SDsubjet0_deltaR
+    drange: 0.1
+  - name: delphesJet_SDsubjet0_mass
+    drange: 100
+  - name: delphesJet_SDsubjet1_eta
+    drange: 0.1
+  - name: delphesJet_SDsubjet1_deltaEta
+    drange: 0.1
+  - name: delphesJet_SDsubjet1_phi
+    drange: 0.5
+  - name: delphesJet_SDsubjet1_deltaPhi
+    drange: 0.5
+  - name: delphesJet_SDsubjet1_deltaR
+    drange: 0.1
+  - name: delphesJet_SDsubjet1_mass
+    drange: 50
+  - name: delphesJet_tau1
+    drange: 0.1
+  - name: delphesJet_tau2
+    drange: 0.1
+  - name: delphesJet_tau3
+    drange: 0.1
+  - name: delphesJet_tau4
+    drange: 0.05
+  - name: delphesJet_tau21
+    drange: 0.25
+  - name: delphesJet_tau32
+    drange: 0.4
+  - name: delphesJet_ecf1
+    range: [0., 1000.]
+    drange: 100.
+  - name: delphesJet_ecf2
+    range: [-100000., 100000.]
+    drange: 1000.
+  - name: delphesJet_ecf3
+  - name: delphesJet_ecfC1
+    drange: 0.1
+  - name: delphesJet_ecfC2
+    drange: 0.1
+  - name: delphesJet_ecfC3
+    drange: 0.1
+  - name: delphesJet_ecfD
+    drange: 0.5
+  - name: delphesJet_ecfDbeta2
+    drange: 0.5
+  - name: delphesJet_ecfM1
+    drange: 0.5
+  - name: delphesJet_ecfM2
+    drange: 0.05
+  - name: delphesJet_ecfM3
+  - name: delphesJet_ecfM1beta2
+  - name: delphesJet_ecfM2beta2
+    drange: 0.05
+  - name: delphesJet_ecfM3beta2
+    drange: 0.05
+  - name: delphesJet_ecfN1
+  - name: delphesJet_ecfN2
+  - name: delphesJet_ecfN3
+  - name: delphesJet_ecfN1beta2
+    drange: 0.05
+  - name: delphesJet_ecfN2beta2
+  - name: delphesJet_ecfN3beta2
+  - name: delphesJet_ecfU1
+    drange: 0.05
+  - name: delphesJet_ecfU2
+    drange: 0.01
+  - name: delphesJet_ecfU3
+    drange: 0.001
+  - name: delphesJet_ecfU1beta2
+    drange: 0.05
+  - name: delphesJet_ecfU2beta2
+    drange: 0.005
+  - name: delphesJet_ecfU3beta2
+    drange: 0.0005
+  - name: dR_delphesJet_q1
+    drange: 0.1
+  - name: dR_delphesJet_q2
+    drange: 0.1
+  - name: dR_delphesJet_W
+    drange: 0.1
+  - name: dR_delphesJet_b
+    drange: 0.1
+  - name: dR_delphesJet_top
+    drange: 0.1
+  - name: dR_delphesJet_maxq1q2b
+    drange: 0.1

@@ -28,13 +28,13 @@ from tools import user
 
 
 # parameters for training if module is run as a script
-TRAIN_FILE_RANGE = (0,20)
+TRAIN_FILE_RANGE = (0,50)
 HIDDEN_LAYERS = (300,100,100)
 N_EPOCH = 10
 LEARNING_RATE = 1e-5
 PRINT_EVERY = 1
-SAVE_EVERY = 1
-MODEL_DIRECTORY = None
+SAVE_EVERY = 10
+MODEL_DIRECTORY = 'test_2'
 
 
 
@@ -71,8 +71,8 @@ def learn_lin_weight(model, data_loader, n_epoch=10, learning_rate=1e-3, print_e
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 
-    if scheduler is not None:
-        scheduler = StepLR(optimizer=optimizer, step_size=plot_every, gamma=0.9, verbose=False)
+    # if scheduler is not None:
+    #     scheduler = StepLR(optimizer=optimizer, step_size=plot_every, gamma=0.9, verbose=False)
 
     #losses = []
     # accuracies = []
@@ -158,6 +158,8 @@ if __name__ == '__main__':
 
     if MODEL_DIRECTORY is None:
         MODEL_DIRECTORY = datetime.datetime.now().strftime('%d_%m_%Y_%H-%M-%S')
+
+    print(f'model directory: {os.path.join(user.model_directory, MODEL_DIRECTORY)}')
 
     print('start training')
     learn_lin_weight(
