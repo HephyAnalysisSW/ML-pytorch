@@ -103,8 +103,8 @@ if (args.LSTM):
     V = np.column_stack( [np.stack(vec_br[name]) for name in vector_branches] ).reshape( len(Y), len(vector_branches), max_timestep).transpose((0,2,1))
     V = np.nan_to_num(V)
 V = torch.Tensor(V)
-
-
+print(V[1, :, 6:8])
+assert False
 # new dataset for handing data to the MVA
 class NewDataset(Dataset):
 

@@ -1,11 +1,21 @@
 # ML-pytorch
 
+## Activate conda from mambaforge
+
+The recommanded way to use mamba is [mambaforge](https://mamba.readthedocs.io/en/latest/installation.html#)
+
+On CBE just add following to your  ```.bashrc```. (Do not forget to remove any older conda setup)
+
+        eval "$('/groups/hephy/cms/Tools/mambaforge/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+
+
+
 ## set up environment (CBE with gpu using MAMBA)
 ```
-conda activate /groups/hephy/cms/dietrich.liko/conda/envs/my-base
+conda activate base
 mamba create -n pt-gpu -c pytorch -c conda-forge -c default --file=env/env-pytorch-gpu-mamba.yml
 ```
-## set up environment (local)
+## set up environment with conda
 ```
 conda env create --file=env/env-pt.yml
 ```

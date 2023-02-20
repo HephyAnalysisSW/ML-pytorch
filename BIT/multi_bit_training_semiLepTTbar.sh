@@ -1,0 +1,2 @@
+#python multi_bit_training.py --plot_directory multiBIT_semiLepTTbar_v3 --prefix v3 --model semiLepTTbar --modelFile models --nTraining -1 --coefficients ctGRe ctGIm ctWRe ctWIm --loss CrossEntropy --debug --n_trees 400 --auto_clip 0.002 --feature_plots
+python multi_bit_training.py --plot_directory multiBIT_semiLepTTbar_v3 --prefix v3 --model semiLepTTbar_delphesJet --modelFile models --nTraining -1 --coefficients ctGRe ctGIm ctWRe ctWIm --loss CrossEntropy --debug --n_trees 400 --auto_clip 0.002 --feature_plots
