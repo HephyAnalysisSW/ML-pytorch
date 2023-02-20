@@ -6,9 +6,8 @@ The recommanded way to use mamba is [mambaforge](https://mamba.readthedocs.io/en
 
 On CBE just add following to your  ```.bashrc```. (Do not forget to remove any older conda setup)
 
-        eval "$('/groups/hephy/cms/Tools/mambaforge/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
-
-
+        . /software/2020/software/mamba/22.11.1-4/etc/profile.d/mamba.sh
+        . /software/2020/software/mamba/22.11.1-4/etc/profile.d/conda.sh
 
 ## set up environment (CBE with gpu using MAMBA)
 ```
