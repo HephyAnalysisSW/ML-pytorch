@@ -178,7 +178,6 @@ if (args.animate):
     fig, ax = plt.subplots(4,5, figsize=(15,12), tight_layout=True)  # plot max 20 vars
     for i in range (len(plotvars)):
         eval_truth(plotvars[i])
-    logging.info("...done")
 
 if not (args.animate):
     logging.info("skipping animation set up")
@@ -248,7 +247,7 @@ class NeuralNet(nn.Module):
 class LossLikelihoodFree(torch.nn.L1Loss):
     __constants__ = ['reduction']
 
-    def __init__(self, reduction: str = 'sum') -> None:
+    def __init__(self, reduction: str = 'mean') -> None:
         super(LossLikelihoodFree, self).__init__(None, None, reduction)
 
         self.base_points = [1,2] # hardcoded
@@ -260,7 +259,7 @@ class LossLikelihoodFree(torch.nn.L1Loss):
 
         loss = 0
         for theta_base in self.base_points: #two base-points: 1,2
-            loss += weight*( theta_base*(target_lin/weight-input[:,0]) + .5*theta_base**2*(target_quad/weight-input[:,1]) )**2
+            loss += weight*( theta_base*(target_lin/weight-input[:,0]) + theta_base**2*(target_quad/weight-input[:,1]) )**2
 
         if self.reduction == 'none':
             return loss
@@ -285,7 +284,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 losses = []
 
 # set up directory and model names
-dir_name = str(args.sample)+'-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
+dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
 if ( args.LSTM ): 
     dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
 
