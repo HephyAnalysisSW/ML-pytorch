@@ -30,9 +30,9 @@ from tools import user
 # parameters for training if module is run as a script
 TRAIN_FILE_RANGE = (0,50)
 HIDDEN_LAYERS = (300,100,100)
-N_EPOCH = 10
+N_EPOCH = 200
 LEARNING_RATE = 1e-5
-PRINT_EVERY = 1
+PRINT_EVERY = 10
 SAVE_EVERY = 10
 MODEL_DIRECTORY = 'test_2'
 

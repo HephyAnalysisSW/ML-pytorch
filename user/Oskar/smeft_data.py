@@ -19,11 +19,11 @@ from tools.WeightInfo    import WeightInfo
 
 # specify which observables to plot
 def get_branch_names():
-	from branches import branches
-	with uproot.open('/scratch-cbe/users/robert.schoefbeck/TMB/postprocessed/gen/v2/tschRefPointNoWidthRW/tschRefPointNoWidthRW_0.root:Events') as f:
-		scalar_branches=f.keys(branches, filter_typename=['float', 'int32_t','uint64_t'])
-		vector_branches=f.keys(branches, filter_typename='*[]')
-	return scalar_branches, vector_branches
+    from branches import branches
+    with uproot.open('/scratch-cbe/users/robert.schoefbeck/TMB/postprocessed/gen/v2/tschRefPointNoWidthRW/tschRefPointNoWidthRW_0.root:Events') as f:
+        scalar_branches=f.keys(branches, filter_typename=['float', 'int32_t','uint64_t'])
+        vector_branches=f.keys(branches, filter_typename='*[]')
+    return scalar_branches, vector_branches
 
 
 ## return the subset of combinations that include at most the elements of coefficients
@@ -48,27 +48,30 @@ coefficients = ['ctWRe',]
 file_names = '/scratch-cbe/users/robert.schoefbeck/TMB/postprocessed/gen/v2/tschRefPointNoWidthRW/tschRefPointNoWidthRW_0.root:Events'
 selection = '(genJet_pt>500) & (genJet_SDmass>0) & (abs(dR_genJet_maxQ1Q2b)<0.6) & (genJet_SDsubjet1_mass>=0)'
 def load_data(file_names=file_names, selection=selection, coefficients=coefficients):
-	# get branch names and fromat file names
-	scalar_branches, vector_branches = get_branch_names()
-	# load scalar and vector branches as awkward arrays
-	scalar_events = uproot.concatenate(file_names, cut=selection, branches=scalar_branches)							
-	vector_events = uproot.concatenate(file_names, cut=selection, branches=vector_branches)
-	# load the weights 
-	p_C = uproot.concatenate(file_names, cut=selection, branches='p_C')
-	p_C = ak.to_numpy(p_C.p_C)
-	combinations = make_combinations(coefficients)
-	weights = np.array([p_C[:,w.combinations.index(comb)] for comb in combinations]).transpose()
-	#convert to numpy
-	scalar_events = np.array([scalar_events[sb] for sb in scalar_branches]).transpose().astype('float32')
-	for vb in vector_branches:
-	# print(vb)
-		max = 1
-		for ve in vector_events[vb]:
-			if len(ve)>max: max=len(ve)
-		vector_events[vb] = ak.fill_none(ak.pad_none(vector_events[vb], target=max, clip=True), value=0)
-		np.stack
+    # get branch names and fromat file names
+    scalar_branches, vector_branches = get_branch_names()
+    # load scalar and vector branches as awkward arrays
+    scalar_events = uproot.concatenate(file_names, cut=selection, branches=scalar_branches)							
+    vector_events = uproot.concatenate(file_names, cut=selection, branches=vector_branches)
+    # load the weights 
+    p_C = uproot.concatenate(file_names, cut=selection, branches='p_C')
+    p_C = ak.to_numpy(p_C.p_C)
+    combinations = make_combinations(coefficients)
+    weights = np.array([p_C[:,w.combinations.index(comb)] for comb in combinations]).transpose()
+    #test for nans
+    for sb in scalar_branches:
+        print(f'#nans in branch {sb}. {np.isnan(np.array(scalar_events[sb])).sum()}')
+    #convert to numpy
+    scalar_events = np.array([scalar_events[sb] for sb in scalar_branches]).transpose().astype('float32')
+    for vb in vector_branches:
+    # print(vb)
+        max = 1
+        for ve in vector_events[vb]:
+            if len(ve)>max: max=len(ve)
+        vector_events[vb] = ak.fill_none(ak.pad_none(vector_events[vb], target=max, clip=True), value=0)
+        np.stack
 
-	return scalar_events, vector_events, weights
+    return scalar_events, vector_events, weights
 
 
 # get the weights

@@ -2,7 +2,9 @@
 # Tasks
 
 ## Open
-* use weaver for training a dnn (without weights) on high level features to regress ctWRe
+* make the smeft_plot script compatible with the weaver output, find a better way to handle the branch names
+* find out why --in-memory option in weaver is not working:
+    * nr of events, branches,  NaNs?, network config, loss value
 * use weaver for training a dnn (with weights) on high level features to regress ctWRe
 * learn how Andreas injected lepton features into the dense layer of ParticleNet
 * do equal width bin histograms for gen_theta and nn output
@@ -19,6 +21,8 @@
 * narrow width approximation
 
 ## Closed
+* with delphes data use weaver for training a dnn (with weights) on high level features to regress ctWRe (12.01.22)
+* use weaver for training a dnn (without weights) on high level features to regress ctWRe (10.01.22)
 * train w/o top mass (09.01.22)
 * reweight hists according to ratio of gen theta sm to bsm (09.01.22)
 * LLR plot add gen_theta
@@ -84,6 +88,7 @@ this is a template for a week entry
 
 ***
 
+## Compare training on gen data with/without top mass
 * training without inclusion of the generator top mass gives virtually identical performance in terms of a LLR confidence intervall, so the nn still outperforms gen_theta. 
 
 #### LLR for nn trained w/o top mass vs gen_theta
@@ -99,6 +104,8 @@ If the same variable is used, i.e. perfect 'factoring out', we arrive back at th
 ![gen_theta_reweight_nn](https://orothbac.web.cern.ch/pytorch/test_no_top_mass/nn_reweight_with_gen_theta_hist_weighted_quantiles.png)
 ![gen_theta_reweight_gen_theta](https://orothbac.web.cern.ch/pytorch/test_no_top_mass/gen_theta_reweight_with_gen_theta_hist_weighted_quantiles.png)
 
+
+## train dnn on delphes data with weaver
 
 </details>
 

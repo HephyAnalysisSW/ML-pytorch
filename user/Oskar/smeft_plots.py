@@ -22,12 +22,12 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
-MODEL_PATH = 'test_no_top_mass'
+MODEL_PATH = 'test_2'
 MODEL_NAME = 'epoch_200.pkl'
 
 EPOCH_LIST = [1, 11, 31, 71, 200]
 
-OUT_PATH = 'test_no_top_mass'
+OUT_PATH = 'test_2'
 
 TEST_FILE_RANGE = (80,100)
 

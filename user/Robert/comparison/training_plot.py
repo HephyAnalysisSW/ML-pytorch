@@ -17,7 +17,7 @@ ROOT.setTDRStyle()
 
 # BIT
 from BIT.MultiBoostedInformationTree import MultiBoostedInformationTree
-from NN.CholeskyNN import CholeskyNN 
+from CholeskyNN.CholeskyNN import CholeskyNN 
 import torch
 torch.set_grad_enabled(False)
 
