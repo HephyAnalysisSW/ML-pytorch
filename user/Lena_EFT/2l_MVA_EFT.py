@@ -284,7 +284,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 losses = []
 
 # set up directory and model names
-dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
+dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_epochs-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
 if ( args.LSTM ): 
     dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
 
