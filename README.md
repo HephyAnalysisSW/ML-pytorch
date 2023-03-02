@@ -13,6 +13,8 @@ On CBE just add following to your  ```.bashrc```. (Do not forget to remove any o
 ```
 conda activate base
 mamba create -n pt-gpu -c pytorch -c conda-forge -c default --file=env/env-pytorch-gpu-mamba.yml
+conda activate pytorch-gpu-mamba
+conda install -c conda-forge python-xxhash
 ```
 ## set up environment with conda
 ```
