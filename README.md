@@ -15,6 +15,7 @@ conda activate base
 mamba create -n pt-gpu -c pytorch -c conda-forge -c default --file=env/env-pytorch-gpu-mamba.yml
 conda activate pytorch-gpu-mamba
 conda install -c conda-forge python-xxhash
+conda install -c anaconda lz4
 ```
 ## set up environment with conda
 ```
