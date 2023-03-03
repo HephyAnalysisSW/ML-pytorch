@@ -16,7 +16,8 @@ mamba create -n pt-gpu -c pytorch -c conda-forge -c default --file=env/env-pytor
 conda activate pytorch-gpu-mamba
 conda install -c conda-forge python-xxhash
 conda install -c anaconda lz4
-conda install -c conda-forge uproot4
+#conda install -c conda-forge uproot4
+pip install uproot awkward
 ```
 ## set up environment with conda
 ```
