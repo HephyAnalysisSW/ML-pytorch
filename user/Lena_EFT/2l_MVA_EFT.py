@@ -22,12 +22,13 @@ argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',                   default='INFO', nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
 argParser.add_argument('--sample',             action='store',      type=str,    default='TTTT_MS')
 argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models/')
-argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v4/MVA-training/ttbb_2l_dilep-met30-njet4p-btag2p/')
-argParser.add_argument('--n_epochs',           action='store',      type=int,    default = '500',  help='number of epochs in training')
-argParser.add_argument('--hs1_mult',           action='store',      type=int,    default = '2',    help='hidden size 1 = #features * mult')
+argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v6/MVA-training/ttbb_2l_dilep-bjet_delphes-met30-njet4p-btag2p/')
+argParser.add_argument('--n_epochs',           action='store',      type=int,    default= '500',   help='number of epochs in training')
+argParser.add_argument('--hs1_mult',           action='store',      type=int,    default= '2',     help='hidden size 1 = #features * mult')
 argParser.add_argument('--hs2_add',            action='store',      type=int,    default= '5',     help='hidden size 2 = #features + add')
+argParser.add_argument('--hs_combined',        action='store',      type=int,    default= '5',     help='hidden size of combined layer after LSTM+DNN')
 argParser.add_argument('--LSTM',               action='store_true',              default=False,    help='add LSTM?')
-argParser.add_argument('--num_layers',         action='store',      type=int,    default='1',      help='number of LSTM layers')
+argParser.add_argument('--num_layers',         action='store',      type=int,    default= '1',     help='number of LSTM layers')
 argParser.add_argument('--LSTM_out',           action='store',      type=int,    default= '1',     help='output size of LSTM')
 argParser.add_argument('--nbins',              action='store',      type=int,    default='20',     help='number of bins')
 argParser.add_argument('--EFTCoefficients',    action='store',                   default='ctt',    help="Training vectors for particle net")
@@ -56,6 +57,7 @@ n_epochs         = args.n_epochs
 input_size       = len( mva_variables ) 
 hidden_size      = input_size * args.hs1_mult
 hidden_size2     = input_size + args.hs2_add
+hidden_size_comb = args.hs_combined
 output_size      = 2                        # hard coded: lin, quad
 
 if ( args.LSTM ):
@@ -72,6 +74,7 @@ logging.info( "  Number of epochs:                        %i",n_epochs )
 logging.info( "  Number of features,linear layer:         %i",input_size )
 logging.info( "  Size of first hidden layer:              %i",hidden_size )
 logging.info( "  Size of second hidden layer:             %i",hidden_size2 )
+logging.info( "  Size of combined layer:                  %i",hidden_size_comb )
 logging.info( "  LSTM:                                    %r",args.LSTM )
 if ( args.LSTM ):
     logging.info( "          Number of LSTM layers:         %i", num_layers )
@@ -208,21 +211,21 @@ train_loader = DataLoader(dataset=dataset,
 
 # set up NN
 class NeuralNet(nn.Module):
-    def __init__(self, input_size, hidden_size, hidden_size2, output_size, input_size_lstm, hidden_size_lstm, num_layers):
+    def __init__(self, input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm, hidden_size_lstm, num_layers):
         super(NeuralNet, self).__init__()
         self.batchn = nn.BatchNorm1d(input_size)
         self.linear1 = nn.Linear(input_size, hidden_size)
         self.relu = nn.ReLU()
         self.linear2 = nn.Linear(hidden_size, hidden_size2)
-        self.softm = nn.Softmax(dim = 1)
         
         if (args.LSTM):
             self.num_layers = num_layers
             self.hidden_size_lstm = hidden_size_lstm
             self.lstm = nn.LSTM(input_size_lstm, hidden_size_lstm, num_layers, batch_first=True)
-            self.linear3 = nn.Linear(hidden_size2+hidden_size_lstm, output_size)
+            self.linear3 = nn.Linear(hidden_size2+hidden_size_lstm, hidden_size_comb)
         else:
-            self.linear3 = nn.Linear(hidden_size2, output_size)    
+            self.linear3 = nn.Linear(hidden_size2, hidden_size_comb) 
+        self.linear4 = nn.Linear(hidden_size_comb, output_size)    
         
     def forward(self, x, y):
         # set linear layers
@@ -240,7 +243,9 @@ class NeuralNet(nn.Module):
             x2 = x2[:, -1, :]        
             x1 = torch.cat([x1, x2], dim=1)          
         x1 = self.relu(x1)
-        x1 = self.linear3(x1)        
+        x1 = self.linear3(x1)   
+        x1 = self.relu(x1)  
+        x1 = self.linear4(x1)   
         return x1
 
 
@@ -274,9 +279,9 @@ def get_loss( **kwargs ):
 
 # define model
 if ( args.LSTM == False ):    
-    model = NeuralNet(input_size, hidden_size, hidden_size2, output_size, input_size_lstm=0, hidden_size_lstm=0, num_layers=0).to(device)    
+    model = NeuralNet(input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm=0, hidden_size_lstm=0, num_layers=0).to(device)    
 else:
-    model = NeuralNet(input_size, hidden_size, hidden_size2, output_size, input_size_lstm, hidden_size_lstm, num_layers).to(device) 
+    model = NeuralNet(input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm, hidden_size_lstm, num_layers).to(device) 
     
 # define loss function   
 criterion = get_loss()
@@ -284,7 +289,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 losses = []
 
 # set up directory and model names
-dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_epochs-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)
+dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_epochs-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)+'_hsc-'+str(hidden_size_comb)
 if ( args.LSTM ): 
     dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
 
