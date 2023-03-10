@@ -13,6 +13,11 @@ On CBE just add following to your  ```.bashrc```. (Do not forget to remove any o
 ```
 conda activate base
 mamba create -n pt-gpu -c pytorch -c conda-forge -c default --file=env/env-pytorch-gpu-mamba.yml
+conda activate pt-gpu
+conda install -c conda-forge python-xxhash
+conda install -c anaconda lz4
+#conda install -c conda-forge uproot4
+pip install uproot awkward
 ```
 ## set up environment with conda
 ```
