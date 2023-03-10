@@ -40,7 +40,7 @@ argParser.add_argument("--nEvents",            action="store",      type=int, de
 argParser.add_argument('--truth',              action='store_true', help="Truth?" )
 argParser.add_argument('--lumi_factor',        action='store',      type=float, default=1.0, help="Lumi factor" )
 argParser.add_argument('--bit',                action='store',      default='multiBit_semiLepTTbar_v3_ctGRe_ctGIm_ctWRe_ctWIm_nTraining_-1_nTrees_400', help="Which BIT?" )
-argParser.add_argument('--ignoreR',            action='store_true', help="Use log(inclusive xsec ratio) as test statistic?" )
+argParser.add_argument('--ignoreEFTShape',            action='store_true', help="Use log(inclusive xsec ratio) as test statistic?" )
 argParser.add_argument('--ignoreEFTScaling',   action='store_true', help="Ignore the xec effect of EFT, only use shapes?" )
 
 args = argParser.parse_args()
@@ -52,7 +52,7 @@ exec( "import models.%s as model"%args.model )
 
 feature_names = model.feature_names
 
-if args.ignoreR:
+if args.ignoreEFTShape:
     sub_directory = "1bin" 
 elif args.ignoreEFTScaling:
     sub_directory = "unbinned_shape" 
@@ -89,7 +89,7 @@ def lambda_tot( lin=False, **kwargs):
     return result 
 
 # xsec ratio
-def lambda_ratio( lin=False, **kwargs):
+def lambda_ratio(lin=False, **kwargs):
     return lambda_tot( lin=lin, **kwargs ) / lambda_expected_sm
 
 # compute weights for arbitrary WC
@@ -97,9 +97,10 @@ def make_weights( lin=False, **kwargs):
     result =  copy.deepcopy(weights[tuple()])
     result += sum( [ (kwargs[coeff] - model.default_eft_parameters[coeff])*weights[(coeff,)] for coeff in list(kwargs.keys()) ])
     if not lin:
-        result += sum( [ (.5 if coeff1!=coeff2 else 1)*(kwargs[coeff1] - model.default_eft_parameters[coeff1])*(kwargs[coeff2] - model.default_eft_parameters[coeff2])*weights[tuple(sorted((coeff1,coeff2)))] for coeff1 in list(kwargs.keys())  for coeff2 in list(kwargs.keys())])
+        result += sum( [ (.5 if coeff1!=coeff2 else 1)*(kwargs[coeff1] - model.default_eft_parameters[coeff1])*(kwargs[coeff2] - model.default_eft_parameters[coeff2])*weights[tuple(sorted((coeff1,coeff2)))] for coeff1 in list(kwargs.keys()) for coeff2 in list(kwargs.keys())])
     return result 
 
+# Load BIT predictions
 filename = os.path.join(user.model_directory, args.bit)+'.pkl'
 try:
     print ("Loading MultiBIT %s"%(filename))
@@ -112,8 +113,10 @@ except (IOError, EOFError, ValueError):
 
 def make_logR_to_SM( order, predictions=predictions, truth=False,  **kwargs ):
 
-    if args.ignoreR:
-        return log(lambda_ratio(**kwargs))*np.ones(len(weights[()])) 
+    # in q = yield(H_alt)-yield(H_null) - sum_i w_H_null_i*log R(xi|ALT, null) replace the last logR term with the xsec ratio
+    if args.ignoreEFTShape:
+        # minus sign, because ALT is the SM
+        return -log(lambda_ratio(**kwargs))*np.ones(len(weights[()])) 
 
     eft      = model.make_eft(**kwargs)
     if order not in ["lin", "quad", "total"]:
