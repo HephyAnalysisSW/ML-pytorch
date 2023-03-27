@@ -238,3 +238,14 @@ def MT2(event, sample):
 sequence.append( MT2 )
 
 
+total_genWeight = {
+"TTTT_MS"   :3.07644844055,
+"TT_2L"     :10325881856.0,
+"TTbb_MS"   :258.110778809,
+}
+
+xsec = {
+"TTTT_MS"   :11.9e-03,
+"TT_2L"     :831.762*((3*0.108)**2),
+"TTbb_MS"   :5.253e-01,
+}
