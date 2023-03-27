@@ -3,13 +3,16 @@ import   ROOT
 import   array
 
 
-def clip_quantile( features, quantile, weights = None ):
+def clip_quantile( features, quantile, weights = None, return_selection=False):
 
     selected  = np.array(list(range(len(features)))).reshape(-1)
     selection = np.ones_like( selected ).astype('bool')
 
     for i_feature in range(len(features[0])):
         selection&= 1==np.digitize( features[:, i_feature], np.quantile( features[:, i_feature], ( quantile, 1.-quantile )) )
+
+    if return_selection:
+        return selection
 
     #len_before = len(selected)
     selected = selected[selection]
@@ -31,6 +34,19 @@ def make_TH1F( h, ignore_binning = False):
     for i_v, v in enumerate(vals):
         if v<float('inf'): # NAN protection
             histo.SetBinContent(i_v+1, v)
+    return histo
+
+def make_TH2F( h, ignore_binning = False):
+    # remove infs from thresholds
+    vals, thrs_x, thrs_y = h
+    if ignore_binning:
+        histo = ROOT.TH2F("h","h",len(vals[0]),0,len(vals[0]),len(vals),0,len(vals))
+    else:
+        histo = ROOT.TH2F("h","h",len(thrs_x)-1,array.array('d', thrs_x),len(thrs_y)-1,array.array('d', thrs_y))
+    for iy, _ in enumerate(vals):
+        for ix, v in enumerate(vals[iy]):
+            if v<float('inf'): # NAN protection
+                histo.SetBinContent(histo.FindBin(thrs_x[ix], thrs_y[iy]), v)
     return histo
 
 # https://stackoverflow.com/questions/21844024/weighted-percentile-using-numpy
