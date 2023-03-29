@@ -240,7 +240,7 @@ sequence.append( MT2 )
 
 total_genWeight = {
 "TTTT_MS"   :3.07644844055,
-"TT_2L"     :10325881856.0,
+"TT_2L"     :3465481472.0,
 "TTbb_MS"   :258.110778809,
 }
 
