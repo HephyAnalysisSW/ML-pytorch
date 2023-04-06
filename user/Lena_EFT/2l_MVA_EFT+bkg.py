@@ -58,7 +58,6 @@ if ( args.sample == "TTbb_MS" ): reweight_pkl = "/eos/vbc/group/cms/robert.schoe
 
 
 import ttbb_2l_python3 as config
-
 # set hyperparameters
 mva_variables    = [ mva_variable[0] for mva_variable in config.mva_variables ]
 sample           = args.sample
@@ -165,12 +164,11 @@ logging.info("calculating new weights, reweighting to integrated luminosity")
 W_0     = lumi * config.xsec[sample] * 1000 * y[:,0]/ config.total_genWeight[sample]
 if args.add_bkg:
     W_0_bkg = lumi * config.xsec[bkg] * 1000 * y_bkg[:,0]/ config.total_genWeight[bkg]
-
+    
 # store new weights W_0 as a 4th position in y and y_bkg -> w and w_bkg
 w = np.zeros((len(y[:,0]),4))
 w[:,:-1] = y 
 w[:,-1]  = W_0
-
 if args.add_bkg:
     w_bkg = np.zeros((len(y_bkg[:,0]),4))
     w_bkg[:,:-1] = y_bkg 
@@ -182,15 +180,11 @@ red_bkg = 0
 if args.add_bkg and args.reduce is not None: red_bkg = int(len(x_bkg[:,0])/args.reduce)
 if (reduce):
     x = x[0:red, :]
-    y = y[0:red, :]
     v = v[0:red, :, :]
-    W_0 = W_0[0:red]
     w = w[0:red, :]
     if args.add_bkg:
         x_bkg = x_bkg[0:red_bkg :]
-        y_bkg = y_bkg[0:red_bkg, :]
         v_bkg = v_bkg[0:red_bkg, :, :]
-        W_0_bkg = W_0_bkg[0:red_bkg]
         w_bkg = w_bkg[0:red_bkg, :]
     logging.info("using only small dataset of 1/%s of total events -> %s events for signal %s and %s events for bkg %s", args.reduce, red, args.sample, red_bkg, bkg)
 
@@ -218,158 +212,91 @@ logging.debug("shape of the LSTM input is %s", V.shape)
 
 #Define steps for evaluation 
 def eval_train ( var_evaluation ):
-    total_weight =  config.total_genWeight[sample]+config.total_genWeight[bkg] if args.add_bkg else config.total_genWeight[sample]
+    total_weight =  np.sum(W_np[:,3])
     if (args.animate == "FULL"):
         z = np.array( model(X,V) )
         x_eval = np.concatenate((np.array(xx[var_evaluation]),np.array(xx_bkg[var_evaluation]))) if args.add_bkg else np.array(xx[var_evaluation]) 
         if reduce: x_eval = np.concatenate((np.array(xx[var_evaluation][0:red]),np.array(xx_bkg[var_evaluation][0:red_bkg]))) if args.add_bkg else np.array(xx[var_evaluation][0:red])
-        hist, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-        train_lin  = np.zeros( (len(bins),1) )
-        train_quad = np.zeros( (len(bins),1) )
-        for b in range ( 1,len(bins)-1 ):
-            for ind in range ( x_eval.shape[0] ):
-                val = x_eval[ind]
-                if ( val > bins[b-1] and val<= bins[b] ):
-                    train_lin[b] += z[ind,0] * W_np[ind,0] /total_weight
-                    train_quad[b]+= z[ind,1] * W_np[ind,0] /total_weight                              
-        name_var = var_evaluation          
-        plots[name_var+'_lin' ].set_data( bins, train_lin[:,0]  )               
-        plots[name_var+'_quad'].set_data( bins, train_quad[:,0] )
+        hist_lin,  bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,0] * W_np[:,3] /total_weight )
+        hist_quad, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,1] * W_np[:,3] /total_weight )                               
     
     if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
         z = np.array( model(torch.Tensor(x),torch.Tensor(v)) )
-        x_eval = np.array(xx[var_evaluation])
-        if reduce: x_eval = np.array(xx[var_evaluation])[0:red]
-        hist, bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-        train_lin  = np.zeros( (len(bins),1) )
-        train_quad = np.zeros( (len(bins),1) )
-        for b in range ( 1,len(bins)-1 ):
-            for ind in range ( x_eval.shape[0] ):
-                val = x_eval[ind]
-                if ( val > bins[b-1] and val<= bins[b] ):
-                    train_lin[b] += z[ind,0] * w[ind,0]/total_weight
-                    train_quad[b]+= z[ind,1] * w[ind,0]/total_weight                        
-        name_var = var_evaluation          
-        plots[name_var+'_lin' ].set_data( bins, train_lin[:,0]  )               
-        plots[name_var+'_quad'].set_data( bins, train_quad[:,0] )  
-        
         z_bkg = np.array( model(torch.Tensor(x_bkg),torch.Tensor(v_bkg)) )
+        x_eval = np.array(xx[var_evaluation])
         x_eval_bkg = np.array(xx_bkg[var_evaluation])
-        if reduce: x_eval_bkg = np.array(xx_bkg[var_evaluation])[0:red_bkg]
-        hist_bkg, bins  = np.histogram( x_eval_bkg, bins=bins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-        train_lin  = np.zeros( (len(bins),1) )
-        train_quad = np.zeros( (len(bins),1) )
-        for b in range ( 1,len(bins)-1 ):
-            for ind in range ( x_eval_bkg.shape[0] ):
-                val = x_eval_bkg[ind]
-                if ( val > bins[b-1] and val<= bins[b] ):
-                    train_lin[b] += z_bkg[ind,0]*w_bkg[ind,0]/total_weight  
-                    train_quad[b]+= z_bkg[ind,1]*w_bkg[ind,0]/total_weight                                   
-        if (args.animate == "sig+bkg"):
-            name_var = var_evaluation+'_bkg'          
-            plots[name_var+'_lin' ].set_data( bins, train_lin[:,0]  )               
-            plots[name_var+'_quad'].set_data( bins, train_quad[:,0] )  
-        if (args.animate == "sig-bkg"):
-            name_var = var_evaluation+'_bkg_'          
-            plots[name_var+'_lin' ].set_data( bins, train_lin[:,0]  )               
-            plots[name_var+'_quad'].set_data( bins, train_quad[:,0] )  
+        if reduce:
+            x_eval = np.array(xx[var_evaluation])[0:red]
+            x_eval_bkg = np.array(xx_bkg[var_evaluation])[0:red_bkg]
+        hist_lin,      bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,0] * w[:,3] /total_weight )
+        hist_quad,     bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,1] * w[:,3] /total_weight )
+        hist_lin_bkg,  bins = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z_bkg[:,0] * w_bkg[:,3] /total_weight )
+        hist_quad_bkg, bins = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z_bkg[:,1] * w_bkg[:,3] /total_weight )
+                               
+    name_var = var_evaluation          
+    plots[name_var+'_lin' ].set_data( bins, np.hstack((0,hist_lin))   )               
+    plots[name_var+'_quad'].set_data( bins, np.hstack((0,hist_quad)) )
+    
+    if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
+        name_var = var_evaluation+'_bkg_'          
+        plots[name_var+'_lin' ].set_data( bins, np.hstack((0,hist_lin_bkg))  )
+        plots[name_var+'_quad'].set_data( bins, np.hstack((0,hist_quad_bkg)) )
 
 def eval_truth ( var_evaluation ):
-    total_weight =  config.total_genWeight[sample]+config.total_genWeight[bkg] if args.add_bkg else config.total_genWeight[sample]
+    total_weight =  np.sum(W_np[:,3])
     if (args.animate == "FULL"):
         x_eval = np.concatenate((np.array(xx[var_evaluation]),np.array(xx_bkg[var_evaluation]))) if args.add_bkg else np.array(xx[var_evaluation]) 
         if reduce: x_eval = np.concatenate((np.array(xx[var_evaluation][0:red]),np.array(xx_bkg[var_evaluation][0:red_bkg]))) if args.add_bkg else np.array(xx[var_evaluation][0:red])
-        hist, bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-        truth_lin   = np.zeros( (len(bins),1) )
-        truth_quad  = np.zeros( (len(bins),1) )
-        for b in range ( 1,len(bins)-1 ):
-            for ind in range ( x_eval.shape[0] ):
-                val = x_eval[ind]
-                if ( val > bins[b-1] and val<= bins[b] ):
-                    truth_lin[b] +=W_np[ind,1]   / total_weight#W_np[ind,0] 
-                    truth_quad[b]+=W_np[ind,2]   / total_weight#W_np[ind,0] 
-        i = plotvars.index( var_evaluation )
-        name_var = var_evaluation
-        plots[name_var+'truelin'],  = ax[index[i]].plot( bins,truth_lin[:,0],  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
-        plots[name_var+'truequad'], = ax[index[i]].plot( bins,truth_quad[:,0], drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
-        plots[name_var+"_lin"],     = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "lin train",   color='orange' )
-        plots[name_var+"_quad"],    = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "quad train",  color='red'    )
-        max_  = np.max(hist)
-        max__ = np.max(truth_quad[:,0])
-        hist_ = np.zeros((len(hist)+1))
-        hist_[1:] = hist
-        plots["hist"]               = ax[index[i]].plot( bins, hist_ * max__/max_      ,drawstyle='steps',   label = "yield",       color='gray',   linestyle = 'dotted' )
-        #plots[name_var+"_quad"],    = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "quad train",  color='red'    )
-        ax[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )    
-    
+        hist_truelin,  bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np[:,1] / W_np[:,0]*W_np[:,3]   / total_weight)
+        hist_truequad, bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np[:,2] / W_np[:,0]*W_np[:,3]   / total_weight)
+        hist_var,      bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np[:,3] /  total_weight)
+        
     if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
         x_eval = np.array(xx[var_evaluation])
-        if reduce: x_eval = np.array(xx[var_evaluation])[0:red]
-        hist, bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-        truth_lin   = np.zeros( (len(bins),1) )
-        truth_quad  = np.zeros( (len(bins),1) )
-        for b in range ( 1,len(bins)-1 ):
-            for ind in range ( x_eval.shape[0] ):
-                val = x_eval[ind]
-                if ( val > bins[b-1] and val<= bins[b] ):
-                    truth_lin[b] +=w[ind,1] / total_weight 
-                    truth_quad[b]+=w[ind,2] / total_weight            
-        i = plotvars.index( var_evaluation )
-        name_var = var_evaluation
-        plots[name_var+'truelin'],  = ax[index[i]].plot( bins,truth_lin[:,0],  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
-        plots[name_var+'truequad'], = ax[index[i]].plot( bins,truth_quad[:,0], drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
-        plots[name_var+"_lin"],     = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "lin train",   color='orange' )
-        plots[name_var+"_quad"],    = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "quad train",  color='red'    )
-        max_  = np.max(hist)
-        max__ = np.max(truth_quad[:,0])
-        hist_ = np.zeros((len(hist)+1))
-        hist_[1:] = hist
-        plots["hist"]               = ax[index[i]].plot( bins, hist_ * max__/max_      ,drawstyle='steps',   label = "yield",       color='gray',   linestyle = 'dotted' )
-        
         x_eval_bkg = np.array(xx_bkg[var_evaluation])
-        if reduce: x_eval_bkg = np.array(xx_bkg[var_evaluation])[0:red_bkg]
-        hist_bkg, bins  = np.histogram( x_eval_bkg, bins=bins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-        truth_lin   = np.zeros( (len(bins),1) )
-        truth_quad  = np.zeros( (len(bins),1) )
-        for b in range ( 1,len(bins)-1 ):
-            for ind in range ( x_eval_bkg.shape[0] ):
-                val = x_eval_bkg[ind]
-                if ( val > bins[b-1] and val<= bins[b] ):
-                    truth_lin[b] +=w_bkg[ind,1]  / total_weight
-                    truth_quad[b]+=w_bkg[ind,2]  / total_weight        
-        name_var = var_evaluation+"_bkg"
+        if reduce: 
+            x_eval = np.array(xx[var_evaluation])[0:red]
+            x_eval_bkg = np.array(xx_bkg[var_evaluation])[0:red_bkg]
+        hist_truelin,      bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w[:,1] / w[:,0]*w[:,3]   / total_weight)
+        hist_truequad,     bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w[:,2] / w[:,0]*w[:,3]   / total_weight)
+        hist_var,          bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w[:,3] /  total_weight)
+        hist_truelin_bkg,  bins  = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w_bkg[:,1] / w_bkg[:,0]*w_bkg[:,3]   / total_weight)
+        hist_truequad_bkg, bins  = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w_bkg[:,2] / w_bkg[:,0]*w_bkg[:,3]   / total_weight)
+        hist_var_bkg,      bins  = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w_bkg[:,3] /  total_weight)
         
-        hist_ = np.zeros((len(hist_bkg)+1))
-        hist_[1:] = hist_bkg
-        plots["hist"]               = ay[index[i]].plot( bins, hist_ /100000000 ,drawstyle='steps',   label = "yield",       color='black',   linestyle = 'dotted' )
+    i = plotvars.index( var_evaluation )
+    name_var = var_evaluation
+    #plots[name_var+'yield'],    = ax[index[i]].plot( bins,np.hstack((0,hist_var)),      drawstyle='steps', label = "yield",       color='gray' ,  linestyle = 'dotted' )
+    plots[name_var+'truelin'],  = ax[index[i]].plot( bins,np.hstack((0,hist_truelin)),  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
+    plots[name_var+'truequad'], = ax[index[i]].plot( bins,np.hstack((0,hist_truequad)), drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
+    plots[name_var+"_lin"],     = ax[index[i]].plot(  [] , [] ,                         drawstyle='steps', label = "lin train",   color='orange' )
+    plots[name_var+"_quad"],    = ax[index[i]].plot(  [] , [] ,                         drawstyle='steps', label = "quad train",  color='red'    )
+    ax[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )    
+    ay[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )          
         
-        if args.animate=="sig+bkg":
-            plots[name_var+'truelin'],  = ax[index[i]].plot( bins,truth_lin[:,0],  drawstyle='steps', label = "lin truth",   color='blue' ,linestyle = 'dotted' )
-            plots[name_var+'truequad'], = ax[index[i]].plot( bins,truth_quad[:,0], drawstyle='steps', label = "quad truth",  color='green'    ,linestyle = 'dotted' )           
-            plots[name_var+"_lin"],     = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "lin train",   color='blue' )
-            plots[name_var+"_quad"],    = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "quad train",  color='green'    )
-        if args.animate=="sig-bkg":
-            name_var = var_evaluation+"_bkg_"
-            plots[name_var+'truelin'],  = ay[index[i]].plot( bins,truth_lin[:,0],  drawstyle='steps', label = "lin truth",   color='blue' ,linestyle = 'dotted' )
-            plots[name_var+'truequad'], = ay[index[i]].plot( bins,truth_quad[:,0], drawstyle='steps', label = "quad truth",  color='green'    ,linestyle = 'dotted' )           
-            plots[name_var+"_lin"],     = ay[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "lin train",   color='blue' )
-            plots[name_var+"_quad"],    = ay[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "quad train",  color='green'    )    
-        ax[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )  
-        ay[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )          
+    name_var = var_evaluation+"_bkg_"
+    if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
+        if args.animate=="sig+bkg": obj = ax[index[i]]
+        if args.animate=="sig-bkg": obj = ay[index[i]]
+        #plots[name_var+'yield'],    = obj.plot( bins,np.hstack((0,hist_var_bkg)),      drawstyle='steps', label = "yield",       color='black' ,  linestyle = 'dotted' )
+        plots[name_var+'truelin'],  = obj.plot( bins,np.hstack((0,hist_truelin_bkg)),  drawstyle='steps', label = "lin truth",   color='green' ,  linestyle = 'dotted' )
+        plots[name_var+'truequad'], = obj.plot( bins,np.hstack((0,hist_truequad_bkg)), drawstyle='steps', label = "quad truth",  color='blue'  ,  linestyle = 'dotted' )           
+        plots[name_var+"_lin"],     = obj.plot(  [] , [] ,                             drawstyle='steps', label = "lin train",   color='green' )
+        plots[name_var+"_quad"],    = obj.plot(  [] , [] ,                             drawstyle='steps', label = "quad train",  color='blue'  )
     
 # Initialize the gif
 if (args.animate):
     logging.info("setting up animation...")
     # for debug: warning: conflict with animation frame every 10 epochs <-> n_epochs < 10
     assert n_epochs >= args.animate_step, " n_epochs = %i is not sufficient for animating, required > %i " %( n_epochs, args.animate_step )
+    
     # Define the meta data for the movie
     GifWriter = manimation.writers['pillow']
     writer = manimation.PillowWriter( fps=args.animate_fps, metadata=None )
-    writer1 = manimation.PillowWriter( fps=args.animate_fps, metadata=None )
-    
+    writer1 = manimation.PillowWriter( fps=args.animate_fps, metadata=None ) 
     logging.info("       gif's duration will be %s second(s)", n_epochs / args.animate_step / args.animate_fps)
-
-    nbins = 20
+    
+    nbins = args.nbins
     index = list(itertools.product(list(range(0, 4)), list(range(0, 5))))
     plotvars=list(config.plot_mva_variables.keys())
     plots = {}   
@@ -482,7 +409,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 losses = []
 
 # set up directory and model names
-dir_name = "NEU_"+str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_lr-'+str(args.lr)[2:]+'_lumi-'+str(int(lumi))+'_epx-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)+'_hsc-'+str(hidden_size_comb)
+dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_lr-'+str(args.lr)[2:]+'_lumi-'+str(int(lumi))+'_epx-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)+'_hsc-'+str(hidden_size_comb)
 if ( args.LSTM ):              dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
 if (reduce):                   dir_name = dir_name + '_red-'+str(args.reduce)    
 if (args.add_bkg):             dir_name = dir_name + '+bkg'  if args.full_bkg==False else dir_name + '+fullbkg'
@@ -494,8 +421,6 @@ if not os.path.exists( results_dir ): os.makedirs( results_dir )
 # train the model
 logging.info("starting training") 
 logging.info("")
-
-
 logger_handler.setFormatter(logging.Formatter('\x1b[80D\x1b[1A\x1b[K%(asctime)s %(message)s'))
 if (args.animate):
     with writer.saving(fig, dir_name+".gif", 100):
@@ -506,7 +431,6 @@ if (args.animate):
                 for i, data in enumerate(train_loader):
                     inputs1,inputs2, labels = data
                     z = model(inputs1, inputs2)
-                    #print(z)
                     loss=criterion(z,labels)
                     assert (loss.data>=0), "Loss haut schun wido o dio knedl"
                     losses.append(loss.data)
