@@ -18,16 +18,14 @@ features = [
 
 observers = ["parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k","parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star", "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab"]
 
-def data(input_files, branches )
+predictions =  ["ctGIm_lin_1_epoch_%i"%i for i in range(0,251,50)] #forgot to remove th lin from the name
 
-    return DataGenerator(
-        #input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/ctGIm/TT01j_HT800_ext_comb/output_*.root"],
-        input_files = [input_files] if type(input_files)==str else input_files,
-            n_split = 1,
-            splitting_strategy = "files",
-            selection   = None,
-            #branches = ["p_C"] + features + observers + predictions) 
-            branches = ["p_C"] + branches) 
+data_generator =  DataGenerator(
+    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/ctGIm-lin/TT01j_HT800_ext_comb/output_*.root"],
+        n_split = 1,
+        splitting_strategy = "files",
+        selection   = None,
+        branches = ["p_C"] + features + observers + predictions) 
 
 reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/ParticleNet/TT01jDebug_reweight_card.pkl'
 weightInfo = WeightInfo(reweight_pkl)
@@ -190,9 +188,10 @@ plot_options =  {
 }
 
 if __name__=="__main__":
-   
+    import numpy as np
+ 
     # load some events and their weights 
-    x, w = getEvents(1000)
+    x,w,o = getEvents(-1, return_observers = True)
 
     # x are a list of feature-vectors such that x[0] are the features of the first event. Their branch-names are stored in feature_names.
     # w are a dictionary with the weight-coefficients. The key tuple(), i.e., the empty n-tuple, is the constant term. The key ('ctWRe', ), i.e., the coefficient 
@@ -206,11 +205,15 @@ if __name__=="__main__":
     for k in w.keys():
         w[k] *= const 
 
+    auto_clip = 0.003
+    quantiles = {feature: np.quantile( x[:, i_feature], ( auto_clip, 1.-auto_clip )) for i_feature, feature in enumerate(features)}
+    print( "Clipping cut for %f"%auto_clip)
+    print( " & ".join(["(%s>%f) & (%s<%f)"%( feature, quantiles[feature][0], feature, quantiles[feature][1]) for feature in features]) )
+    
     #let's remove the most extreme weight derivatives ... cosmetics for the propaganda plots
     from   tools import helpers 
     len_before = len(x)
-    auto_clip = 0.001
-    x, w = helpers.clip_quantile(x, auto_clip, weights = w )
+    x, w = helpers.clip_quantile(x, auto_clip, weights = w)
     print ("Auto clip efficiency (training) %4.3f is %4.3f"%( auto_clip, len(x)/len_before ) )
 
     print ("Wilson coefficients:", weightInfo.variables )

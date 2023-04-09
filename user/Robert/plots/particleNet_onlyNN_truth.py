@@ -10,24 +10,23 @@ from tools.DataGenerator import DataGenerator
 from tools.WeightInfo    import WeightInfo
 
 features = [   
-    "parton_lepTop_pt", "parton_lepTop_phi", "parton_lepTop_lep_pt", "parton_lepTop_lep_eta", "parton_lepTop_lep_phi", "parton_lepTop_nu_pt", "parton_lepTop_nu_phi", "parton_lepTop_b_pt", "parton_lepTop_b_eta", "parton_lepTop_b_phi", "parton_lepTop_W_pt", "parton_lepTop_W_phi",
+     ]
+
+observers = ["parton_lepTop_pt", "parton_lepTop_phi", "parton_lepTop_lep_pt", "parton_lepTop_lep_eta", "parton_lepTop_lep_phi", "parton_lepTop_nu_pt", "parton_lepTop_nu_phi", "parton_lepTop_b_pt", "parton_lepTop_b_eta", "parton_lepTop_b_phi", "parton_lepTop_W_pt", "parton_lepTop_W_phi",
         "delphesJet_pt", "delphesJet_eta", "delphesJet_phi",   
         "delphesJet_SDmass", "delphesJet_SDsubjet0_deltaEta", "delphesJet_SDsubjet0_deltaPhi", "delphesJet_SDsubjet0_deltaR", "delphesJet_SDsubjet0_mass", "delphesJet_SDsubjet1_deltaEta",  "delphesJet_SDsubjet1_deltaPhi", "delphesJet_SDsubjet1_deltaR", "delphesJet_SDsubjet1_mass",  
         "delphesJet_tau1", "delphesJet_tau2", "delphesJet_tau3", "delphesJet_tau4", "delphesJet_tau21", "delphesJet_tau32", "delphesJet_ecf1", "delphesJet_ecf2", "delphesJet_ecf3", "delphesJet_ecfC1", "delphesJet_ecfC2", "delphesJet_ecfC3", "delphesJet_ecfD", "delphesJet_ecfDbeta2", "delphesJet_ecfM1", "delphesJet_ecfM2", "delphesJet_ecfM3", "delphesJet_ecfM1beta2", "delphesJet_ecfM2beta2", "delphesJet_ecfM3beta2", "delphesJet_ecfN1", "delphesJet_ecfN2", "delphesJet_ecfN3", "delphesJet_ecfN1beta2", "delphesJet_ecfN2beta2", "delphesJet_ecfN3beta2", "delphesJet_ecfU1", "delphesJet_ecfU2", "delphesJet_ecfU3", "delphesJet_ecfU1beta2", "delphesJet_ecfU2beta2", "delphesJet_ecfU3beta2",  
-    ]
+"parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k","parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star", "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab"]
 
-observers = ["parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k","parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star", "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab"]
+predictions =  ["ctGIm_truth_epoch_%i"%i for i in range(50)]
 
-def data(input_files, branches )
-
-    return DataGenerator(
-        #input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/ctGIm/TT01j_HT800_ext_comb/output_*.root"],
-        input_files = [input_files] if type(input_files)==str else input_files,
-            n_split = 1,
-            splitting_strategy = "files",
-            selection   = None,
-            #branches = ["p_C"] + features + observers + predictions) 
-            branches = ["p_C"] + branches) 
+data_generator =  DataGenerator(
+    #input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/ctGIm-truth-onlyNN-v2/TT01j_HT800_ext_comb/output*.root"],
+    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/ctGIm-truth-onlyNN-v2-oldData/TT01j_HT800_ext_comb/output*.root"],
+        n_split = 1,
+        splitting_strategy = "files",
+        selection   = None,
+        branches = ["p_C"] + features + observers + predictions) 
 
 reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/ParticleNet/TT01jDebug_reweight_card.pkl'
 weightInfo = WeightInfo(reweight_pkl)

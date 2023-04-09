@@ -18,16 +18,14 @@ features = [
 
 observers = ["parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k","parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star", "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab"]
 
-def data(input_files, branches )
+predictions =  ["ctGIm_d_epoch_%i"%i for i in range(14)]
 
-    return DataGenerator(
-        #input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/ctGIm/TT01j_HT800_ext_comb/output_*.root"],
-        input_files = [input_files] if type(input_files)==str else input_files,
-            n_split = 1,
-            splitting_strategy = "files",
-            selection   = None,
-            #branches = ["p_C"] + features + observers + predictions) 
-            branches = ["p_C"] + branches) 
+data_generator =  DataGenerator(
+    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/TT01j_HT800_ext_comb-d_parton/*.root"],
+        n_split = 1,
+        splitting_strategy = "files",
+        selection   = None,
+        branches = ["p_C"] + features + observers + predictions) 
 
 reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/ParticleNet/TT01jDebug_reweight_card.pkl'
 weightInfo = WeightInfo(reweight_pkl)
