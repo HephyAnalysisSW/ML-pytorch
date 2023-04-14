@@ -9,15 +9,16 @@ import  numpy                    as np
 from    matplotlib               import pyplot as plt
 from    torch.utils.data         import Dataset, DataLoader, WeightedRandomSampler
 import  torch.nn                 as nn
-import  os                       
+import  os, shutil                       
 import  argparse                 
 import  matplotlib.animation     as manimation 
-from    WeightInfo               import WeightInfo #have it in my local folder
+from    Tools.WeightInfo         import WeightInfo #have it in my local folder
 import  itertools                
 from    multiprocessing          import Pool
 from    datetime                 import datetime
 import  torch.optim              as optim
 import  torch.optim.lr_scheduler as lr_scheduler
+import  Tools.syncer_for_gif     as syncer 
 
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',                   default='INFO', nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
@@ -26,6 +27,7 @@ argParser.add_argument('--full_bkg',           action='store_true',             
 argParser.add_argument('--lumi',               action='store',      type=float,  default=300.0)
 argParser.add_argument('--reduce',             action='store',      type=int,    default=None,     help="Reduce training data by factor?"),
 argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models/')
+argParser.add_argument('--plot_directory',     action='store',      type=str,    default='/groups/hephy/cms/lena.wild/www/tttt/plots/gifs_sig+bkg/')
 argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v7/MVA-training/ttbb_2l_dilep2-bjet_delphes-ht500-njet6p-btag1p/')
 argParser.add_argument('--n_epochs',           action='store',      type=int,    default= '500',   help='number of epochs in training')
 argParser.add_argument('--lr',                 action='store',      type=float,  default= '0.01',  help='learning rate')
@@ -45,6 +47,9 @@ argParser.add_argument('--animate_fps' ,       action='store',      type=int,   
 argParser.add_argument('--load_model' ,        action='store',      type=str,    default= None,    help="load model and continue training?")
 args = argParser.parse_args()
 
+def copyIndexPHP( results_dir ):
+    index_php = os.path.join( results_dir, 'index.php' )
+    shutil.copyfile( os.path.join( "Tools", 'index_for_gif.php' ), index_php )
 
 import  logging
 logger = logging.getLogger()
@@ -440,7 +445,7 @@ else:                      model = NeuralNet(input_size, hidden_size, hidden_siz
 criterion = get_loss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) 
 if (args.scheduler is not None):   
-    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=args.scheduler, total_iters=n_epochs) 
+    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=args.scheduler, total_iters=int(n_epochs*7/10)) 
     logging.info("using linear scheduler from lr_start = %s to lr_end = %s", args.lr, args.lr*args.scheduler)
 if ((args.load_model is not None) or (args.scheduler is None)): scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
 losses = []
@@ -454,23 +459,25 @@ if (args.load_model is not None):
     
 # set up directory and model names
 n_epochs_ = n_epochs if args.load_model is None else n_epochs+start_epoch
-dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_lr-'+str(args.lr)+'_lumi-'+str(int(lumi))+'_epx-'+str(n_epochs_)+'_hs0-'+str(hidden_size)+'_hs1-'+str(hidden_size1)+'_hs2-'+str(hidden_size2)+'_hsc-'+str(hidden_size_comb)
-if ( args.LSTM ):              dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
-if (reduce):                   dir_name = dir_name + '_red-'+str(args.reduce)    
+dir_name = str(args.EFTCoefficients)+'_lr'+str(args.lr)+'_l'+str(int(lumi))+'_e'+str(n_epochs_)+'_'+str(hidden_size)+'-'+str(hidden_size1)+'-'+str(hidden_size2)+'-'+str(hidden_size_comb)
+if ( args.LSTM ):              dir_name = dir_name +  '_lstm'+str(num_layers)+'x'+str(hidden_size_lstm)
+if (reduce):                   dir_name = dir_name + '_r'+str(args.reduce)    
 if (args.add_bkg):             dir_name = dir_name + '+bkg'  if args.full_bkg==False else dir_name + '+fullbkg'
-if (args.animate is not None): dir_name = dir_name + "_" + args.animate    
-if (args.scheduler is not None): dir_name = dir_name + "_sched-"  + str(args.scheduler ) 
+if (args.animate != "FULL"): dir_name = dir_name + "_" + args.animate    
+if (args.scheduler is not None): dir_name = dir_name + "_s"  + str(args.scheduler ) 
 
 results_dir = args.output_directory
 if not os.path.exists( results_dir ): os.makedirs( results_dir )
+plot_dir = args.plot_directory
+if not os.path.exists( plot_dir ): os.makedirs( plot_dir )
 
 # train the model
 logging.info("starting training") 
 logging.info("")
 logger_handler.setFormatter(logging.Formatter('\x1b[80D\x1b[1A\x1b[K%(asctime)s %(message)s'))
 if (args.animate):
-    with writer.saving(fig, dir_name+".gif", 100):
-        with writer1.saving(fig1, dir_name+"_BKG.gif", 100):
+    with writer.saving(fig, os.path.join(args.plot_directory, dir_name+"_.gif"), 100):
+        with writer1.saving(fig1, os.path.join(args.plot_directory, dir_name+"_BKG.gif"), 100):
             start = datetime.now()
             for epoch in range(start_epoch, n_epochs_):
                 logging.info("		epoch: %i of %i, lr = %s ", epoch+1, n_epochs_,scheduler.get_last_lr())
@@ -525,15 +532,18 @@ save_ckp(checkpoint, os.path.join(results_dir, str(dir_name)+'.pt'))
 logging.info("saved checkpoint to %s", os.path.join(results_dir, str(dir_name)+'.pt')) 
 logger_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))           
 logging.info("done with training, plotting losses") 
-if args.animate != "sig-bkg": os.remove(dir_name+"_BKG.gif")  #remove empty bkg animation         
+if args.animate != "sig-bkg": os.remove(os.path.join(args.plot_directory, dir_name+"_BKG.gif"))  #remove empty bkg animation         
 
+
+shutil.copyfile(os.path.join(args.plot_directory, dir_name+"_.gif"), os.path.join(args.plot_directory,dir_name+".gif"))
+os.remove(os.path.join(args.plot_directory, dir_name+"_.gif")) 
 # plot losses 
 fig, ay = plt.subplots()        
 plt.plot(losses, color='red')
 plt.title("Losses over epoch")
 sample_file_name = str(dir_name)+"_losses.png"
 plt.yscale("log")  
-plt.savefig(sample_file_name)
+plt.savefig(os.path.join(args.plot_directory,sample_file_name))
 
 # save model
 with torch.no_grad():
@@ -548,7 +558,6 @@ with torch.no_grad():
     torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
     logging.info("Saved model to %s", os.path.join(results_dir, name)) 
 
-
-     
     
-    
+copyIndexPHP(os.path.join(args.plot_directory))    
+syncer.sync()    
