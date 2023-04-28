@@ -9,20 +9,24 @@ import  numpy                   as np
 from    matplotlib              import pyplot as plt
 from    torch.utils.data        import Dataset, DataLoader, WeightedRandomSampler
 import  torch.nn                as nn
-import  os
+import  os, shutil
 import  argparse
 import  matplotlib.animation    as manimation 
-from    WeightInfo              import WeightInfo #have it in my local folder
+from    Tools.WeightInfo        import WeightInfo #have it in my local folder
 import  itertools
 from    multiprocessing         import Pool
 import  logging
-
+from    datetime                 import datetime
+import  Tools.syncer_for_gif     as syncer 
+import  torch.optim.lr_scheduler as lr_scheduler
 
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',                   default='INFO', nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
 argParser.add_argument('--sample',             action='store',      type=str,    default='TTTT_MS')
 argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models/')
-argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v6_1/MVA-training/ttbb_2l_dilep-bjet_delphes-met30-njet4p-btag2p/')
+argParser.add_argument('--plot_directory',     action='store',      type=str,    default='/groups/hephy/cms/lena.wild/www/tttt/plots/train_DNN_sig_red10_vx/')
+argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v6_1/MVA-training/PN_ttbb_2l_dilep2-bjet_delphes-met30-njet4p-btag2p/')
+argParser.add_argument('--scheduler',          action='store',      type=float,  default=None,     help='factor by which the final lr is reduced')
 argParser.add_argument('--n_epochs',           action='store',      type=int,    default= '500',   help='number of epochs in training')
 argParser.add_argument('--hs1_mult',           action='store',      type=int,    default= '2',     help='hidden size 1 = #features * mult')
 argParser.add_argument('--hs2_add',            action='store',      type=int,    default= '5',     help='hidden size 2 = #features + add')
@@ -35,15 +39,29 @@ argParser.add_argument('--EFTCoefficients',    action='store',                  
 argParser.add_argument('--animate_step',       action='store',      type=int,    default= '10',    help="plot every n epochs")
 argParser.add_argument('--animate_fps' ,       action='store',      type=int,    default= '10',    help="frames per second in animation")
 argParser.add_argument('--animate' ,           action='store_true',              default= False,   help="make an animation?")
+argParser.add_argument('--reduce',             action='store',      type=int,    default=None,     help="Reduce training data by factor?"),
+argParser.add_argument('--lr',                 action='store',      type=float,  default= '0.001',  help='learning rate')
+
 args = argParser.parse_args()
 
 
-logging.basicConfig(filename=None,  format='%(asctime)s %(message)s', level=logging.INFO)
+import  logging
+logger = logging.getLogger()
+logger_handler = logging.StreamHandler()
+logger.addHandler(logger_handler)
+logger_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+logger.setLevel(args.logLevel)
 
+def copyIndexPHP( results_dir ):
+    index_php = os.path.join( results_dir, 'index.php' )
+    shutil.copyfile( os.path.join( "Tools", 'index_for_gif.php' ), index_php )
 
 # adding hard coded reweight_pkl because of ML-pytorch
 if ( args.sample == "TTTT_MS" ): reweight_pkl = "/eos/vbc/group/cms/robert.schoefbeck/gridpacks/4top/TTTT_MS_reweight_card.pkl" 
 if ( args.sample == "TTbb_MS" ): reweight_pkl = "/eos/vbc/group/cms/robert.schoefbeck/gridpacks/4top/TTbb_MS_reweight_card.pkl" 
+
+if args.reduce is not None: reduce = True 
+else: reduce = False
 
 
 import ttbb_2l_python3 as config
@@ -52,7 +70,7 @@ import ttbb_2l_python3 as config
 mva_variables    = [ mva_variable[0] for mva_variable in config.mva_variables ]
 sample           = args.sample
 device           = torch.device( 'cuda' if torch.cuda.is_available() else 'cpu' )
-learning_rate    = 0.001
+learning_rate    = args.lr
 n_epochs         = args.n_epochs
 input_size       = len( mva_variables ) 
 hidden_size      = input_size * args.hs1_mult
@@ -70,6 +88,7 @@ if ( args.LSTM ):
 
 # print hyperparameter selection
 logging.info( "------------Parameters for training----------------" )
+logging.info( "  EFT Coefficient:                         %s",args.EFTCoefficients )
 logging.info( "  Number of epochs:                        %i",n_epochs )
 logging.info( "  Number of features,linear layer:         %i",input_size )
 logging.info( "  Size of first hidden layer:              %i",hidden_size )
@@ -103,7 +122,7 @@ with uproot.open(upfile_name) as upfile:
     y = np.asarray( weigh )
     
 
-V = np.zeros( (len(y[:,0])) )
+v = np.zeros( (len(y[:,0]),1,1) )
 # add lstm if needed
 if ( args.LSTM ):
     vec_br_f  = {}
@@ -114,50 +133,68 @@ if ( args.LSTM ):
                 branch[i]=np.pad( branch[i][:max_timestep], (0, max_timestep - len(branch[i][:max_timestep])) )
             vec_br_f[name] = branch
     # put columns side by side and transpose the innermost two axis
-    V = np.column_stack( [np.stack( vec_br_f[name] ) for name in vector_branches] ).reshape( len(y), len(vector_branches), max_timestep ).transpose((0,2,1))
-    
+    v = np.column_stack( [np.stack( vec_br_f[name] ) for name in vector_branches] ).reshape( len(y), len(vector_branches), max_timestep ).transpose((0,2,1))
+
+if args.reduce is not None: red = int(len(x[:,0])/args.reduce)    
+if (reduce):
+    x = x[0:red, :]
+    v = v[0:red, :, :]
+    y = y[0:red, :]
+    logging.info("using only small dataset of 1/%s of total events -> %s events for signal %s", args.reduce, red, args.sample)
 
 #double check for NaNs:
 assert not np.isnan( np.sum(x) ), logging.info("found NaNs in DNN input!")
 assert not np.isnan( np.sum(y) ), logging.info("found NaNs in DNN truth values!")
-assert not np.isnan( np.sum(V) ), logging.info("found NaNs in LSTM input!")
+assert not np.isnan( np.sum(v) ), logging.info("found NaNs in LSTM input!")
 
 X = torch.Tensor( x )
 Y = torch.Tensor( y )
-V = torch.Tensor( V )
+V = torch.Tensor( v )
 
 
 # Define steps for evaluation 
-def eval_train ( var_evaluation ):
-    z = np.array( model(X, V) )
+def eval_train ( var_evaluation, z ):
+    zz = np.array( z )
     x_eval = np.array ( xx[var_evaluation] )
-    hist, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-    train_lin  = np.zeros( (len(bins),1) )
-    train_quad = np.zeros( (len(bins),1) )
-    for b in range ( 1,len(bins)-1 ):
-        for ind in range ( x_eval.shape[0] ):
-            val = x_eval[ind]
-            if ( val > bins[b-1] and val<= bins[b] ):
-                train_lin[b] += y[ind,0]*z[ind,0]
-                train_quad[b]+= y[ind,0]*z[ind,1]
-    plots[var_evaluation+'_lin' ].set_data( bins, train_lin[:,0]  )               
-    plots[var_evaluation+'_quad'].set_data( bins, train_quad[:,0] )   
+    if reduce: x_eval = np.array(xx[var_evaluation])[0:red]
+    hist_lin,  bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=y[:,0]*zz[:,0])
+    hist_quad, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=y[:,0]*zz[:,1])                               
+    
+    # hist, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
+    # train_lin  = np.zeros( (len(bins),1) )
+    # train_quad = np.zeros( (len(bins),1) )
+    # for b in range ( 1,len(bins)-1 ):
+        # for ind in range ( x_eval.shape[0] ):
+            # val = x_eval[ind]
+            # if ( val > bins[b-1] and val<= bins[b] ):
+                # train_lin[b] += y[ind,0]*z[ind,0]
+                # train_quad[b]+= y[ind,0]*z[ind,1]
+    # plots[var_evaluation+'_lin' ].set_data( bins, train_lin[:,0]  )               
+    # plots[var_evaluation+'_quad'].set_data( bins, train_quad[:,0] )   
+    plots[var_evaluation+'_lin' ].set_data( bins, np.hstack((0,hist_lin))   )            
+    plots[var_evaluation+'_quad'].set_data( bins, np.hstack((0,hist_quad)) )
 
   
 def eval_truth ( var_evaluation ):
     x_eval = np.array ( xx[var_evaluation] )
-    hist, bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
-    truth_lin   = np.zeros( (len(bins),1) )
-    truth_quad  = np.zeros( (len(bins),1) )
-    for b in range ( 1,len(bins)-1 ):
-        for ind in range ( x_eval.shape[0] ):
-            val = x_eval[ind]
-            if ( val > bins[b-1] and val<= bins[b] ):
-                truth_lin[b] +=y[ind,1]
-                truth_quad[b]+=y[ind,2] 
+    if reduce: x_eval = np.array(xx[var_evaluation])[0:red]
+    hist_truelin,      bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= y[:,1] )
+    hist_truequad,     bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= y[:,2] )
+        
+    # hist, bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]) )
+    # truth_lin   = np.zeros( (len(bins),1) )
+    # truth_quad  = np.zeros( (len(bins),1) )
+    # for b in range ( 1,len(bins)-1 ):
+        # for ind in range ( x_eval.shape[0] ):
+            # val = x_eval[ind]
+            # if ( val > bins[b-1] and val<= bins[b] ):
+                # truth_lin[b] +=y[ind,1]
+                # truth_quad[b]+=y[ind,2] 
     i = plotvars.index( var_evaluation )   
-    plots[var_evaluation+'truelin'],  = ax[index[i]].plot( bins,truth_lin[:,0],  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
-    plots[var_evaluation+'truequad'], = ax[index[i]].plot( bins,truth_quad[:,0], drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
+    # plots[var_evaluation+'truelin'],  = ax[index[i]].plot( bins,truth_lin[:,0],  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
+    # plots[var_evaluation+'truequad'], = ax[index[i]].plot( bins,truth_quad[:,0], drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
+    plots[var_evaluation+'truelin'],  = ax[index[i]].plot( bins,np.hstack((0,hist_truelin)),  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
+    plots[var_evaluation+'truequad'], = ax[index[i]].plot( bins,np.hstack((0,hist_truequad)), drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
     plots[var_evaluation+"_lin"],     = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "lin train",   color='orange' )
     plots[var_evaluation+"_quad"],    = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "quad train",  color='red'    )
     ax[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )
@@ -174,11 +211,11 @@ if (args.animate):
     logging.info("       gif's duration will be %s second(s)", n_epochs / args.animate_step / args.animate_fps)
 
     nbins = 20
-    index = list(itertools.product(list(range(0, 4)), list(range(0, 5))))
+    index = list(itertools.product(list(range(0, 4)), list(range(0, 10))))
     plotvars=list(config.plot_mva_variables.keys())
     plots = {}   
     logging.info("       plotting truth for %i variables ", len(plotvars))
-    fig, ax = plt.subplots(4,5, figsize=(15,12), tight_layout=True)  # plot max 20 vars
+    fig, ax = plt.subplots(4,10, figsize=(28,12), tight_layout=True)  # plot max 20 vars
     for i in range (len(plotvars)):
         eval_truth(plotvars[i])
 
@@ -215,7 +252,8 @@ class NeuralNet(nn.Module):
         super(NeuralNet, self).__init__()
         self.batchn = nn.BatchNorm1d(input_size)
         self.linear1 = nn.Linear(input_size, hidden_size)
-        self.relu = nn.ReLU()
+        # self.relu = nn.ReLU()
+        self.relu = nn.LeakyReLU(0.1) 
         self.linear2 = nn.Linear(hidden_size, hidden_size2)
         
         if (args.LSTM):
@@ -282,25 +320,38 @@ if ( args.LSTM == False ):
     model = NeuralNet(input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm=0, hidden_size_lstm=0, num_layers=0).to(device)    
 else:
     model = NeuralNet(input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm, hidden_size_lstm, num_layers).to(device) 
-    
+ 
+ 
 # define loss function   
 criterion = get_loss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) 
 losses = []
 
+if (args.scheduler is not None):   
+    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=args.scheduler, total_iters=int(n_epochs*9/10)) 
+    logging.info("using linear scheduler from lr_start = %s to lr_end = %s", args.lr, args.lr*args.scheduler)
+if (args.scheduler is None): scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
+
+
 # set up directory and model names
-dir_name = str(args.sample)+'_mean_'+str(args.EFTCoefficients)+'_epochs-'+str(n_epochs)+'_hs1-'+str(hidden_size)+'_hs2-'+str(hidden_size2)+'_hsc-'+str(hidden_size_comb)
-if ( args.LSTM ): 
-    dir_name = dir_name +  '_lstm-'+str(num_layers)+'_hs-lstm-'+str(hidden_size_lstm)
+dir_name = str(args.sample)+'_'+str(args.EFTCoefficients)+'_lr'+str(args.lr)+'_e'+str(n_epochs)+'_'+str(hidden_size)+'-'+str(hidden_size2)+'-'+str(hidden_size_comb)
+if ( args.LSTM ):              dir_name = dir_name +  '_lstm'+str(num_layers)+'x'+str(hidden_size_lstm)
+if (reduce):                   dir_name = dir_name + '_r'+str(args.reduce)    
+if (args.scheduler is not None): dir_name = dir_name + "_s"  + str(args.scheduler ) 
 
 results_dir = args.output_directory
-if not os.path.exists( results_dir ): 
-    os.makedirs( results_dir )
+if not os.path.exists( results_dir ): os.makedirs( results_dir )
+plot_dir = args.plot_directory
+if not os.path.exists( plot_dir ): os.makedirs( plot_dir )
 
 # train the model
 logging.info("starting training") 
+logging.info("")
+logger_handler.setFormatter(logging.Formatter('\x1b[80D\x1b[1A\x1b[K%(asctime)s %(message)s'))
+
 if (args.animate):
-    with writer.saving(fig, dir_name+'_'+"all"+".gif", 100):
+    with writer.saving(fig, os.path.join(args.plot_directory, dir_name+"_.gif"), 100):
+        start = datetime.now()
         for epoch in range(n_epochs):
             logging.info("		epoch: %i of %i ", epoch+1, n_epochs)
             for i, data in enumerate(train_loader):
@@ -311,12 +362,20 @@ if (args.animate):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                if (epoch%args.animate_step==0):
+                if (epoch%10==1):
+                    assert (z[0,0] != z[1,0]), "z is all the same" 
+                if (epoch%args.animate_step==args.animate_step-1):
                     with torch.no_grad():
                         for i in range (len(plotvars)):
-                            eval_train(plotvars[i])
+                            eval_train(plotvars[i], z)
                         writer.grab_frame()
+                if (args.n_epochs/(epoch+1)==args.n_epochs/args.animate_step):    
+                        end = datetime.now()
+                        logging.info('estimate for training duration: {} \n'.format((end - start)*(args.n_epochs/args.animate_step-1)))
+                        logging.info('training will finish appx. at {} \n'.format((end - start)*(args.n_epochs/args.animate_step-1)+end))        
+                scheduler.step()
 if not (args.animate):
+    start = datetime.now()  
     for epoch in range(n_epochs):
         logging.info("		epoch: %i of %i ", epoch+1, n_epochs)
         for i, data in enumerate(train_loader):
@@ -326,17 +385,36 @@ if not (args.animate):
             losses.append(loss.data)
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step()                    
-           
+            optimizer.step() 
+            if (n_epochs/(epoch+1)==10):    
+                end = datetime.now()
+                logging.info('estimate for training duration: {} \n'.format((end - start)*9))
+                logging.info('training will finish appx. at {} \n'.format((end - start)*9+end))
+            scheduler.step()
+  
+logger_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))    
 logging.info("done with training, plotting losses") 
-          
+if args.animate:      
+    shutil.copyfile(os.path.join(args.plot_directory, dir_name+"_.gif"), os.path.join(args.plot_directory,dir_name+".gif"))
+    os.remove(os.path.join(args.plot_directory, dir_name+"_.gif")) 
 # plot losses 
 fig, ay = plt.subplots()        
 plt.plot(losses, color='red')
 plt.title("Losses over epoch")
-sample_file_name = str(dir_name)+"_losses.png"
-plt.savefig(sample_file_name)
+sample_file_name = str(dir_name)+".png"
+plt.yscale("log")  
+plt.savefig(os.path.join(args.plot_directory,sample_file_name))
+logging.info("saved plots to %s", os.path.join(args.plot_directory,sample_file_name))      
+# plot losses 
+# fig, ay = plt.subplots()        
+# plt.plot(losses, color='red')
+# plt.title("Losses over epoch")
+# sample_file_name = str(dir_name)+"_losses.png"
+# plt.savefig(sample_file_name)
 
+logging.info("")
+logging.info("plot dir link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)))) 
+if args.animate: logging.info("gif link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)), dir_name+".gif")) 
 
 # save model
 with torch.no_grad():
@@ -349,4 +427,8 @@ with torch.no_grad():
         name = str(dir_name)+".onnx" 
     torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
     torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
-    logging.info("Saved model to %s", os.path.join(results_dir, name)) 
+    torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
+    logging.info("saved model to %s", os.path.join(results_dir, name)) 
+
+copyIndexPHP(os.path.join(args.plot_directory))    
+syncer.sync()    

@@ -26,7 +26,7 @@ argParser.add_argument('--sample',             action='store',      type=str,   
 argParser.add_argument('--full_bkg',           action='store_true',              default=False,    help="add full TT_2L sample as bkg"),
 argParser.add_argument('--lumi',               action='store',      type=float,  default=300.0)
 argParser.add_argument('--reduce',             action='store',      type=int,    default=None,     help="Reduce training data by factor?"),
-argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models/')
+argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models_LSTM/')
 argParser.add_argument('--plot_directory',     action='store',      type=str,    default='/groups/hephy/cms/lena.wild/www/tttt/plots/train_sig+bkg_red10_v3/')
 argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v7/MVA-training/ttbb_2l_dilep2-bjet_delphes-ht500-njet6p-btag1p/')
 argParser.add_argument('--n_epochs',           action='store',      type=int,    default= '500',   help='number of epochs in training')
@@ -39,17 +39,28 @@ argParser.add_argument('--num_layers',         action='store',      type=int,   
 argParser.add_argument('--LSTM_out',           action='store',      type=int,    default= '1',     help='output size of LSTM')
 argParser.add_argument('--nbins',              action='store',      type=int,    default='20',     help='number of bins')
 argParser.add_argument('--add_bkg',            action='store_true',              default=False,    help='add bkg TT_2L?')
-argParser.add_argument('--scheduler',          action='store',      type=float,  default=None,     help='factor by which the final lr is reduced')
+argParser.add_argument('--scheduler',          action='store',      type=str,    nargs = 2,  default=[None, None],     help='linear+flat, decay , factor by which the final lr is reduced')
 argParser.add_argument('--EFTCoefficients',    action='store',                   default='ctt',    help="Training vectors for particle net")
-argParser.add_argument('--animate' ,           action='store',                   default=None,     choices=["FULL", "SIG","sig-bkg", "sig+bkg"], help="make an animation of full / sig or separated sig+bkg data?")
+argParser.add_argument('--animate' ,           action='store_true', default=False,                 help="make an animation of data?")
 argParser.add_argument('--animate_step',       action='store',      type=int,    default= '10',    help="plot every n epochs")
 argParser.add_argument('--animate_fps' ,       action='store',      type=int,    default= '10',    help="frames per second in animation")
+argParser.add_argument('--dropout',            action='store',      type=float,  default= None, )
+argParser.add_argument('--weight_decay',       action='store',      type=float,  default= None, )
+argParser.add_argument('--ReLU_slope',         action='store',      type=float,  default= 0.1, )
 argParser.add_argument('--load_model' ,        action='store',      type=str,    default= None,    help="load model and continue training?")
+
+# for LLR eval
+argParser.add_argument('--LLR_eval',           action='store_true', default=False     )
+argParser.add_argument('--theta_range',        action='store',      type=float,    default=10     )
+argParser.add_argument('--sample_weight',      action='store',      type=float,  default=100)
+argParser.add_argument('--shape_effects_only', action='store_true', default=True, help="Normalize sm *and* bsm weights to sample_weight number of events")
 args = argParser.parse_args()
 
 def copyIndexPHP( results_dir ):
     index_php = os.path.join( results_dir, 'index.php' )
     shutil.copyfile( os.path.join( "Tools", 'index_for_gif.php' ), index_php )
+
+torch.manual_seed(0)
 
 import  logging
 logger = logging.getLogger()
@@ -72,10 +83,12 @@ sample           = args.sample
 bkg              = "TT_2L" if args.full_bkg==False else "TT_2L_full"
 device           = torch.device( 'cuda' if torch.cuda.is_available() else 'cpu' )
 learning_rate    = args.lr
+dropout          = args.dropout if args.dropout is not None else 0
+weight_decay     = args.weight_decay if args.weight_decay is not None else 0
+ReLU_slope       = args.ReLU_slope
 n_epochs         = args.n_epochs
 input_size       = len( mva_variables ) 
-hidden_size      = input_size * (args.hs1_mult+2)
-hidden_size1     = input_size * args.hs1_mult
+hidden_size      = input_size * args.hs1_mult
 hidden_size2     = input_size + args.hs2_add
 hidden_size_comb = args.hs_combined
 output_size      = 2                        # hard coded: lin, quad
@@ -94,11 +107,11 @@ if ( args.LSTM ):
 
 # print hyperparameter selection
 logging.info( "------------parameters for training----------------" )
+logging.info( "  EFT Coefficient:                         %s",args.EFTCoefficients )
 logging.info( "  number of epochs:                        %i",n_epochs )
 logging.info( "  learning rate:                           %s",learning_rate )
 logging.info( "  number of features,linear layer:         %i",input_size )
 logging.info( "  size of first hidden layer:              %i",hidden_size )
-logging.info( "  size of second hidden layer:             %i",hidden_size1 )
 logging.info( "  size of third hidden layer:              %i",hidden_size2 )
 logging.info( "  size of combined layer:                  %i",hidden_size_comb )
 logging.info( "  LSTM:                                    %r",args.LSTM )
@@ -185,139 +198,110 @@ if args.add_bkg:
 # normalizing to integrated luminosity W_0 gives new target weights:   w = (w_0, w_1, w_2, W_0) and w_bkg = (genWeight,0,0,W_0)
 logging.info("calculating new weights, reweighting to integrated luminosity")
 W_0     = lumi * config.xsec[sample] * 1000 * y[:,0]/ config.total_genWeight[sample]
+W_1     = lumi * config.xsec[sample] * 1000 * y[:,1]/ config.total_genWeight[sample]
+W_2     = lumi * config.xsec[sample] * 1000 * y[:,2]/ config.total_genWeight[sample]
 if args.add_bkg:
     W_0_bkg = lumi * config.xsec[bkg] * 1000 * y_bkg[:,0]/ config.total_genWeight[bkg]
+    W_1_bkg = lumi * config.xsec[bkg] * 1000 * y_bkg[:,1]/ config.total_genWeight[bkg]
+    W_2_bkg = lumi * config.xsec[bkg] * 1000 * y_bkg[:,2]/ config.total_genWeight[bkg]
     
 # store new weights W_0 as a 4th position in y and y_bkg -> w and w_bkg
-w = np.zeros((len(y[:,0]),4))
-w[:,:-1] = y 
-w[:,-1]  = W_0
+w = np.zeros((len(y[:,0]),6))
+w[:,:3] = y 
+w[:,-3]  = W_0
+w[:,-2]  = W_1
+w[:,-1]  = W_2
 if args.add_bkg:
-    w_bkg = np.zeros((len(y_bkg[:,0]),4))
-    w_bkg[:,:-1] = y_bkg 
-    w_bkg[:,-1]  = np.array([aa if aa >= 0 else 0 for aa in list(W_0_bkg)]) #remove negative weights 
+    w_bkg = np.zeros((len(y_bkg[:,0]),6))
+    w_bkg[:,:3] = y_bkg 
+    w_bkg[:,-3]  = np.array([aa if aa >= 0 else 0 for aa in list(W_0_bkg)]) #remove negative weights 
+    w_bkg[:,-2]  = np.array([aa if aa >= 0 else 0 for aa in list(W_1_bkg)]) #remove negative weights 
+    w_bkg[:,-1]  = np.array([aa if aa >= 0 else 0 for aa in list(W_2_bkg)]) #remove negative weights 
 
-
+red=len(x[:,0])
 if args.reduce is not None: red = int(len(x[:,0])/args.reduce)
 red_bkg = 0
 if args.add_bkg and args.reduce is not None: red_bkg = int(len(x_bkg[:,0])/args.reduce)
-if (reduce):
-    x = x[0:red, :]
-    v = v[0:red, :, :]
-    w = w[0:red, :]
-    if args.add_bkg:
-        x_bkg = x_bkg[0:red_bkg :]
-        v_bkg = v_bkg[0:red_bkg, :, :]
-        w_bkg = w_bkg[0:red_bkg, :]
-    logging.info("using only small dataset of 1/%s of total events -> %s events for signal %s and %s events for bkg %s", args.reduce, red, args.sample, red_bkg, bkg)
+
+#split train and eval data
+half = int(red*0.8)
+half_bkg = int(red_bkg*0.8)
+v_v = v[half:red, :, :]
+x_v = x[half:red, :]
+w_v = w[half:red, :]
+x = x[0:half, :]
+v = v[0:half, :, :]
+w = w[0:half, :]
+if args.add_bkg:
+    x_bkg_v = x_bkg[half_bkg:red_bkg, :]
+    v_bkg_v = v_bkg[half_bkg:red_bkg, :, :]
+    w_bkg_v = w_bkg[half_bkg:red_bkg, :]
+    x_bkg = x_bkg[0:half_bkg :]
+    v_bkg = v_bkg[0:half_bkg, :, :]
+    w_bkg = w_bkg[0:half_bkg, :]
+logging.info("using only small dataset of 1/%s of total events -> %s events for signal %s and %s events for bkg %s", args.reduce, red, args.sample, red_bkg, bkg)
 
 if args.add_bkg:
     X_np = np.concatenate(( x, x_bkg ))
     W_np = np.concatenate(( w, w_bkg ))
     V_np = np.concatenate(( v, v_bkg ))
+    X_np_v = np.concatenate(( x_v, x_bkg_v ))
+    W_np_v = np.concatenate(( w_v, w_bkg_v ))
+    V_np_v = np.concatenate(( v_v, v_bkg_v ))
 else:     
     X_np = x
     W_np = w
     V_np = v
+    X_np_v = x_v
+    W_np_v = w_v
+    V_np_v = v_v
     
 #double check for NaNs:
-assert not np.isnan( np.sum( X_np ) ), logging.info("found NaNs in DNN input!")
-assert not np.isnan( np.sum( W_np ) ), logging.info("found NaNs in DNN truth values!")
-assert not np.isnan( np.sum( V_np ) ), logging.info("found NaNs in LSTM input!")
+assert not np.isnan( np.sum( X_np ) ), logging.info("found NaNs in train DNN input!")
+assert not np.isnan( np.sum( W_np ) ), logging.info("found NaNs in train DNN truth values!")
+assert not np.isnan( np.sum( V_np ) ), logging.info("found NaNs in train LSTM input!")
+assert not np.isnan( np.sum( X_np_v ) ), logging.info("found NaNs in eval DNN input!")
+assert not np.isnan( np.sum( W_np_v ) ), logging.info("found NaNs in eval DNN truth values!")
+assert not np.isnan( np.sum( V_np_v ) ), logging.info("found NaNs in eval LSTM input!")
 
 X = torch.Tensor( X_np )
 W = torch.Tensor( W_np )
 V = torch.Tensor( V_np )
+X_v = torch.Tensor( X_np_v )
+W_v = torch.Tensor( W_np_v )
+V_v = torch.Tensor( V_np_v )
 
 logging.debug("shape of the DNN input is %s", X.shape)
 logging.debug("shape of the truth is %s", W.shape)
 logging.debug("shape of the LSTM input is %s", V.shape)
 
 #Define steps for evaluation 
-def eval_train ( var_evaluation ):
-    total_weight =  np.sum(W_np[:,3])
-    if (args.animate == "FULL"):
-        z = np.array( model(X,V) )
-        x_eval = np.concatenate((np.array(xx[var_evaluation]),np.array(xx_bkg[var_evaluation]))) if args.add_bkg else np.array(xx[var_evaluation]) 
-        if reduce: x_eval = np.concatenate((np.array(xx[var_evaluation][0:red]),np.array(xx_bkg[var_evaluation][0:red_bkg]))) if args.add_bkg else np.array(xx[var_evaluation][0:red])
-        hist_lin,  bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,0] * W_np[:,3] /total_weight )
-        hist_quad, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,1] * W_np[:,3] /total_weight )                               
-    
-    if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
-        z = np.array( model(torch.Tensor(x),torch.Tensor(v)) )
-        z_bkg = np.array( model(torch.Tensor(x_bkg),torch.Tensor(v_bkg)) )
-        x_eval = np.array(xx[var_evaluation])
-        x_eval_bkg = np.array(xx_bkg[var_evaluation])
-        if reduce:
-            x_eval = np.array(xx[var_evaluation])[0:red]
-            x_eval_bkg = np.array(xx_bkg[var_evaluation])[0:red_bkg]
-        hist_lin,      bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,0] * w[:,3] /total_weight )
-        hist_quad,     bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z[:,1] * w[:,3] /total_weight )
-        hist_lin_bkg,  bins = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z_bkg[:,0] * w_bkg[:,3] /total_weight )
-        hist_quad_bkg, bins = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=z_bkg[:,1] * w_bkg[:,3] /total_weight )
-                               
+def eval_train ( var_evaluation, zz ):
+    total_weight =  np.sum(W_np_v[:,3])
+    zz = np.array( zz )
+    x_eval = np.concatenate((np.array(xx[var_evaluation])[half:red],np.array(xx_bkg[var_evaluation])[half_bkg:red_bkg])) if args.add_bkg else np.array(xx[var_evaluation])[half:red] 
+    hist_lin,  bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=zz[:,0] * W_np_v[:,3] /total_weight )
+    hist_quad, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=zz[:,1] * W_np_v[:,3] /total_weight )                               
+     
     name_var = var_evaluation          
     plots[name_var+'_lin' ].set_data( bins, np.hstack((0,hist_lin))   )               
     plots[name_var+'_quad'].set_data( bins, np.hstack((0,hist_quad)) )
     
-    if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
-        name_var = var_evaluation+'_bkg_'          
-        plots[name_var+'_lin' ].set_data( bins, np.hstack((0,hist_lin_bkg))  )
-        plots[name_var+'_quad'].set_data( bins, np.hstack((0,hist_quad_bkg)) )
-
 def eval_truth ( var_evaluation ):
-    total_weight =  np.sum(W_np[:,3])
-    if (args.animate == "FULL"):
-        x_eval = np.concatenate((np.array(xx[var_evaluation]),np.array(xx_bkg[var_evaluation]))) if args.add_bkg else np.array(xx[var_evaluation]) 
-        x_eval_sig = np.array(xx[var_evaluation])
-        x_eval_bkg = np.array(xx_bkg[var_evaluation])
-        if reduce: 
-            x_eval_sig = np.array(xx[var_evaluation])[0:red]
-            x_eval_bkg = np.array(xx_bkg[var_evaluation])[0:red_bkg]
-        if reduce: x_eval = np.concatenate((np.array(xx[var_evaluation][0:red]),np.array(xx_bkg[var_evaluation][0:red_bkg]))) if args.add_bkg else np.array(xx[var_evaluation][0:red])
-        hist_truelin,  bins  = np.histogram( x_eval,     bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np[:,1] / W_np[:,0]*W_np[:,3]   / total_weight)
-        hist_truequad, bins  = np.histogram( x_eval,     bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np[:,2] / W_np[:,0]*W_np[:,3]   / total_weight)
-        hist_var,      bins  = np.histogram( x_eval,     bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np[:,3] /  total_weight)
-        hist_var_sig,  bins  = np.histogram( x_eval_sig, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w[:,3] /  total_weight)
-        hist_var_bkg,  bins  = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w_bkg[:,3] /  total_weight)
-         
-    if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
-        x_eval = np.array(xx[var_evaluation])
-        x_eval_bkg = np.array(xx_bkg[var_evaluation])
-        if reduce: 
-            x_eval = np.array(xx[var_evaluation])[0:red]
-            x_eval_bkg = np.array(xx_bkg[var_evaluation])[0:red_bkg]
-        hist_truelin,      bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w[:,1] / w[:,0]*w[:,3]   / total_weight)
-        hist_truequad,     bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w[:,2] / w[:,0]*w[:,3]   / total_weight)
-        hist_var,          bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w[:,3] /  total_weight)
-        hist_truelin_bkg,  bins  = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w_bkg[:,1] / w_bkg[:,0]*w_bkg[:,3]   / total_weight)
-        hist_truequad_bkg, bins  = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w_bkg[:,2] / w_bkg[:,0]*w_bkg[:,3]   / total_weight)
-        hist_var_bkg,      bins  = np.histogram( x_eval_bkg, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= w_bkg[:,3] /  total_weight)
-        
+    total_weight =  np.sum(W_np_v[:,3])
+    x_eval = np.concatenate((np.array(xx[var_evaluation])[half:red],np.array(xx_bkg[var_evaluation])[half_bkg:red_bkg])) if args.add_bkg else np.array(xx[var_evaluation])[half:red] 
+    hist_truelin,  bins  = np.histogram( x_eval,     bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np_v[:,1] / W_np_v[:,0]*W_np_v[:,3]   / total_weight)
+    hist_truequad, bins  = np.histogram( x_eval,     bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np_v[:,2] / W_np_v[:,0]*W_np_v[:,3]   / total_weight)
+     
     i = plotvars.index( var_evaluation )
     name_var = var_evaluation
-    # plots[name_var+'yield_sig'], = ax[index[i]].plot( bins,np.hstack((0,hist_var_sig)),  drawstyle='steps', label = "yield",       color='black' ,  linestyle = 'dotted' )
-    # plots[name_var+'yield_bkh'], = ax[index[i]].plot( bins,np.hstack((0,hist_var_bkg)),  drawstyle='steps', label = "yield",       color='gray' ,  linestyle = 'dotted' )
     plots[name_var+'truelin'],   = ax[index[i]].plot( bins,np.hstack((0,hist_truelin)),  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
     plots[name_var+'truequad'],  = ax[index[i]].plot( bins,np.hstack((0,hist_truequad)), drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
     plots[name_var+"_lin"],      = ax[index[i]].plot(  [] , [] ,                         drawstyle='steps', label = "lin train",   color='orange' )
     plots[name_var+"_quad"],     = ax[index[i]].plot(  [] , [] ,                         drawstyle='steps', label = "quad train",  color='red'    )
-    # plots[name_var+'yield_stack']     = ax[index[i]].hist( [x_eval_sig, x_eval_bkg], bins=bins, stacked=True, weights=[ w[:,3] /  total_weight, w_bkg[:,3] /  total_weight], color=["orange","blue"] )
-    # plots[name_var+'yield'],     = ax[index[i]].plot( bins,np.hstack((0,hist_var)),      drawstyle='steps', label = "yield",       color='gray' ,  linestyle = 'dotted' )
     ax[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )    
-    ay[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] ) 
-    #ax[index[i]].set_yscale("log")
-        
-    name_var = var_evaluation+"_bkg_"
-    if  (args.animate=="sig+bkg" or args.animate=="sig-bkg"):
-        if args.animate=="sig+bkg": obj = ax[index[i]]
-        if args.animate=="sig-bkg": obj = ay[index[i]]
-        #plots[name_var+'yield'],    = obj.plot( bins,np.hstack((0,hist_var_bkg)),      drawstyle='steps', label = "yield",       color='black' ,  linestyle = 'dotted' )
-        plots[name_var+'truelin'],  = obj.plot( bins,np.hstack((0,hist_truelin_bkg)),  drawstyle='steps', label = "lin truth",   color='green' ,  linestyle = 'dotted' )
-        plots[name_var+'truequad'], = obj.plot( bins,np.hstack((0,hist_truequad_bkg)), drawstyle='steps', label = "quad truth",  color='blue'  ,  linestyle = 'dotted' )           
-        plots[name_var+"_lin"],     = obj.plot(  [] , [] ,                             drawstyle='steps', label = "lin train",   color='green' )
-        plots[name_var+"_quad"],    = obj.plot(  [] , [] ,                             drawstyle='steps', label = "quad train",  color='blue'  )
     
+   
 # Initialize the gif
 if (args.animate):
     logging.info("setting up animation...")
@@ -327,7 +311,6 @@ if (args.animate):
     # Define the meta data for the movie
     GifWriter = manimation.writers['pillow']
     writer = manimation.PillowWriter( fps=args.animate_fps, metadata=None )
-    writer1 = manimation.PillowWriter( fps=args.animate_fps, metadata=None ) 
     logging.info("       gif's duration will be %s second(s)", n_epochs / args.animate_step / args.animate_fps)
     
     nbins = args.nbins
@@ -336,7 +319,6 @@ if (args.animate):
     plots = {}   
     logging.info("       plotting truth for %i variables ", len(plotvars))
     fig,  ax = plt.subplots(4,10, figsize=(28,12), tight_layout=True)  # plot max 20 vars
-    fig1, ay = plt.subplots(4,10, figsize=(28,12), tight_layout=True)  # plot max 20 vars
     for i in range (len(plotvars)):
         eval_truth(plotvars[i])
     
@@ -368,43 +350,61 @@ train_loader = DataLoader(dataset=dataset, shuffle = True,
 
 # set up NN
 class NeuralNet(nn.Module):
-    def __init__(self, input_size, hidden_size, hidden_size1, hidden_size2, hidden_size_comb, output_size, input_size_lstm, hidden_size_lstm, num_layers):
+    def __init__(self, input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm, hidden_size_lstm, num_layers):
         super(NeuralNet, self).__init__()
         self.batchn = nn.BatchNorm1d(input_size)
-        self.linear1 = nn.Linear(input_size, hidden_size)
-        self.relu = nn.LeakyReLU(0.1) #seems to work slightly better than just a ReLU
-        self.linear21 = nn.Linear(hidden_size, hidden_size1)
-        self.linear2 = nn.Linear(hidden_size1, hidden_size2)
+        self.linear1 = nn.Sequential(
+            nn.Linear(in_features=input_size, out_features=hidden_size),
+            nn.LeakyReLU(ReLU_slope),
+            nn.Dropout(dropout),
+        )
+        self.linear2 = nn.Sequential(
+            nn.Linear(in_features=hidden_size, out_features=hidden_size2),
+            nn.LeakyReLU(ReLU_slope),
+            nn.Dropout(dropout),
+        )
         
         if (args.LSTM):
             self.num_layers = num_layers
             self.hidden_size_lstm = hidden_size_lstm
             self.lstm = nn.LSTM(input_size_lstm, hidden_size_lstm, num_layers, batch_first=True)
-            self.linear3 = nn.Linear(hidden_size2+hidden_size_lstm, hidden_size_comb)
+            self.after_lstm = nn.Sequential(
+                nn.LeakyReLU(ReLU_slope),
+                nn.Dropout(dropout),
+            )
+            self.linear3 = nn.Sequential(
+                nn.Linear(in_features=hidden_size2+hidden_size_lstm, out_features=hidden_size_comb),
+                nn.LeakyReLU(ReLU_slope),
+                nn.Dropout(dropout),
+            )
+            
         else:
-            self.linear3 = nn.Linear(hidden_size2, hidden_size_comb) 
-        self.linear4 = nn.Linear(hidden_size_comb, output_size)    
+            self.linear3 = nn.Sequential(
+                nn.Linear(in_features=hidden_size2, out_features=hidden_size_comb),
+                nn.LeakyReLU(ReLU_slope),
+                nn.Dropout(dropout)
+            )
+        self.linear4 = nn.Sequential(
+                nn.Linear(in_features=hidden_size_comb, out_features=output_size),
+            )  
+        
         
     def forward(self, x, y):
         # set linear layers
         x1 = self.batchn(x)
         x1 = self.linear1(x1)
-        x1 = self.relu(x1)
-        x1 = self.linear21(x1)
-        x1 = self.relu(x1)
         x1 = self.linear2(x1)
         
         # add lstm
         if (args.LSTM):
             h0 = torch.zeros(self.num_layers, y.size(0), self.hidden_size_lstm).to(device) 
             c0 = torch.zeros(self.num_layers, y.size(0), self.hidden_size_lstm).to(device) 
-            x2 = self.relu(y)
-            x2, _ = self.lstm(x2, (h0,c0))
-            x2 = x2[:, -1, :]        
+            x2, _ = self.lstm(y)
+            x2 = x2[:, -1, :]   
+            x2 = self.after_lstm(x2)
             x1 = torch.cat([x1, x2], dim=1)          
-        x1 = self.relu(x1)
+       
         x1 = self.linear3(x1)   
-        x1 = self.relu(x1)  
         x1 = self.linear4(x1)   
         return x1
 
@@ -438,17 +438,26 @@ def get_loss( **kwargs ):
 
 
 # define model
-if ( args.LSTM == False ): model = NeuralNet(input_size, hidden_size, hidden_size1, hidden_size2, hidden_size_comb, output_size, input_size_lstm=0, hidden_size_lstm=0, num_layers=0).to(device)    
-else:                      model = NeuralNet(input_size, hidden_size, hidden_size1, hidden_size2, hidden_size_comb, output_size, input_size_lstm, hidden_size_lstm, num_layers).to(device) 
-    
+if ( args.LSTM == False ): model = NeuralNet(input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm=0, hidden_size_lstm=0, num_layers=0).to(device)    
+else:                      model = NeuralNet(input_size, hidden_size, hidden_size2, hidden_size_comb, output_size, input_size_lstm, hidden_size_lstm, num_layers).to(device) 
+
+logging.info("")
+logging.info(model) 
+ 
 # define loss function   
 criterion = get_loss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate) 
-if (args.scheduler is not None):   
-    scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=args.scheduler, total_iters=int(n_epochs*7/10)) 
-    logging.info("using linear scheduler from lr_start = %s to lr_end = %s", args.lr, args.lr*args.scheduler)
-if ((args.load_model is not None) or (args.scheduler is None)): scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= weight_decay) 
+
 losses = []
+losses_v = []
+
+if (args.scheduler[0] is not None):   
+    if args.scheduler[0] == 'linear+flat': scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=float(args.scheduler[1]), total_iters=int(n_epochs*9/10)) 
+    if args.scheduler[0] == 'decay': scheduler = lr_scheduler.ExponentialLR(optimizer, gamma = float(args.scheduler[1])) 
+    logging.info("using %s scheduler with factor %s from initial lr rate %s", args.scheduler[0], args.scheduler[1],  args.lr)
+else: scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
+if ((args.load_model is not None) or (args.scheduler[0] is None)): scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
+
 start_epoch = 0
 
 # load pretrained model if necessary
@@ -459,53 +468,85 @@ if (args.load_model is not None):
     
 # set up directory and model names
 n_epochs_ = n_epochs if args.load_model is None else n_epochs+start_epoch
-dir_name = str(args.sample)+"_"+str(args.EFTCoefficients)+'_lr'+str(args.lr)+'_l'+str(int(lumi))+'_e'+str(n_epochs_)+'_'+str(hidden_size)+'-'+str(hidden_size1)+'-'+str(hidden_size2)+'-'+str(hidden_size_comb)
+dir_name = str(args.sample)+"_"+str(args.EFTCoefficients)+'_lr'+str(args.lr)+'_l'+str(int(lumi))+'_e'+str(n_epochs_)+'_'+str(hidden_size)+'-'+str(hidden_size2)+'-'+str(hidden_size_comb)
 if ( args.LSTM ):              dir_name = dir_name +  '_lstm'+str(num_layers)+'x'+str(hidden_size_lstm)
 if (reduce):                   dir_name = dir_name + '_r'+str(args.reduce)    
 if (args.add_bkg):             dir_name = dir_name + '+bkg'  if args.full_bkg==False else dir_name + '+fullbkg'
-if (args.animate != "FULL"): dir_name = dir_name + "_" + args.animate    
-if (args.scheduler is not None): dir_name = dir_name + "_s"  + str(args.scheduler ) 
+if (args.scheduler is not None):        dir_name = dir_name + "_s"  + str(args.scheduler[0])+str(args.scheduler[1] ) 
+if (args.dropout is not None):          dir_name = dir_name + "_do"  + str(args.dropout ) 
+if (args.weight_decay is not None):     dir_name = dir_name + "_wd"  + str(args.weight_decay ) 
+dir_name = dir_name + "_ReLU"  + str(args.ReLU_slope ) 
 
 results_dir = args.output_directory
 if not os.path.exists( results_dir ): os.makedirs( results_dir )
 plot_dir = args.plot_directory
 if not os.path.exists( plot_dir ): os.makedirs( plot_dir )
+model_dir = os.path.join(args.output_directory, dir_name)
+if not os.path.exists( model_dir ): os.makedirs( model_dir )
 
 # train the model
 logging.info("starting training") 
 logging.info("")
 logger_handler.setFormatter(logging.Formatter('\x1b[80D\x1b[1A\x1b[K%(asctime)s %(message)s'))
+
+dummyx = X[0,:].reshape(1,len(mva_variables))
+if (args.LSTM):
+    dummyv = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
+else: 
+    dummyv = V[0].reshape(1,1)
+
 if (args.animate):
     with writer.saving(fig, os.path.join(args.plot_directory, dir_name+"_.gif"), 100):
-        with writer1.saving(fig1, os.path.join(args.plot_directory, dir_name+"_BKG.gif"), 100):
-            start = datetime.now()
-            for epoch in range(start_epoch, n_epochs_):
-                logging.info("		epoch: %i of %i, lr = %s ", epoch+1, n_epochs_,scheduler.get_last_lr())
-                for i, data in enumerate(train_loader):
-                    inputs1,inputs2, labels = data
-                    #print(inputs1[0,:], inputs2[0,:], labels[0,:])
-                    z = model(inputs1, inputs2)
-                    loss=criterion(z,labels)
-                    assert (loss.data>=0), "Loss haut schun wido o dio knedl"
-                    losses.append(loss.data)
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    if (epoch%args.animate_step==args.animate_step-1):
-                        with torch.no_grad():
-                            for i in range (len(plotvars)):
-                                eval_train(plotvars[i])
-                            writer.grab_frame()
-                            writer1.grab_frame()
-                    if (args.n_epochs/(epoch+1)==args.n_epochs/args.animate_step):    
-                        end = datetime.now()
-                        logging.info('estimate for training duration: {} \n'.format((end - start)*(args.n_epochs/args.animate_step-1)))
-                        logging.info('training will finish appx. at {} \n'.format((end - start)*(args.n_epochs/args.animate_step-1)+end))
+        start = datetime.now()
+        for epoch in range(start_epoch, n_epochs_):
+            model.train()
+            for i, data in enumerate(train_loader):
+                inputs1,inputs2, labels = data
+                z = model(inputs1, inputs2)
+                loss=criterion(z,labels)
+                assert (loss.data>=0), "Loss haut schun wido o dio knedl"
+                losses.append(loss.data)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
                 scheduler.step()
+            # save epoch            
+            if (epoch%10==0):
+                assert (z[0,0] != z[1,0]), "z is all the same" 
+                # with torch.no_grad():
+                    # torch.save(model.state_dict(), os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.pth'))    
+                    # torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.onnx'),input_names=["input1", "input2"],output_names=["output1"])    
+            model.eval()
+            # zz = model(X_v, V_v)
+            with torch.no_grad():
+                zz = model(X_v, V_v)
+                loss_v=criterion(zz,W_v)
+                losses_v.append(loss_v.data)
                 
+            try:
+                l = u'\u2191' if (losses[-2]<=losses[-1]) else u'\u2193'
+                l_v = u'\u2191' if (losses_v[-2]<=losses_v[-1]) else u'\u2193'
+                haha = '( ︶︿︶)_╭∩╮' if (losses_v[-2]<=losses_v[-1]) else '          '
+            except:
+                l = "-"
+                l_v = "-"
+                haha = ''
+            logging.info("		epoch: %i of %i      loss(tr/ev): %s, %s (%s, %s)     %s        lr: %s", epoch+1, n_epochs, losses[-1], losses_v[-1], l, l_v, haha, scheduler.get_last_lr())
+            if (epoch%args.animate_step==args.animate_step-1):
+                with torch.no_grad():
+                    for i in range (len(plotvars)):
+                        eval_train(plotvars[i], zz)
+                    writer.grab_frame()
+            if (args.n_epochs/(epoch+1)==args.n_epochs/args.animate_step):    
+                    end = datetime.now()
+                    logging.info('estimate for training duration: {} \n'.format((end - start)*(args.n_epochs/args.animate_step-1)))
+                    logging.info('training will finish appx. at {} \n'.format((end - start)*(args.n_epochs/args.animate_step-1)+end))
+                                
+                  
 if not (args.animate):
     start = datetime.now()  
     for epoch in range(start_epoch, n_epochs_):
+        model.train()
         logging.info("		epoch: %i of %i, lr = %s ", epoch+1, n_epochs_,scheduler.get_last_lr())
         for i, data in enumerate(train_loader):
             inputs1,inputs2, labels = data
@@ -517,12 +558,24 @@ if not (args.animate):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()   
-            if (args.n_epochs/(epoch+1)==10):    
-                end = datetime.now()
-                logging.info('estimate for training duration: {} \n'.format((end - start)*9))
-                logging.info('training will finish appx. at {} \n'.format((end - start)*9+end))
-        scheduler.step()
-
+            scheduler.step()
+               # save epoch
+        if (epoch%10==0):
+            assert (z[0,0] != z[1,0]), "z is all the same" 
+            with torch.no_grad():
+                torch.save(model.state_dict(), os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.pth'))    
+                torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.onnx'),input_names=["input1", "input2"],output_names=["output1"]) 
+                            
+        model.eval()
+        # zz = model(X_v, V_v)
+        with torch.no_grad(): 
+            zz = model(X_v, V_v)
+            loss_v=criterion(zz,W_v)
+            losses_v.append(loss_v.data)
+            
+            logging.info("		epoch: %i of %i        train loss: %s , validation loss: %s", epoch+1, n_epochs, losses[-1], losses_v[-1])
+                
+      
 logger_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))           
 #create checkpoint after training
 checkpoint = {
@@ -534,33 +587,152 @@ checkpoint = {
 save_ckp(checkpoint, os.path.join(results_dir, str(dir_name)+'.pt'))
 logging.info("saved checkpoint to %s", os.path.join(results_dir, str(dir_name)+'.pt')) 
 logging.info("done with training, plotting losses") 
-if args.animate != "sig-bkg": os.remove(os.path.join(args.plot_directory, dir_name+"_BKG.gif"))  #remove empty bkg animation         
 
 
 shutil.copyfile(os.path.join(args.plot_directory, dir_name+"_.gif"), os.path.join(args.plot_directory,dir_name+".gif"))
 os.remove(os.path.join(args.plot_directory, dir_name+"_.gif")) 
+
 # plot losses 
 fig, ay = plt.subplots()        
-plt.plot(losses, color='red')
+plt.plot(losses[10:], color='red', label='training loss')
+plt.plot(losses_v[10:], color='blue', label='valiadation loss')
 plt.title("Losses over epoch")
-sample_file_name = str(dir_name)+"_losses.png"
+plt.legend()
+sample_file_name = str(dir_name)+".png"
 plt.yscale("log")  
 plt.savefig(os.path.join(args.plot_directory,sample_file_name))
+logging.info("saved plots to %s", os.path.join(args.plot_directory,sample_file_name))  
 
 # save model
 with torch.no_grad():
-    x = X[0,:].reshape(1,len(mva_variables))
-    if (args.LSTM):
-        v = V[0,:,:].reshape(1, max_timestep, len(vector_branches))
-        name = str(dir_name)+".onnx"
-    else: 
-        v = V[0].reshape(1,1)
-        name = str(dir_name)+".onnx" 
-    #torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
-    torch.onnx.export(model,args=(x, v),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
-    logging.info("Saved model to %s", os.path.join(results_dir, name)) 
+    name = str(dir_name)+".onnx" 
+    torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
+    torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
+    logging.info("saved model to %s", os.path.join(results_dir, name)) 
 
-logging.info("plot dir link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)))) 
-if args.animate is not None: logging.info("gif link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)), dir_name+".gif")) 
 copyIndexPHP(os.path.join(args.plot_directory))    
+
+
+# eval model performance on data eval
+def make_cdf_map( x, y ):
+    import scipy.interpolate
+    map__ = scipy.interpolate.interp1d(x, y, 'linear', fill_value="extrapolate")
+    max_x, min_x = max(x), min(x)
+    max_y, min_y = max(y), min(y)
+    def map_( x_ ):
+        x__ = np.array(x_)
+        result = np.zeros_like(x__).astype('float')
+        result[x__>max_x] = max_y
+        result[x__<min_x] = min_y
+        vals = (x__>=min_x) & (x__<=max_x)
+        result[vals] = map__(x__[vals]) 
+        return result 
+    return map_    
+
+if args.LLR_eval: 
+    from scipy import optimize 
+    import scipy as scipy
+
+    model.eval()
+    with torch.no_grad(): zz = model(X_v, V_v)    
+    zz = np.array(zz)
+    logging.info("plotting LLR")
+    nbins = 20
+    theta_ = np.linspace(-args.theta_range,args.theta_range,nbins)
+    # theta_ = np.linspace(-1,1,nbins)
+    exp_nll_ratios = {}
+
+    limits = {}
+    exp_nll_ratio = []
+    histos = []
+    k = 0
+    for theta in theta_: 
+        w_sm   =   args.lumi /np.sum(W_np_v[:,3]) * args.sample_weight * W_np_v[:,3]
+        stack_weights = W_np_v[:,3] + theta * W_np_v[:,4]+ theta**2 * W_np_v[:,5]
+        if args.shape_effects_only: w_bsm  =   args.lumi /np.sum(stack_weights) * args.sample_weight * stack_weights
+        else: 
+            w_bsm  =   args.lumi /np.sum(W_np_v[:,3]) * args.sample_weight * stack_weights
+        t_theta = 1 + theta * zz[:,0]  + theta**2 * zz[:,1] * 0.5
+        
+        t_theta_argsort     = np.argsort(t_theta)
+        t_theta_argsort_inv = np.argsort(t_theta_argsort)
+        cdf_sm = np.cumsum(w_sm[t_theta_argsort])
+        cdf_sm/=cdf_sm[-1]
+        
+        cdf_map = make_cdf_map( t_theta[t_theta_argsort], cdf_sm )
+        t_theta_cdf = cdf_map( t_theta )
+        nb=10
+        binning = np.linspace(0, 1, nb+1)
+
+        np_histo_sm  = np.histogram(t_theta_cdf, bins=binning, weights = w_sm  ) 
+        np_histo_bsm = np.histogram(t_theta_cdf, bins=binning, weights = w_bsm  ) 
+       
+        np_histo_sm  = np_histo_sm[0]
+        np_histo_bsm = np_histo_bsm[0]
+        
+        if any(np_histo_sm)==0: assert False
+        
+        
+        exp_nll_ratio_ =2*np.sum(np_histo_sm - np_histo_bsm - np_histo_bsm*np.log(np_histo_sm/np_histo_bsm))
+        exp_nll_ratio.append(exp_nll_ratio_)
+        
+    drawObjects = [ ]
+    if (sample == 'TTTT_MS'):
+        down = int(args.sample_weight / nb * 0.5)
+        up = int(args.sample_weight / nb * 5)
+    if (sample == 'TTbb_MS'):
+        down = int(args.sample_weight / nb * 0.9)
+        up = int(args.sample_weight / nb * 1.5)
+        
+
+    exp_nll_ratios = exp_nll_ratio  
+    interp_fn = scipy.interpolate.interp1d(theta_, exp_nll_ratio, 'quadratic', fill_value="extrapolate")
+    interp_fn4 = lambda x: interp_fn(x)-4
+    interp_fn1 = lambda x: interp_fn(x)-1
+
+    #auto search for vicinity
+    for i in range (len(exp_nll_ratio)-1):
+        if exp_nll_ratio[i] <= 4 and exp_nll_ratio[i+1] >= 4: r4 = theta_[i]
+        if exp_nll_ratio[i] <= 1 and exp_nll_ratio[i+1] >= 1: r1 = theta_[i]
+    try: 
+        r4
+    except NameError:
+        print("NameError: r4 does not exist. args.range_theta too small?")
+    if (r4 < args.theta_range):   
+        root1, root2 = optimize.newton(interp_fn4, -r4,maxiter=500), optimize.newton(interp_fn4, r4,maxiter=500)
+    else: root1, root2 = -args.theta_range, args.theta_range
+    if (r1 < args.theta_range):   
+        root3, root4 = optimize.newton(interp_fn1, -r1,maxiter=500), optimize.newton(interp_fn1, r1,maxiter=500)
+    else: root3, root4 = -args.theta_range, args.theta_range    
+
+    # limits[model+'_interp4'] = ROOT.TBox(root1, 5, root2, 0)
+    # limits[model+'_interp4'].SetFillColorAlpha(color[0], 0.1)
+    # limits[model+'_interp1'] = ROOT.TBox(root3, 5, root4, 0)
+    # limits[model+'_interp1'].SetFillColorAlpha(color[1], 0.1)
+    # exp_nll_ratios[model+'_label'] = Z[model+"_label"]
+            
+    fig, at = plt.subplots()        
+    plt.plot(theta_, exp_nll_ratio, color='black', label='1D LLR')
+    plt.axvline(x = root1, color = 'red', linewidth=0.7, linestyle='dotted')
+    plt.axvline(x = root2, color = 'red', linewidth=0.7, linestyle='dotted')
+    plt.axvline(x = root3, color = 'blue', linewidth=0.7,linestyle='dotted')
+    plt.axvline(x = root4, color = 'blue', linewidth=0.7,linestyle='dotted')
+    plt.axhline(y = 4, color = 'red', linewidth=0.7,linestyle='dotted')
+    plt.axhline(y = 4, color = 'red', linewidth=0.7,linestyle='dotted')
+    plt.axhline(y = 1, color = 'blue', linewidth=0.7, linestyle='dotted')
+    plt.axhline(y = 1, color = 'blue', linewidth=0.7, linestyle='dotted')
+    plt.ylim(0)
+    plt.xlim((-args.theta_range, args.theta_range))
+    plt.ylabel(args.EFTCoefficients)
+    plt.xlabel(r"$\theta}$")
+    sample_file_name = str(dir_name)+"_LLR.png"
+    plt.savefig(os.path.join(args.plot_directory,sample_file_name))
+    logging.info("saved LLR plot to %s", os.path.join(args.plot_directory,sample_file_name))      
+    logging.info("LLR plot link:   %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)), sample_file_name)) 
+
+
+logging.info("")
+logging.info("loss plot link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)),dir_name+".png")) 
+if args.animate: logging.info("gif link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)), dir_name+".gif")) 
+
 syncer.sync()    
