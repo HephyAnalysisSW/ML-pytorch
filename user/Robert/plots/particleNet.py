@@ -39,7 +39,16 @@ features = model.features
 plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.prefix if args.prefix is not None else "", args.model )
 os.makedirs( plot_directory, exist_ok=True)
 
-features, weights, observers = model.getEvents(-1, return_observers = True)
+#nn_model = "ctGIm_lin_1" 
+#epochs   = reversed(range(0, 251,50))
+derivatives = [(args.WC, ) ]
+
+#predictions =  ["ctGIm_lin_epoch_%i"%i for i in range(0,161,10)] #forgot to remove th lin from the name
+predictions =  ["%s_epoch_%i"%(args.model, i) for i in args.epochs] #forgot to remove th lin from the name
+data_generator = model.data( input_files = args.input_files, extra_branches = predictions )
+
+
+features, weights, observers = model.getEvents(data_generator, -1, return_observers = True)
 
 # Text on the plots
 def drawObjects( offset=0 ):
@@ -204,14 +213,6 @@ tex.SetTextSize(0.06)
 #epochs   = reversed(range(0, 160,10))
 #derivatives = [('ctGIm', ), ('ctGIm', 'ctGIm')]
 
-#nn_model = "ctGIm_lin_1" 
-#epochs   = reversed(range(0, 251,50))
-derivatives = [(args.WC, ) ]
-
-#predictions =  ["ctGIm_lin_epoch_%i"%i for i in range(0,161,10)] #forgot to remove th lin from the name
-predictions =  ["%s_epoch_%i"(args.model, %i) for i in args.epochs] #forgot to remove th lin from the name
-data_generator = model.data( input_files = args.input_files, branches = model.features + model.observers + predictions )
-
 # colors
 color = {}
 i_lin, i_diag, i_mixed = 0,0,0
@@ -226,8 +227,8 @@ for i_der, der in enumerate(derivatives):
         color[der] = ROOT.kGreen + i_mixed
         i_mixed+=1
 
-for epoch in epochs:
-    predictions = data_generator.vector_branch(nn_model+'_epoch_%i'%epoch)
+for epoch in args.epochs:
+    predictions = data_generator.vector_branch(args.model+'_epoch_%i'%epoch)
     if predictions.ndim==1:
         predictions=predictions.reshape(-1,1) 
 
@@ -331,6 +332,7 @@ for epoch in epochs:
             mask        = np.transpose( binned.reshape(-1,1)==range(1,len(lin_binning[feature])) )
             h_w0[feature]           = np.array([  w0[m].sum() for m in mask])
             h_derivative_prediction = np.array([ wp_pred[m].sum(axis=0) for m in mask])
+            assert False, "check bug ... are weights relative or aboslute?"
             h_derivative_truth      = np.array([ (np.transpose(np.array([(weights[der] if der in weights else weights[tuple(reversed(der))]) for der in derivatives])))[m].sum(axis=0) for m in mask])
             h_ratio_prediction[feature] = h_derivative_prediction/(h_w0[feature].reshape(-1,1))
             h_ratio_truth[feature]      = h_derivative_truth/(h_w0[feature].reshape(-1,1))
@@ -424,7 +426,7 @@ for epoch in epochs:
             for o in drawObjects:
                 o.Draw()
 
-            plot_directory_ = os.path.join( plot_directory, "training_plots", nn_model, "log" if logY else "lin" )
+            plot_directory_ = os.path.join( plot_directory, "training_plots", args.model, "log" if logY else "lin" )
             if not os.path.isdir(plot_directory_):
                 try:
                     os.makedirs( plot_directory_ )

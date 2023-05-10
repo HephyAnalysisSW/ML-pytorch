@@ -18,7 +18,7 @@ features = [
 
 observers = ["parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k","parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star", "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab"]
 
-def data(input_files, branches )
+def data(input_files, extra_branches ):
 
     return DataGenerator(
         #input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/predictions/ctGIm/TT01j_HT800_ext_comb/output_*.root"],
@@ -26,8 +26,8 @@ def data(input_files, branches )
             n_split = 1,
             splitting_strategy = "files",
             selection   = None,
-            #branches = ["p_C"] + features + observers + predictions) 
-            branches = ["p_C"] + branches) 
+            branches = ["p_C"] + features + observers + extra_branches) 
+            #branches = ["p_C"] + branches) 
 
 reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/ParticleNet/TT01jDebug_reweight_card.pkl'
 weightInfo = WeightInfo(reweight_pkl)
@@ -59,14 +59,14 @@ def make_combinations( coefficients ):
             combinations.append(comb)
     return combinations
 
-def getEvents( nTraining, return_observers = True):
-    data_generator.load(-1, small=nTraining )
+def getEvents( generator, nTraining, return_observers = True):
+    generator.load(-1, small=nTraining )
     combinations = make_combinations( wilson_coefficients )
-    coeffs = data_generator.vector_branch('p_C')
+    coeffs = generator.vector_branch('p_C')
     if return_observers:
-        return data_generator.scalar_branches( features ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}, data_generator.scalar_branches( observers )
+        return generator.scalar_branches( features ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}, generator.scalar_branches( observers )
     else:
-        return data_generator.scalar_branches( features ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
+        return generator.scalar_branches( features ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
 
 tex = {"ctWRe":"C_{tW}^{Re}", "ctWIm":"C_{tW}^{Im}", "ctGRe":"C_{tG}^{Re}", "ctGIm":"C_{tG}^{Im}", "ctBIm":"C_{tB}^{Im}", "ctBRe":"C_{tB}^{Re}", "cHt":"C_{Ht}", 'cHtbRe':'C_{Htb}^{Re}', 'cHtbIm':'C_{Htb}^{Im}', 'cHQ3':'C_{HQ}^{(3)}'}
 
