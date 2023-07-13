@@ -12,7 +12,7 @@ import  torch.nn                as nn
 import  os, shutil
 import  argparse
 import  matplotlib.animation    as manimation 
-from    Tools.WeightInfo        import WeightInfo #have it in my local folder
+from    Tools.WeightInfo        import WeightInfo #have it in my local folder because it's ML-pytorch
 import  itertools
 from    multiprocessing         import Pool
 import  logging
@@ -23,8 +23,8 @@ import  torch.optim.lr_scheduler as lr_scheduler
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',                   default='INFO', nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
 argParser.add_argument('--sample',             action='store',      type=str,    default='TTTT_MS')
-argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models_LSTM/')
-argParser.add_argument('--plot_directory',     action='store',      type=str,    default='/groups/hephy/cms/lena.wild/www/tttt/plots/DNN_500_all')
+argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models_DNN/')
+argParser.add_argument('--plot_directory',     action='store',      type=str,    default='/groups/hephy/cms/lena.wild/www/tttt/plots/DNN_all')
 argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v6_1/MVA-training/PN_ttbb_2l_dilep2-bjet_delphes-met30-njet4p-btag2p/')
 argParser.add_argument('--scheduler',          action='store',      type=str,    nargs = 2,  default=[None, None],     help='linear+flat, decay , factor by which the final lr is reduced')
 argParser.add_argument('--n_epochs',           action='store',      type=int,    default= '500',   help='number of epochs in training')
@@ -41,16 +41,12 @@ argParser.add_argument('--animate_fps' ,       action='store',      type=int,   
 argParser.add_argument('--animate' ,           action='store_true',              default= False,   help="make an animation?")
 argParser.add_argument('--reduce',             action='store',      type=int,    default=None,     help="Reduce training data by factor?"),
 argParser.add_argument('--lr',                 action='store',      type=float,  default= '0.001',  help='learning rate')
-argParser.add_argument('--dropout',            action='store',      type=float,  default= None, )
+argParser.add_argument('--dropout',            action='store',      type=float,  default= 0.5, )
 argParser.add_argument('--weight_decay',       action='store',      type=float,  default= None, )
-argParser.add_argument('--ReLU_slope',         action='store',      type=float,  default= 0.1, )
+argParser.add_argument('--ReLU_slope',         action='store',      type=float,  default= 0.5, )
+argParser.add_argument('--load_model' ,        action='store',      type=str,    default= None,    help="load model and continue training?")
 
-# for LLR eval
-argParser.add_argument('--LLR_eval',           action='store_true', default=False     )
-argParser.add_argument('--theta_range',        action='store',      type=float,    default=1     )
-argParser.add_argument('--sample_weight',      action='store',      type=float,  default=100)
-argParser.add_argument('--shape_effects_only', action='store_true', default=True, help="Normalize sm *and* bsm weights to sample_weight number of events")
-argParser.add_argument('--lumi',               action='store',      type=int,    default=1     )
+
 args = argParser.parse_args()
 
 torch.manual_seed(0)
@@ -90,6 +86,19 @@ hidden_size      = input_size * args.hs1_mult
 hidden_size2     = input_size + args.hs2_add
 hidden_size_comb = args.hs_combined
 output_size      = 2                        # hard coded: lin, quad
+
+# save checkpoint
+def save_ckp(state, checkpoint_path):
+    torch.save(state, checkpoint_path)
+
+# load checkpoint        
+def load_ckp(checkpoint_fpath, model, optimizer):
+    # load check point
+    checkpoint = torch.load(checkpoint_fpath)
+    model.load_state_dict(checkpoint['state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer'])
+    valid_loss_min = checkpoint['valid_loss_min']
+    return model, optimizer, checkpoint['epoch'], valid_loss_min.item() 
 
 if ( args.LSTM ):
     vector_branches = ["mva_Jet_%s" % varname for varname in config.lstm_jetVarNames] 
@@ -178,6 +187,7 @@ V_v = torch.Tensor( v_v )
 def eval_train ( var_evaluation, zz ):
     zz = np.array( zz )
     x_eval = np.array(xx[var_evaluation])[half:red]
+    nbins = 8 if var_evaluation=="nrecoJet" else 20
     hist_lin,  bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=y_v[:,0]*zz[:,0])
     hist_quad, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=y_v[:,0]*zz[:,1])                               
 
@@ -187,14 +197,15 @@ def eval_train ( var_evaluation, zz ):
   
 def eval_truth ( var_evaluation ):
     x_eval = np.array(xx[var_evaluation])[half:red]
+    nbins = 8 if var_evaluation=="nrecoJet" else 20
     hist_truelin,      bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= y_v[:,1] )
     hist_truequad,     bins  = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= y_v[:,2] )
 
     i = plotvars.index( var_evaluation )   
        
-    plots[var_evaluation+'truelin'],  = ax[index[i]].plot( bins,np.hstack((0,hist_truelin)),  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
+    plots[var_evaluation+'truelin'],  = ax[index[i]].plot( bins,np.hstack((0,hist_truelin)),  drawstyle='steps', label = "lin truth",   color='blue' ,linestyle = 'dotted' )
     plots[var_evaluation+'truequad'], = ax[index[i]].plot( bins,np.hstack((0,hist_truequad)), drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
-    plots[var_evaluation+"_lin"],     = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "lin train",   color='orange' )
+    plots[var_evaluation+"_lin"],     = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "lin train",   color='blue' )
     plots[var_evaluation+"_quad"],    = ax[index[i]].plot(  [] , [] ,            drawstyle='steps', label = "quad train",  color='red'    )
     ax[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )
  
@@ -341,7 +352,9 @@ else:
 
 logging.info("")
 logging.info(model) 
- 
+
+if args.load_model is not None:
+    model.load_state_dict(torch.load(args.load_model))
 # define loss function   
 criterion = get_loss()
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= weight_decay) 
@@ -352,7 +365,7 @@ if (args.scheduler[0] is not None):
     if args.scheduler[0] == 'linear+flat': scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=float(args.scheduler[1]), total_iters=int(n_epochs*9/10)) 
     if args.scheduler[0] == 'decay': scheduler = lr_scheduler.ExponentialLR(optimizer, gamma = float(args.scheduler[1])) 
     logging.info("using %s scheduler with factor %s from initial lr rate %s", args.scheduler[0], args.scheduler[1],  args.lr)
-else: scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
+else: scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs) #==no scheduler
 
 
 # set up directory and model names
@@ -362,6 +375,7 @@ if (reduce):                            dir_name = dir_name + '_r'+str(args.redu
 if (args.scheduler is not None):        dir_name = dir_name + "_s"  + str(args.scheduler[0])+str(args.scheduler[1] ) 
 if (args.dropout is not None):          dir_name = dir_name + "_do"  + str(args.dropout ) 
 if (args.weight_decay is not None):     dir_name = dir_name + "_wd"  + str(args.weight_decay ) 
+if (args.load_model is not None):       dir_name = dir_name + "_loaded"
 dir_name = dir_name + "_ReLU"  + str(args.ReLU_slope ) 
 
 results_dir = args.output_directory
@@ -398,9 +412,9 @@ if (args.animate):
                 scheduler.step()
                 
             # save epoch
-            if (epoch%10==0):
+            #if (epoch%10==0):
                 #print(z[:10,0])
-                assert (z[0,0] != z[1,0]), "z is all the same" 
+                #assert (z[0,0] != z[1,0]), "z is all the same" 
                 # with torch.no_grad():
                     # torch.save(model.state_dict(), os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.pth'))    
                     # torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.onnx'),input_names=["input1", "input2"],output_names=["output1"])    
@@ -415,12 +429,12 @@ if (args.animate):
             try:
                 l = u'\u2191' if (losses[-2]<=losses[-1]) else u'\u2193'
                 l_v = u'\u2191' if (losses_v[-2]<=losses_v[-1]) else u'\u2193'
-                haha = '( ︶︿︶)_╭∩╮' if (losses_v[-2]<=losses_v[-1]) else '          '
+                
             except:
                 l = "-"
                 l_v = "-"
-                haha = ''
-            logging.info("		epoch: %i of %i      loss(tr/ev): %s, %s (%s, %s)     %s        lr: %s", epoch+1, n_epochs, losses[-1], losses_v[-1], l, l_v, haha, scheduler.get_last_lr())
+                
+            logging.info("		epoch: %i of %i      loss(tr/ev): %s, %s (%s, %s)        lr: %s", epoch+1, n_epochs, losses[-1], losses_v[-1], l, l_v, scheduler.get_last_lr())
             if (epoch%args.animate_step==args.animate_step-1):
                 with torch.no_grad():
                     for i in range (len(plotvars)):
@@ -451,11 +465,11 @@ if not (args.animate):
                 logging.info('training will finish appx. at {} \n'.format((end - start)*9+end))
             scheduler.step()
         # save epoch
-        if (epoch%10==0):
-            assert (z[0,0] != z[1,0]), "z is all the same" 
-            with torch.no_grad():
-                torch.save(model.state_dict(), os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.pth'))    
-                torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.onnx'),input_names=["input1", "input2"],output_names=["output1"]) 
+        #if (epoch%10==0):
+            #assert (z[0,0] != z[1,0]), "z is all the same" 
+            #with torch.no_grad():
+                #torch.save(model.state_dict(), os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.pth'))    
+                #torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.onnx'),input_names=["input1", "input2"],output_names=["output1"]) 
                             
         model.eval()
         # zz = model(X_v, V_v)
@@ -469,9 +483,15 @@ if not (args.animate):
       
 logger_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))    
 logging.info("done with training, plotting losses") 
+with torch.no_grad():
+    name = str(dir_name)+".onnx" 
+    torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
+    torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
+    logging.info("saved model to %s", os.path.join(results_dir, name)) 
 if args.animate:      
     shutil.copyfile(os.path.join(args.plot_directory, dir_name+"_.gif"), os.path.join(args.plot_directory,dir_name+".gif"))
-    os.remove(os.path.join(args.plot_directory, dir_name+"_.gif")) 
+    #os.remove(os.path.join(args.plot_directory, dir_name+"_.gif")) 
+    
 # plot losses 
 fig, ay = plt.subplots()        
 plt.plot(losses[10:], color='red', label='training loss')
@@ -484,138 +504,11 @@ plt.savefig(os.path.join(args.plot_directory,sample_file_name))
 logging.info("saved plots to %s", os.path.join(args.plot_directory,sample_file_name))      
 
 
-
-# save model
-with torch.no_grad():
-    name = str(dir_name)+".onnx" 
-    torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
-    torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
-    logging.info("saved model to %s", os.path.join(results_dir, name)) 
-
 copyIndexPHP(os.path.join(args.plot_directory))
 
 
-# eval model performance on data eval
-def make_cdf_map( x, y ):
-    import scipy.interpolate
-    map__ = scipy.interpolate.interp1d(x, y, 'linear', fill_value="extrapolate")
-    max_x, min_x = max(x), min(x)
-    max_y, min_y = max(y), min(y)
-    def map_( x_ ):
-        x__ = np.array(x_)
-        result = np.zeros_like(x__).astype('float')
-        result[x__>max_x] = max_y
-        result[x__<min_x] = min_y
-        vals = (x__>=min_x) & (x__<=max_x)
-        result[vals] = map__(x__[vals]) 
-        return result 
-    return map_    
-
-if args.LLR_eval: 
-
-    from scipy import optimize 
-    import scipy as scipy
-
-    model.eval()
-    with torch.no_grad(): zz = model(X_v, V_v)    
-    zz = np.array(zz)
-    logging.info("plotting LLR")
-    nbins = 20
-    theta_ = np.linspace(-args.theta_range,args.theta_range,nbins)
-    # theta_ = np.linspace(-1,1,nbins)
-    exp_nll_ratios = {}
-
-    limits = {}
-    exp_nll_ratio = []
-    histos = []
-    k = 0
-    for theta in theta_: 
-        w_sm   =   args.lumi /np.sum(y_v[:,0]) * args.sample_weight * y_v[:,0] 
-        stack_weights = y_v[:,0] + theta * y_v[:,1]+ theta**2 * y_v[:,2]
-        if args.shape_effects_only: w_bsm  =   args.lumi /np.sum(stack_weights) * args.sample_weight * stack_weights
-        else: 
-            w_bsm  =   args.lumi /np.sum(y_v[:,0]) * args.sample_weight * stack_weights
-        t_theta = 1 + theta * zz[:,0]  + theta**2 * zz[:,1] * 0.5
-        
-        t_theta_argsort     = np.argsort(t_theta)
-        t_theta_argsort_inv = np.argsort(t_theta_argsort)
-        cdf_sm = np.cumsum(w_sm[t_theta_argsort])
-        cdf_sm/=cdf_sm[-1]
-        
-        cdf_map = make_cdf_map( t_theta[t_theta_argsort], cdf_sm )
-        t_theta_cdf = cdf_map( t_theta )
-        nb=10
-        binning = np.linspace(0, 1, nb+1)
-
-        np_histo_sm  = np.histogram(t_theta_cdf, bins=binning, weights = w_sm  ) 
-        np_histo_bsm = np.histogram(t_theta_cdf, bins=binning, weights = w_bsm  ) 
-       
-        np_histo_sm  = np_histo_sm[0]
-        np_histo_bsm = np_histo_bsm[0]
-        
-        if any(np_histo_sm)==0: assert False
-        
-        
-        exp_nll_ratio_ =2*np.sum(np_histo_sm - np_histo_bsm - np_histo_bsm*np.log(np_histo_sm/np_histo_bsm))
-        exp_nll_ratio.append(exp_nll_ratio_)
-        
-    drawObjects = [ ]
-    if (sample == 'TTTT_MS'):
-        down = int(args.sample_weight / nb * 0.5)
-        up = int(args.sample_weight / nb * 5)
-    if (sample == 'TTbb_MS'):
-        down = int(args.sample_weight / nb * 0.9)
-        up = int(args.sample_weight / nb * 1.5)
-        
-
-    exp_nll_ratios = exp_nll_ratio  
-    interp_fn = scipy.interpolate.interp1d(theta_, exp_nll_ratio, 'quadratic', fill_value="extrapolate")
-    interp_fn4 = lambda x: interp_fn(x)-4
-    interp_fn1 = lambda x: interp_fn(x)-1
-
-    #auto search for vicinity
-    for i in range (len(exp_nll_ratio)-1):
-        if exp_nll_ratio[i] <= 4 and exp_nll_ratio[i+1] >= 4: r4 = theta_[i]
-        if exp_nll_ratio[i] <= 1 and exp_nll_ratio[i+1] >= 1: r1 = theta_[i]
-    try: 
-        r4
-    except NameError:
-        print("NameError: r4 does not exist. args.range_theta too small?")
-    if (r4 < args.theta_range):   
-        root1, root2 = optimize.newton(interp_fn4, -r4,maxiter=500), optimize.newton(interp_fn4, r4,maxiter=500)
-    else: root1, root2 = -args.theta_range, args.theta_range
-    if (r1 < args.theta_range):   
-        root3, root4 = optimize.newton(interp_fn1, -r1,maxiter=500), optimize.newton(interp_fn1, r1,maxiter=500)
-    else: root3, root4 = -args.theta_range, args.theta_range    
-
-    # limits[model+'_interp4'] = ROOT.TBox(root1, 5, root2, 0)
-    # limits[model+'_interp4'].SetFillColorAlpha(color[0], 0.1)
-    # limits[model+'_interp1'] = ROOT.TBox(root3, 5, root4, 0)
-    # limits[model+'_interp1'].SetFillColorAlpha(color[1], 0.1)
-    # exp_nll_ratios[model+'_label'] = Z[model+"_label"]
-            
-    fig, at = plt.subplots()        
-    plt.plot(theta_, exp_nll_ratio, color='black', label='1D LLR')
-    plt.axvline(x = root1, color = 'red', linewidth=0.7, linestyle='dotted')
-    plt.axvline(x = root2, color = 'red', linewidth=0.7, linestyle='dotted')
-    plt.axvline(x = root3, color = 'blue', linewidth=0.7,linestyle='dotted')
-    plt.axvline(x = root4, color = 'blue', linewidth=0.7,linestyle='dotted')
-    plt.axhline(y = 4, color = 'red', linewidth=0.7,linestyle='dotted')
-    plt.axhline(y = 4, color = 'red', linewidth=0.7,linestyle='dotted')
-    plt.axhline(y = 1, color = 'blue', linewidth=0.7, linestyle='dotted')
-    plt.axhline(y = 1, color = 'blue', linewidth=0.7, linestyle='dotted')
-    plt.ylim(0)
-    plt.xlim((-args.theta_range, args.theta_range))
-    plt.ylabel(args.EFTCoefficients)
-    plt.xlabel(r"$\theta}$")
-    sample_file_name = str(dir_name)+"_LLR.png"
-    plt.savefig(os.path.join(args.plot_directory,sample_file_name))
-    logging.info("saved LLR plot to %s", os.path.join(args.plot_directory,sample_file_name))      
-    logging.info("LLR plot link:   %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)), sample_file_name)) 
-
-
 logging.info("")
-logging.info("loss plot link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)),dir_name+".png")) 
+logging.info("loss plot link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)),dir_name+".png")) #HARDCODED
 if args.animate: logging.info("gif link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)), dir_name+".gif")) 
 
         

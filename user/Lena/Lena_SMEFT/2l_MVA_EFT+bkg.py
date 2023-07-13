@@ -26,8 +26,8 @@ argParser.add_argument('--sample',             action='store',      type=str,   
 argParser.add_argument('--full_bkg',           action='store_true',              default=False,    help="add full TT_2L sample as bkg"),
 argParser.add_argument('--lumi',               action='store',      type=float,  default=300.0)
 argParser.add_argument('--reduce',             action='store',      type=int,    default=None,     help="Reduce training data by factor?"),
-argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models_LSTM/')
-argParser.add_argument('--plot_directory',     action='store',      type=str,    default='/groups/hephy/cms/lena.wild/www/tttt/plots/train_sig+bkg_red10_v3/')
+argParser.add_argument('--output_directory',   action='store',      type=str,    default='/groups/hephy/cms/lena.wild/tttt/models_LSTM+bkg_18mai/')
+argParser.add_argument('--plot_directory',     action='store',      type=str,    default='/groups/hephy/cms/lena.wild/www/tttt/plots/train22mai_realweiter/')
 argParser.add_argument('--input_directory',    action='store',      type=str,    default='/eos/vbc/group/cms/lena.wild/tttt/training-ntuples-tttt_v7/MVA-training/ttbb_2l_dilep2-bjet_delphes-ht500-njet6p-btag1p/')
 argParser.add_argument('--n_epochs',           action='store',      type=int,    default= '500',   help='number of epochs in training')
 argParser.add_argument('--lr',                 action='store',      type=float,  default= '0.01',  help='learning rate')
@@ -49,11 +49,7 @@ argParser.add_argument('--weight_decay',       action='store',      type=float, 
 argParser.add_argument('--ReLU_slope',         action='store',      type=float,  default= 0.1, )
 argParser.add_argument('--load_model' ,        action='store',      type=str,    default= None,    help="load model and continue training?")
 
-# for LLR eval
-argParser.add_argument('--LLR_eval',           action='store_true', default=False     )
-argParser.add_argument('--theta_range',        action='store',      type=float,    default=10     )
-argParser.add_argument('--sample_weight',      action='store',      type=float,  default=100)
-argParser.add_argument('--shape_effects_only', action='store_true', default=True, help="Normalize sm *and* bsm weights to sample_weight number of events")
+
 args = argParser.parse_args()
 
 def copyIndexPHP( results_dir ):
@@ -197,7 +193,7 @@ if args.add_bkg:
 # the target vectors y (and y_bkg) now contain the SM and EFT-weights: y = (w_0, w_1, w_2)      and y_bkg = (genWeight,0,0)
 # normalizing to integrated luminosity W_0 gives new target weights:   w = (w_0, w_1, w_2, W_0) and w_bkg = (genWeight,0,0,W_0)
 logging.info("calculating new weights, reweighting to integrated luminosity")
-W_0     = lumi * config.xsec[sample] * 1000 * y[:,0]/ config.total_genWeight[sample]
+W_0     = lumi * config.xsec[sample] * 1000 * y[:,0]/ config.total_genWeight[sample] #umstaendlich...
 W_1     = lumi * config.xsec[sample] * 1000 * y[:,1]/ config.total_genWeight[sample]
 W_2     = lumi * config.xsec[sample] * 1000 * y[:,2]/ config.total_genWeight[sample]
 if args.add_bkg:
@@ -220,22 +216,22 @@ if args.add_bkg:
 
 red=len(x[:,0])
 if args.reduce is not None: red = int(len(x[:,0])/args.reduce)
-red_bkg = 0
+red_bkg = len(x_bkg[:,0])
 if args.add_bkg and args.reduce is not None: red_bkg = int(len(x_bkg[:,0])/args.reduce)
 
 #split train and eval data
 half = int(red*0.8)
 half_bkg = int(red_bkg*0.8)
-v_v = v[half:red, :, :]
-x_v = x[half:red, :]
-w_v = w[half:red, :]
+v_v = v[half:, :, :]
+x_v = x[half:, :]
+w_v = w[half:, :]
 x = x[0:half, :]
 v = v[0:half, :, :]
 w = w[0:half, :]
 if args.add_bkg:
-    x_bkg_v = x_bkg[half_bkg:red_bkg, :]
-    v_bkg_v = v_bkg[half_bkg:red_bkg, :, :]
-    w_bkg_v = w_bkg[half_bkg:red_bkg, :]
+    x_bkg_v = x_bkg[half_bkg:, :]
+    v_bkg_v = v_bkg[half_bkg:, :, :]
+    w_bkg_v = w_bkg[half_bkg:, :]
     x_bkg = x_bkg[0:half_bkg :]
     v_bkg = v_bkg[0:half_bkg, :, :]
     w_bkg = w_bkg[0:half_bkg, :]
@@ -279,7 +275,7 @@ logging.debug("shape of the LSTM input is %s", V.shape)
 def eval_train ( var_evaluation, zz ):
     total_weight =  np.sum(W_np_v[:,3])
     zz = np.array( zz )
-    x_eval = np.concatenate((np.array(xx[var_evaluation])[half:red],np.array(xx_bkg[var_evaluation])[half_bkg:red_bkg])) if args.add_bkg else np.array(xx[var_evaluation])[half:red] 
+    x_eval = np.concatenate((np.array(xx[var_evaluation])[half:],np.array(xx_bkg[var_evaluation])[half_bkg:])) if args.add_bkg else np.array(xx[var_evaluation])[half:] 
     hist_lin,  bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=zz[:,0] * W_np_v[:,3] /total_weight )
     hist_quad, bins = np.histogram( x_eval, bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights=zz[:,1] * W_np_v[:,3] /total_weight )                               
      
@@ -289,15 +285,15 @@ def eval_train ( var_evaluation, zz ):
     
 def eval_truth ( var_evaluation ):
     total_weight =  np.sum(W_np_v[:,3])
-    x_eval = np.concatenate((np.array(xx[var_evaluation])[half:red],np.array(xx_bkg[var_evaluation])[half_bkg:red_bkg])) if args.add_bkg else np.array(xx[var_evaluation])[half:red] 
+    x_eval = np.concatenate((np.array(xx[var_evaluation])[half:],np.array(xx_bkg[var_evaluation])[half_bkg:])) if args.add_bkg else np.array(xx[var_evaluation])[half:] 
     hist_truelin,  bins  = np.histogram( x_eval,     bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np_v[:,1] / W_np_v[:,0]*W_np_v[:,3]   / total_weight)
     hist_truequad, bins  = np.histogram( x_eval,     bins=nbins, range=(config.plot_mva_variables[var_evaluation][0][0], config.plot_mva_variables[var_evaluation][0][1]), weights= W_np_v[:,2] / W_np_v[:,0]*W_np_v[:,3]   / total_weight)
      
     i = plotvars.index( var_evaluation )
     name_var = var_evaluation
-    plots[name_var+'truelin'],   = ax[index[i]].plot( bins,np.hstack((0,hist_truelin)),  drawstyle='steps', label = "lin truth",   color='orange' ,linestyle = 'dotted' )
+    plots[name_var+'truelin'],   = ax[index[i]].plot( bins,np.hstack((0,hist_truelin)),  drawstyle='steps', label = "lin truth",   color='blue' ,linestyle = 'dotted' )
     plots[name_var+'truequad'],  = ax[index[i]].plot( bins,np.hstack((0,hist_truequad)), drawstyle='steps', label = "quad truth",  color='red'    ,linestyle = 'dotted' )           
-    plots[name_var+"_lin"],      = ax[index[i]].plot(  [] , [] ,                         drawstyle='steps', label = "lin train",   color='orange' )
+    plots[name_var+"_lin"],      = ax[index[i]].plot(  [] , [] ,                         drawstyle='steps', label = "lin train",   color='blue' )
     plots[name_var+"_quad"],     = ax[index[i]].plot(  [] , [] ,                         drawstyle='steps', label = "quad train",  color='red'    )
     ax[index[i]].set_xlabel( config.plot_mva_variables[var_evaluation][1] )    
     
@@ -397,8 +393,6 @@ class NeuralNet(nn.Module):
         
         # add lstm
         if (args.LSTM):
-            h0 = torch.zeros(self.num_layers, y.size(0), self.hidden_size_lstm).to(device) 
-            c0 = torch.zeros(self.num_layers, y.size(0), self.hidden_size_lstm).to(device) 
             x2, _ = self.lstm(y)
             x2 = x2[:, -1, :]   
             x2 = self.after_lstm(x2)
@@ -444,20 +438,8 @@ else:                      model = NeuralNet(input_size, hidden_size, hidden_siz
 logging.info("")
 logging.info(model) 
  
-# define loss function   
-criterion = get_loss()
+
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= weight_decay) 
-
-losses = []
-losses_v = []
-
-if (args.scheduler[0] is not None):   
-    if args.scheduler[0] == 'linear+flat': scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=float(args.scheduler[1]), total_iters=int(n_epochs*9/10)) 
-    if args.scheduler[0] == 'decay': scheduler = lr_scheduler.ExponentialLR(optimizer, gamma = float(args.scheduler[1])) 
-    logging.info("using %s scheduler with factor %s from initial lr rate %s", args.scheduler[0], args.scheduler[1],  args.lr)
-else: scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
-if ((args.load_model is not None) or (args.scheduler[0] is None)): scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
-
 start_epoch = 0
 
 # load pretrained model if necessary
@@ -466,6 +448,19 @@ if (args.load_model is not None):
     model, optimizer, start_epoch, valid_loss_min = load_ckp(ckp_path, model, optimizer)
     logging.info("loaded model %s, continue training", ckp_path)
     
+# define loss function   
+criterion = get_loss()
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= weight_decay) 
+
+losses = []
+losses_v = []
+if (args.scheduler[0] is not None):   
+    if args.scheduler[0] == 'linear+flat': scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=float(args.scheduler[1]), total_iters=int(n_epochs*10/10)) 
+    if args.scheduler[0] == 'decay': scheduler = lr_scheduler.ExponentialLR(optimizer, gamma = float(args.scheduler[1])) 
+    logging.info("using %s scheduler with factor %s from initial lr rate %s", args.scheduler[0], args.scheduler[1],  args.lr)
+else: scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
+if (args.scheduler[0] is None): scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1, end_factor=1, total_iters=n_epochs)
+#print(scheduler)
 # set up directory and model names
 n_epochs_ = n_epochs if args.load_model is None else n_epochs+start_epoch
 dir_name = str(args.sample)+"_"+str(args.EFTCoefficients)+'_lr'+str(args.lr)+'_l'+str(int(lumi))+'_e'+str(n_epochs_)+'_'+str(hidden_size)+'-'+str(hidden_size2)+'-'+str(hidden_size_comb)
@@ -526,13 +521,13 @@ if (args.animate):
             try:
                 l = u'\u2191' if (losses[-2]<=losses[-1]) else u'\u2193'
                 l_v = u'\u2191' if (losses_v[-2]<=losses_v[-1]) else u'\u2193'
-                haha = '( ︶︿︶)_╭∩╮' if (losses_v[-2]<=losses_v[-1]) else '          '
+                
             except:
                 l = "-"
                 l_v = "-"
-                haha = ''
-            logging.info("		epoch: %i of %i      loss(tr/ev): %s, %s (%s, %s)     %s        lr: %s", epoch+1, n_epochs, losses[-1], losses_v[-1], l, l_v, haha, scheduler.get_last_lr())
-            if (epoch%args.animate_step==args.animate_step-1):
+                
+            logging.info("		epoch: %i of %i      loss(tr/ev): %s, %s (%s, %s)          lr: %s", epoch+1, n_epochs_, losses[-1], losses_v[-1], l, l_v, scheduler.get_last_lr())
+            if ((epoch-start_epoch)%args.animate_step==args.animate_step-1):
                 with torch.no_grad():
                     for i in range (len(plotvars)):
                         eval_train(plotvars[i], zz)
@@ -560,11 +555,11 @@ if not (args.animate):
             optimizer.step()   
             scheduler.step()
                # save epoch
-        if (epoch%10==0):
-            assert (z[0,0] != z[1,0]), "z is all the same" 
-            with torch.no_grad():
-                torch.save(model.state_dict(), os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.pth'))    
-                torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.onnx'),input_names=["input1", "input2"],output_names=["output1"]) 
+        # if (epoch%10==0):
+            # assert (z[0,0] != z[1,0]), "z is all the same" 
+            # with torch.no_grad():
+                # torch.save(model.state_dict(), os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.pth'))    
+                # torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(model_dir, str(dir_name)+"_epoch_"+str(epoch)+'.onnx'),input_names=["input1", "input2"],output_names=["output1"]) 
                             
         model.eval()
         # zz = model(X_v, V_v)
@@ -577,6 +572,12 @@ if not (args.animate):
                 
       
 logger_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))           
+# save model
+with torch.no_grad():
+    name = str(dir_name)+".onnx" 
+    torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
+    torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
+    logging.info("saved model to %s", os.path.join(results_dir, name)) 
 #create checkpoint after training
 checkpoint = {
     'epoch': epoch + 1,
@@ -589,8 +590,9 @@ logging.info("saved checkpoint to %s", os.path.join(results_dir, str(dir_name)+'
 logging.info("done with training, plotting losses") 
 
 
-shutil.copyfile(os.path.join(args.plot_directory, dir_name+"_.gif"), os.path.join(args.plot_directory,dir_name+".gif"))
-os.remove(os.path.join(args.plot_directory, dir_name+"_.gif")) 
+if args.animate: 
+    shutil.copyfile(os.path.join(args.plot_directory, dir_name+"_.gif"), os.path.join(args.plot_directory,dir_name+".gif"))
+    os.remove(os.path.join(args.plot_directory, dir_name+"_.gif")) 
 
 # plot losses 
 fig, ay = plt.subplots()        
@@ -603,133 +605,8 @@ plt.yscale("log")
 plt.savefig(os.path.join(args.plot_directory,sample_file_name))
 logging.info("saved plots to %s", os.path.join(args.plot_directory,sample_file_name))  
 
-# save model
-with torch.no_grad():
-    name = str(dir_name)+".onnx" 
-    torch.save(model.state_dict(), os.path.join(results_dir, str(dir_name)+'.pth'))    
-    torch.onnx.export(model,args=(dummyx, dummyv),f=os.path.join(results_dir, name),input_names=["input1", "input2"],output_names=["output1"]) 
-    logging.info("saved model to %s", os.path.join(results_dir, name)) 
 
 copyIndexPHP(os.path.join(args.plot_directory))    
-
-
-# eval model performance on data eval
-def make_cdf_map( x, y ):
-    import scipy.interpolate
-    map__ = scipy.interpolate.interp1d(x, y, 'linear', fill_value="extrapolate")
-    max_x, min_x = max(x), min(x)
-    max_y, min_y = max(y), min(y)
-    def map_( x_ ):
-        x__ = np.array(x_)
-        result = np.zeros_like(x__).astype('float')
-        result[x__>max_x] = max_y
-        result[x__<min_x] = min_y
-        vals = (x__>=min_x) & (x__<=max_x)
-        result[vals] = map__(x__[vals]) 
-        return result 
-    return map_    
-
-if args.LLR_eval: 
-    from scipy import optimize 
-    import scipy as scipy
-
-    model.eval()
-    with torch.no_grad(): zz = model(X_v, V_v)    
-    zz = np.array(zz)
-    logging.info("plotting LLR")
-    nbins = 20
-    theta_ = np.linspace(-args.theta_range,args.theta_range,nbins)
-    # theta_ = np.linspace(-1,1,nbins)
-    exp_nll_ratios = {}
-
-    limits = {}
-    exp_nll_ratio = []
-    histos = []
-    k = 0
-    for theta in theta_: 
-        w_sm   =   args.lumi /np.sum(W_np_v[:,3]) * args.sample_weight * W_np_v[:,3]
-        stack_weights = W_np_v[:,3] + theta * W_np_v[:,4]+ theta**2 * W_np_v[:,5]
-        if args.shape_effects_only: w_bsm  =   args.lumi /np.sum(stack_weights) * args.sample_weight * stack_weights
-        else: 
-            w_bsm  =   args.lumi /np.sum(W_np_v[:,3]) * args.sample_weight * stack_weights
-        t_theta = 1 + theta * zz[:,0]  + theta**2 * zz[:,1] * 0.5
-        
-        t_theta_argsort     = np.argsort(t_theta)
-        t_theta_argsort_inv = np.argsort(t_theta_argsort)
-        cdf_sm = np.cumsum(w_sm[t_theta_argsort])
-        cdf_sm/=cdf_sm[-1]
-        
-        cdf_map = make_cdf_map( t_theta[t_theta_argsort], cdf_sm )
-        t_theta_cdf = cdf_map( t_theta )
-        nb=10
-        binning = np.linspace(0, 1, nb+1)
-
-        np_histo_sm  = np.histogram(t_theta_cdf, bins=binning, weights = w_sm  ) 
-        np_histo_bsm = np.histogram(t_theta_cdf, bins=binning, weights = w_bsm  ) 
-       
-        np_histo_sm  = np_histo_sm[0]
-        np_histo_bsm = np_histo_bsm[0]
-        
-        if any(np_histo_sm)==0: assert False
-        
-        
-        exp_nll_ratio_ =2*np.sum(np_histo_sm - np_histo_bsm - np_histo_bsm*np.log(np_histo_sm/np_histo_bsm))
-        exp_nll_ratio.append(exp_nll_ratio_)
-        
-    drawObjects = [ ]
-    if (sample == 'TTTT_MS'):
-        down = int(args.sample_weight / nb * 0.5)
-        up = int(args.sample_weight / nb * 5)
-    if (sample == 'TTbb_MS'):
-        down = int(args.sample_weight / nb * 0.9)
-        up = int(args.sample_weight / nb * 1.5)
-        
-
-    exp_nll_ratios = exp_nll_ratio  
-    interp_fn = scipy.interpolate.interp1d(theta_, exp_nll_ratio, 'quadratic', fill_value="extrapolate")
-    interp_fn4 = lambda x: interp_fn(x)-4
-    interp_fn1 = lambda x: interp_fn(x)-1
-
-    #auto search for vicinity
-    for i in range (len(exp_nll_ratio)-1):
-        if exp_nll_ratio[i] <= 4 and exp_nll_ratio[i+1] >= 4: r4 = theta_[i]
-        if exp_nll_ratio[i] <= 1 and exp_nll_ratio[i+1] >= 1: r1 = theta_[i]
-    try: 
-        r4
-    except NameError:
-        print("NameError: r4 does not exist. args.range_theta too small?")
-    if (r4 < args.theta_range):   
-        root1, root2 = optimize.newton(interp_fn4, -r4,maxiter=500), optimize.newton(interp_fn4, r4,maxiter=500)
-    else: root1, root2 = -args.theta_range, args.theta_range
-    if (r1 < args.theta_range):   
-        root3, root4 = optimize.newton(interp_fn1, -r1,maxiter=500), optimize.newton(interp_fn1, r1,maxiter=500)
-    else: root3, root4 = -args.theta_range, args.theta_range    
-
-    # limits[model+'_interp4'] = ROOT.TBox(root1, 5, root2, 0)
-    # limits[model+'_interp4'].SetFillColorAlpha(color[0], 0.1)
-    # limits[model+'_interp1'] = ROOT.TBox(root3, 5, root4, 0)
-    # limits[model+'_interp1'].SetFillColorAlpha(color[1], 0.1)
-    # exp_nll_ratios[model+'_label'] = Z[model+"_label"]
-            
-    fig, at = plt.subplots()        
-    plt.plot(theta_, exp_nll_ratio, color='black', label='1D LLR')
-    plt.axvline(x = root1, color = 'red', linewidth=0.7, linestyle='dotted')
-    plt.axvline(x = root2, color = 'red', linewidth=0.7, linestyle='dotted')
-    plt.axvline(x = root3, color = 'blue', linewidth=0.7,linestyle='dotted')
-    plt.axvline(x = root4, color = 'blue', linewidth=0.7,linestyle='dotted')
-    plt.axhline(y = 4, color = 'red', linewidth=0.7,linestyle='dotted')
-    plt.axhline(y = 4, color = 'red', linewidth=0.7,linestyle='dotted')
-    plt.axhline(y = 1, color = 'blue', linewidth=0.7, linestyle='dotted')
-    plt.axhline(y = 1, color = 'blue', linewidth=0.7, linestyle='dotted')
-    plt.ylim(0)
-    plt.xlim((-args.theta_range, args.theta_range))
-    plt.ylabel(args.EFTCoefficients)
-    plt.xlabel(r"$\theta}$")
-    sample_file_name = str(dir_name)+"_LLR.png"
-    plt.savefig(os.path.join(args.plot_directory,sample_file_name))
-    logging.info("saved LLR plot to %s", os.path.join(args.plot_directory,sample_file_name))      
-    logging.info("LLR plot link:   %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)), sample_file_name)) 
-
 
 logging.info("")
 logging.info("loss plot link: %s", os.path.join('https://lwild.web.cern.ch/tttt/plots/', os.path.basename(os.path.normpath(args.plot_directory)),dir_name+".png")) 
