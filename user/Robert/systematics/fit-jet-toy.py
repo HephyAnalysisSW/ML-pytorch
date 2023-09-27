@@ -43,7 +43,7 @@ nBins         = 10
 sigmas = [-2, -1, -0.5, 0, 0.5, 1, 2]
 colors = [ ROOT.kRed, ROOT.kOrange, ROOT.kBlue, ROOT.kBlack, ROOT.kMagenta, ROOT.kGreen, ROOT.kCyan ]
 
-import models.jet_toy as model
+import data_models.jet_toy as model
 features_train = model.getEvents( args.nEvents, sigmas = sigmas)
 features_train = {k:v[v[:,0]<150] for k, v in features_train.items()}
 features_train = {k:torch.from_numpy(v).float().to(device) for k, v in features_train.items() }

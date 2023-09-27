@@ -43,7 +43,7 @@ device        = 'cuda' if torch.cuda.is_available() else 'cpu'
 #import models.suman_TTLep as model
 #features_train = model.getEvents(slice(None,1))
 
-import models.jet_toy as model
+import data_models.jet_toy as model
 features_train = model.getEvents(10**4,nBins=20)
 features_train = {k:torch.from_numpy(v).float().to(device) for k, v in features_train.items() }
 n_features = len(model.features)

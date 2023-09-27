@@ -122,6 +122,12 @@ plot_options =  {
     "parton_top2_W_pt" :{'binning':[30,0,1000], 'tex':'p_{T}(W (t_{2}))'},
     "parton_top2_W_eta" :{'binning':[30,-3,3], 'tex':'#eta(W(t_{2}))'},
 
+    "parton_top12_pt":{'binning':[50,0,1000], 'tex':'p_{T}(t#bar{t})'},
+    "parton_top12_mass":{'binning':[50,0,2000], 'tex':'M(t#bar{t})'},
+    "parton_top12_eta":{'binning':[30,-3,3], 'tex':'#eta(t#bar{t})'},
+    "parton_top12_dEta":{'binning':[30,-3,3], 'tex':'#Delta#eta(t#bar{t})'},
+    "parton_top12_dAbsEta":{'binning':[30,-3,3], 'tex':'#Delta|#eta|(t#bar{t})'},
+
     "parton_cosThetaPlus_n"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{n}'},
     "parton_cosThetaMinus_n"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{n}'},
     "parton_cosThetaPlus_r"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{r}'},

@@ -18,29 +18,18 @@ feature_names = [
             "parton_top1_b_pt", 
             "parton_top1_W_pt", 
 
-            "parton_top1_eta",  
-            "parton_top1_f1_eta", 
-            "parton_top1_f2_eta", 
-            "parton_top1_b_eta", 
-            "parton_top1_W_eta", 
+            "parton_top12_pt",
+            "parton_top12_mass",
 
             "recoLep0_pt", 
             "recoLep1_pt", 
             "recoLepPos_pt", 
             "recoLepNeg_pt", 
 
-            "recoLep0_eta", 
-            "recoLep1_eta", 
-            "recoLepPos_eta", 
-            "recoLepNeg_eta", 
-
             "recoBj01_pt", 
             "recoBj01_mass", 
             "recoLep01_pt", 
             "recoLep01_mass", 
-
-
-            "nBTag",
 
             "parton_top2_pt", 
             "parton_top2_f1_pt", 
@@ -48,21 +37,41 @@ feature_names = [
             "parton_top2_b_pt", 
             "parton_top2_W_pt", 
 
+            "parton_top1_eta",  
+            "parton_top1_b_eta", 
+            "parton_top1_W_eta",  
+            "parton_top1_f1_eta", 
+            "parton_top1_f2_eta", 
+
+            "recoLep0_eta", 
+            "recoLep1_eta", 
+            "recoLepPos_eta", 
+            "recoLepNeg_eta", 
+
             "parton_top2_eta",  
             "parton_top2_f1_eta", 
             "parton_top2_f2_eta", 
             "parton_top2_b_eta", 
             "parton_top2_W_eta", 
 
+            "parton_top12_eta",
+            "parton_top12_dEta",
+            "parton_top12_dAbsEta",
+
+            "recoLep_dEta", 
+            "recoLep_dAbsEta",
+
+            "recoLep_dPhi", 
+
+            "parton_top1_decayAngle_theta", 
+            "parton_top1_decayAngle_phi", 
+            "parton_top2_decayAngle_theta", 
+            "parton_top2_decayAngle_phi", 
+
             "parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k", "parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star", 
             "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab",
 
-            "parton_top1_decayAngle_theta", "parton_top1_decayAngle_phi", 
-            "parton_top2_decayAngle_theta", "parton_top2_decayAngle_phi", 
-
-            "recoLep_dPhi", 
-            "recoLep_dEta", 
-            "recoLep_dAbsEta"
+            "nBTag",
     ]
 
 observers = []
@@ -161,6 +170,12 @@ plot_options =  {
     "parton_top2_b_eta" :{'binning':[30,-3,3], 'tex':'#eta(b(t_{2}))'},
     "parton_top2_W_pt" :{'binning':[30,0,1000], 'tex':'p_{T}(W (t_{2}))'},
     "parton_top2_W_eta" :{'binning':[30,-3,3], 'tex':'#eta(W(t_{2}))'},
+
+    "parton_top12_pt":{'binning':[50,0,1000], 'tex':'p_{T}(t#bar{t})'},
+    "parton_top12_mass":{'binning':[50,0,2000], 'tex':'M(t#bar{t})'},
+    "parton_top12_eta":{'binning':[30,-3,3], 'tex':'#eta(t#bar{t})'},
+    "parton_top12_dEta":{'binning':[30,-3,3], 'tex':'#Delta#eta(t#bar{t})'},
+    "parton_top12_dAbsEta":{'binning':[30,-3,3], 'tex':'#Delta|#eta|(t#bar{t})'},
 
     "parton_cosThetaPlus_n"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{n}'},
     "parton_cosThetaMinus_n"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{n}'},

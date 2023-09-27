@@ -157,12 +157,15 @@ def ev_tex( ev ):
     return sstr.lstrip("+")
 
 FI_total = 1./total_yield*np.outer(total_der,total_der)
+var_mask = [v in ['ctGRe', 'cQj18', 'ctj8'] for v in model.weightInfo.variables]
+FI_total = FI_total[:,var_mask][var_mask,:]
 
 #helpers.weighted_quantile( values=features[:,0], quantiles=np.linspace(0,1,11), sample_weights=sm_weights)
 
 from scipy.linalg import eigh
 
 w, vr = eigh(FI_total)
+
 
 print ("Total")
 for i_ew, ew in enumerate(reversed(w)):
@@ -171,35 +174,59 @@ for i_ew, ew in enumerate(reversed(w)):
         continue
     print (i_ew, np.sqrt(ew), ev_tex(ev))
 
-Nbins = 10
-for i_feature, feature_name in enumerate(feature_names):
+print()
 
-    print ("Feature", feature_name)
+Nbins       = 10
+max_counter = 6
+counter     = 0
+FI_best     = FI_total
+while True:
+    print ("Iteration", counter)
+    best_ew = 0
+    for i_feature, feature_name in enumerate(feature_names):
 
-    thresholds = helpers.weighted_quantile(  
-            values=features[:,i_feature], 
-            quantiles=np.linspace(0,1,Nbins+1), sample_weight=sm_weights)
+        #print ("Feature", feature_name)
 
-    binned_yields, _      = np.histogram( features[:,i_feature], thresholds, weights=sm_weights )
+        thresholds = helpers.weighted_quantile(  
+                values=features[:,i_feature], 
+                quantiles=np.linspace(0,1,Nbins+1), sample_weight=sm_weights)
 
-    binned_derivatives = np.zeros((len(model.weightInfo.variables), 10))
-    for i_variable, variable in enumerate(model.weightInfo.variables):
-        binned_derivatives[i_variable], _ = np.histogram( features[:,i_feature], thresholds, weights=derivatives[:,i_variable] )
+        binned_yields, _      = np.histogram( features[:,i_feature], thresholds, weights=sm_weights )
 
-    mask = binned_yields!=0
+        binned_derivatives = np.zeros((len(model.weightInfo.variables), 10))
+        for i_variable, variable in enumerate(model.weightInfo.variables):
+            binned_derivatives[i_variable], _ = np.histogram( features[:,i_feature], thresholds, weights=derivatives[:,i_variable] )
 
-    FI = np.einsum('i,ji,ki',1./binned_yields[mask], binned_derivatives[:, mask], binned_derivatives[:, mask])
+        mask = binned_yields!=0
 
-    if np.isnan(FI.sum()): continue  
+        FI = np.einsum('i,ji,ki',1./binned_yields[mask], binned_derivatives[:, mask], binned_derivatives[:, mask])[:,var_mask][var_mask,:]
 
-    w, vr = eigh(FI-FI_total)
+        if np.isnan(FI.sum()): continue  
 
-    for i_ew, ew in enumerate(reversed(w)):
-        ev = vr[:,len(w)-i_ew-1]
-        if not ew>10**-4*w[-1]: 
-            continue
-        print (i_ew, np.sqrt(ew), ev_tex(ev))
+        w, vr = eigh(FI-FI_best)
 
+        for i_ew, ew in enumerate(reversed(w)):
+            ev = vr[:,len(w)-i_ew-1]
+            if not ew>10**-4*w[-1]: 
+                continue
+            #print (i_ew, np.sqrt(ew), ev_tex(ev))
+
+            if ew>best_ew:
+                #print ("Found new best: feature", feature_name)
+                #print (i_ew, np.sqrt(ew), ev_tex(ev))
+                FI_best_  = FI
+                best_ew   = ew
+                best_evec = ev
+                best_feature = feature_name
+
+    counter+=1
+    print("Done with iteration: ", counter, "best_ew",best_ew)
+    if best_ew>0:
+        print ("Best feature:,", best_feature, "constrainig best evec:\n", ev_tex(best_evec))
+        
+        FI_best += FI_best_
+     
     print()
 
+    if counter>max_counter: break
     

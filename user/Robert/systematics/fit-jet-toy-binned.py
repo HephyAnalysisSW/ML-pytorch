@@ -32,7 +32,7 @@ n_epoch       = 10000
 plot_every    = 10
 device        = 'cuda' if torch.cuda.is_available() else 'cpu'
 nBins         = 10
-import models.jet_toy as model
+import data_models.jet_toy as model
 features_train = model.getEvents(10**4,nBins=nBins)
 features_train = {k:torch.from_numpy(v).float().to(device) for k, v in features_train.items() }
 n_features     = len(model.features)
