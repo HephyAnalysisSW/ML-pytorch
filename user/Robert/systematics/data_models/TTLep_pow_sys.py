@@ -9,7 +9,7 @@ from tools.DataGenerator import DataGenerator as _DataGenerator
 selection = lambda ar: (ar.ht>=500) 
 
 #feature_names = [ "met", "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet3_pt", "jet2_pt", "jet4_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta", "jet4_eta" ]
-feature_names = [ "met", "nJetGood", "ht", "jet0_pt" ]#, "jet1_pt", "jet2_pt", "jet3_pt"] #"jet4_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta", "jet4_eta" ]
+feature_names = [ "met", "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet2_pt", "jet3_pt"] #"jet4_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta", "jet4_eta" ]
 encoding      = { 0.5 :("0p5", "Up"), 1.0 :("1p0", "Up"), 1.5 :("1p5", "Up"), 2.0 :("2p0", "Up"), -0.5 :("0p5", "Down"), -1.0 :("1p0", "Down"), -1.5 :("1p5", "Down"), -2.0 :("2p0", "Down")}
 
 #systematics   = ["jesTotal", "jesAbsoluteMPFBias", "jesAbsoluteScale", "jesAbsoluteStat", "jesRelativeBal", "jesRelativeFSR", "jesRelativeJEREC1", "jesRelativeJEREC2", "jesRelativeJERHF", "jesRelativePtBB", "jesRelativePtEC1", "jesRelativePtEC2", "jesRelativePtHF", "jesRelativeStatEC", "jesRelativeStatFSR", "jesRelativeStatHF", "jesPileDataMC", "jesPilePtBB", "jesPilePtEC1", "jesPilePtEC2", "jesPilePtHF", "jesPilePtRef", "jesFlavorQCD", "jesFragmentation", "jesSinglePionECAL", "jesSinglePionHCAL", "jesTimePtEta"]
@@ -30,7 +30,7 @@ def _add_truth( data, truth ):
 
 class DataGenerator:
 
-    def __init__( self, input_dir = input_dir, systematic = "jesTotal", levels = [-2., -1.5, -1.0, -0.5, 0.5, 1.0, 1.5, 2.0]):
+    def __init__( self, input_dir = input_dir, systematic = "jesTotal", levels = [-2., -1.5, -1.0, -0.5, 0.5, 1.0, 1.5, 2.0], maxN=None):
 
         self.input_dir  = input_dir
         self.levels     = levels
@@ -40,21 +40,11 @@ class DataGenerator:
         for level in levels:
             self.generators[level] = _generator( "TTLep_%s_{systematic}%s".format(systematic=systematic)%encoding[level] )
                 
+        self.maxN = maxN
 
-    #def __call__( self, systematic=None, level = 0):
-    #    if systematic is None or level == 0:
-    #        dir = "TTLep_nominal"
-    #    else:
-    #        dir = "TTLep_%s_{systematic}%s".format(systematic=systematic)%levels[level]
-    #    print ("Looking for data in: %s"%dir)
-    #    return g.scalar_branches(g[-1], feature_names)
-    ## interface to Keras
-#    def __len__( self ):
-#        return self.g.n_split
-#
     def __getitem__(self, index):
-        data = np.concatenate( [ _add_truth(self.generators['nominal'].scalar_branches( self.generators['nominal'][index], feature_names ), 0) ]
-                              +[ _add_truth(self.generators[level].scalar_branches( self.generators[level][index], feature_names ),level) for level in self.levels ], axis=0)
+        data = np.concatenate( [ _add_truth(self.generators['nominal'].scalar_branches( self.generators['nominal'][index], feature_names )[:self.maxN], 0) ]
+                              +[ _add_truth(self.generators[level].scalar_branches( self.generators[level][index], feature_names )[:self.maxN],level) for level in self.levels ], axis=0)
         return data[:, :-1], data[:, -1:]
                         
 
