@@ -25,8 +25,9 @@ argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--prefix',             action='store', type=str,   default='v1', help="Name of the training")
 argParser.add_argument('--data_model',         action='store', type=str,   default='TTLep_pow_sys', help="Which data model?")
 argParser.add_argument('--epochs',             action='store', type=int,   default=200, help="Number of epochs")
-argParser.add_argument('--every',              action='store', type=int,   default=5, help="Plot at every n epochs?")
+argParser.add_argument('--every',              action='store', type=int,   default=10, help="Plot at every n epochs?")
 argParser.add_argument('--small',              action='store_true', help="Small?")
+argParser.add_argument('--quadratic',          action='store_true', help="Quadratic order?")
 argParser.add_argument('--overwrite',          action='store_true', help="Overwrite?")
 argParser.add_argument('--output_directory',   action='store', type=str,   default='/eos/vbc/group/cms/robert.schoefbeck/tt-jec/models/')
 args = argParser.parse_args()
@@ -40,9 +41,11 @@ np.random.seed(1)
 exec( "import data_models.%s as data_model"%args.data_model )
 
 levels    = [-2.0, -1.5, -1, -0.5, 0.5, 1.0, 1.5, 2.0]
-quadratic = True
 
 generator = data_model.DataGenerator(maxN=200000 if args.small else None, levels = levels)
+
+if args.quadratic:
+    args.prefix+="_quadratic"
 
 # directories
 plot_directory   = os.path.join( user.plot_directory, 'systematics', args.data_model, 'training', args.prefix )
@@ -55,7 +58,7 @@ n_var_flat = len(data_model.feature_names)
 ##    model_nn = [torch.nn.BatchNorm1d(n_var_flat), torch.nn.Linear(n_var_flat, hidden_layers[0]), torch.nn.ReLU()]
 ##    for i_layer, layer in enumerate(hidden_layers):
 ##
-##        model_nn.append(torch.nn.Linear(hidden_layers[i_layer], hidden_layers[i_layer+1] if i_layer+1<len(hidden_layers) else (2 if quadratic else 1)))
+##        model_nn.append(torch.nn.Linear(hidden_layers[i_layer], hidden_layers[i_layer+1] if i_layer+1<len(hidden_layers) else (2 if args.quadratic else 1)))
 ##        if i_layer+1<len(hidden_layers):
 ##            model_nn.append( torch.nn.ReLU() )
 ##
@@ -75,7 +78,7 @@ class SysNetwork(torch.nn.Module):
 
         for i_layer, layer in enumerate(hidden_layers):
 
-            self.my_modules.append(torch.nn.Linear(hidden_layers[i_layer], hidden_layers[i_layer+1] if i_layer+1<len(hidden_layers) else (2 if quadratic else 1)))
+            self.my_modules.append(torch.nn.Linear(hidden_layers[i_layer], hidden_layers[i_layer+1] if i_layer+1<len(hidden_layers) else (2 if args.quadratic else 1)))
             if i_layer+1<len(hidden_layers):
                 self.my_modules.append( torch.nn.LeakyReLU() )
                 self.my_modules[-1].negative_slope = 0.1
@@ -109,7 +112,7 @@ def loss(truth, prediction):
 
         nom = level*prediction_nominal[:,0]
         lev = level*prediction_level[:,0]
-        if quadratic:
+        if args.quadratic:
             nom += level**2*prediction_nominal[:,1]
             lev += level**2*prediction_level[:,1]
         #print( "nom", nom.shape, nom)
@@ -140,6 +143,12 @@ print ("Training with", count_0,count_1, "expect", np.log(count_1/count_0), "rel
 with torch.no_grad(): 
     network.set_bias( np.log(count_1/count_0) - network(features_train.float()).mean())
 
+# GIF animation
+color = {2:ROOT.kRed, 1.5: ROOT.kOrange+10, 1:ROOT.kMagenta+2, 0.5: ROOT.kBlue+1, -0.5: ROOT.kCyan+2, -1.:ROOT.kGreen+2, -1.5: ROOT.kYellow+2, -2:ROOT.kAzure-8}
+tex = ROOT.TLatex()
+tex.SetNDC()
+tex.SetTextSize(0.06)
+
 output_file = os.path.join(output_directory, 'multiclass_model.h5')
 if not os.path.exists(output_file) or args.overwrite:
 
@@ -169,12 +178,10 @@ if not os.path.exists(output_file) or args.overwrite:
 
             print ("Mean prediction", _prediction.mean())
             def prediction( nu ):
-                return np.exp( nu*_prediction[:,0] + ( nu**2*_prediction[:,1] if quadratic else 0))
-
-            color = {2:ROOT.kRed, 1.5: ROOT.kOrange+10, 1:ROOT.kMagenta+2, 0.5: ROOT.kBlue+1, -0.5: ROOT.kCyan+2, -1.:ROOT.kGreen+2, -1.5: ROOT.kYellow+2, -2:ROOT.kAzure-8}
+                return np.exp( nu*_prediction[:,0] + ( nu**2*_prediction[:,1] if args.quadratic else 0))
 
             n_pads = len(data_model.feature_names)+1
-            n_col  = int(np.sqrt(n_pads))
+            n_col  = max([int(np.sqrt(n_pads)), 3])
             n_rows = n_pads//n_col
             if n_rows*n_col<n_pads: n_rows+=1
 
@@ -184,8 +191,8 @@ if not os.path.exists(output_file) or args.overwrite:
             c2 = ROOT.TCanvas("c2","ratiopads",500*n_col,500*n_rows);
             c2.Divide(n_col,n_rows)
 
-            l = ROOT.TLegend(0.2,0.8,0.9,0.95)
-            l.SetNColumns(3)
+            l = ROOT.TLegend(0.2,0.1,0.9,0.85)
+            l.SetNColumns(2)
             l.SetFillStyle(0)
             l.SetShadowColor(ROOT.kWhite)
             l.SetBorderSize(0)
@@ -201,13 +208,15 @@ if not os.path.exists(output_file) or args.overwrite:
                 h_nominal  .SetMarkerColor(ROOT.kGray+2)
                 h_nominal  .SetMarkerStyle(0)
 
-                c1.cd(i_feature+1)
+                pad = c1.cd(i_feature+1)
                 ROOT.gStyle.SetOptStat(0)
 
                 h_nominal.Draw()
                 h_nominal.SetTitle("")
                 h_nominal.GetXaxis().SetTitle(data_model.plot_options[feature]['tex'])
-                c1.SetLogy()
+
+                logY = data_model.plot_options[feature]['logY']
+                pad.SetLogy(logY)
 
                 if i_feature==0: l.AddEntry(h_nominal, "nominal")
                 h_level_truth = {}
@@ -232,11 +241,18 @@ if not os.path.exists(output_file) or args.overwrite:
                     h_level_truth[level].Draw("same")
                     h_level_pred[level].Draw("same")
 
+
+                max_ = max( map( lambda h:h.GetMaximum(), list(h_level_truth.values())+[h_nominal] ))
+                max_ = 10**(1.5)*max_ if logY else (1.5*max_ if max_>0 else 0.75*max_)
+                min_ = min( map( lambda h:h.GetMinimum(),  list(h_level_truth.values())+[h_nominal]))
+                min_ = 0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_)
+
+                h_nominal.GetYaxis().SetRangeUser(min_, max_)
                 h_nominal.Draw("same")
 
                 #c1.Print(os.path.join( plot_directory, feature+'.png'))
 
-                c2.cd(i_feature+1)
+                pad = c2.cd(i_feature+1)
                 ROOT.gStyle.SetOptStat(0)
 
                 h_nominal_ = h_nominal.Clone()
@@ -247,23 +263,41 @@ if not os.path.exists(output_file) or args.overwrite:
                 h_nominal_.Divide(ref)
                 h_nominal_.Draw()
                 c2.SetLogy(0)
-                h_nominal.GetYaxis().SetRangeUser(0.8,1.4)
+                pad.SetLogy(0)
+                h_nominal_.GetYaxis().SetRangeUser(0.8,1.4)
+                h_level_truth_ = {}
                 for level in generator.levels:
-                    h_level_truth_ = h_level_truth[level].Clone()
-                    stuff.append( h_level_truth_ )
-                    h_level_truth_.Divide(ref)
+                    h_level_truth_[level] = h_level_truth[level].Clone()
+                    stuff.append( h_level_truth_[level] )
+                    h_level_truth_[level].Divide(ref)
 
                     h_level_pred_ = h_level_pred[level].Clone()
                     stuff.append( h_level_pred_ )
                     h_level_pred_.Divide(ref)
 
-                    h_level_truth_.Draw("same")
+                    h_level_truth_[level].Draw("same")
                     h_level_pred_.Draw("same")
+
+                max_ = max( map( lambda h:h.GetMaximum(), list(h_level_truth_.values()) ))
+                max_ = (1.5*max_ if max_>0 else 0.75*max_)
+                min_ = min( map( lambda h:h.GetMinimum(),  list(h_level_truth_.values())))
+                min_ = (1.5*min_ if min_<0 else 0.75*min_)
+
+                h_nominal_.GetYaxis().SetRangeUser(min_, max_)
+                h_nominal_.Draw("same")
 
             c1.cd(len(data_model.feature_names)+1)
             l.Draw()
+            lines = [ (0.29, 0.9, 'N_{B} =%4i'%( epoch )) ]
+            drawObjects = [ tex.DrawLatex(*line) for line in lines ]
+            for o in drawObjects:
+                o.Draw()
             c1.Print(os.path.join( plot_directory, "features_epoch%04i"%epoch+'.png'))
             c2.cd(len(data_model.feature_names)+1)
+            lines = [ (0.29, 0.9, 'N_{B} =%4i'%( epoch )) ]
+            drawObjects = [ tex.DrawLatex(*line) for line in lines ]
+            for o in drawObjects:
+                o.Draw()
             l.Draw()
             c2.Print(os.path.join( plot_directory, "variation_epoch%04i"%epoch+'.png'))
 
