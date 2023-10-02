@@ -8,7 +8,7 @@ from tools.DataGenerator import DataGenerator as _DataGenerator
 
 selection = lambda ar: (ar.ht>=500) 
 
-#feature_names = [ "met", "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet3_pt", "jet2_pt", "jet4_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta", "jet4_eta" ]
+#feature_names = [ "ht" ]
 feature_names = [ "met", "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet2_pt", "jet3_pt"] #"jet4_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta", "jet4_eta" ]
 encoding      = { 0.5 :("0p5", "Up"), 1.0 :("1p0", "Up"), 1.5 :("1p5", "Up"), 2.0 :("2p0", "Up"), -0.5 :("0p5", "Down"), -1.0 :("1p0", "Down"), -1.5 :("1p5", "Down"), -2.0 :("2p0", "Down")}
 
@@ -49,16 +49,17 @@ class DataGenerator:
                         
 
 plot_options =  {
-    "met" :{'binning':[50,0,1500], 'tex':'E_{T}^{miss}'},
-    "ht"  :{'binning':[50,0,1500], 'tex':'H_{T}'},
-    "jet0_pt" :{'binning':[50,0,500], 'tex':'p_{T}(jet 0)'},
-    "jet1_pt" :{'binning':[50,0,500], 'tex':'p_{T}(jet 1)'},
-    "jet2_pt" :{'binning':[50,0,500], 'tex':'p_{T}(jet 2)'},
-    "jet3_pt" :{'binning':[50,0,500], 'tex':'p_{T}(jet 3)'},
-    "jet4_pt" :{'binning':[50,0,500], 'tex':'p_{T}(jet 4)'},
-    "jet0_eta" :{'binning':[50,0,500], 'tex':'#eta(jet 0)'},
-    "jet1_eta" :{'binning':[50,0,500], 'tex':'#eta(jet 1)'},
-    "jet2_eta" :{'binning':[50,0,500], 'tex':'#eta(jet 2)'},
-    "jet3_eta" :{'binning':[50,0,500], 'tex':'#eta(jet 3)'},
-    "jet4_eta" :{'binning':[50,0,500], 'tex':'#eta(jet 4)'},
+    "met" :{'binning':[20,100,500], 'tex':'E_{T}^{miss}'},
+    "ht"  :{'binning':[20,500,1500], 'tex':'H_{T}'},
+    "nJetGood"  :{'binning':[7,3,10], 'tex':'N_{jet}'},
+    "jet0_pt" :{'binning':[30,0,1000], 'tex':'p_{T}(jet 0)'},
+    "jet1_pt" :{'binning':[30,0,1000], 'tex':'p_{T}(jet 1)'},
+    "jet2_pt" :{'binning':[30,0,500], 'tex':'p_{T}(jet 2)'},
+    "jet3_pt" :{'binning':[30,0,500], 'tex':'p_{T}(jet 3)'},
+    "jet4_pt" :{'binning':[30,0,500], 'tex':'p_{T}(jet 4)'},
+    "jet0_eta" :{'binning':[30,0,500], 'tex':'#eta(jet 0)'},
+    "jet1_eta" :{'binning':[30,0,500], 'tex':'#eta(jet 1)'},
+    "jet2_eta" :{'binning':[30,0,500], 'tex':'#eta(jet 2)'},
+    "jet3_eta" :{'binning':[30,0,500], 'tex':'#eta(jet 3)'},
+    "jet4_eta" :{'binning':[30,0,500], 'tex':'#eta(jet 4)'},
 }
