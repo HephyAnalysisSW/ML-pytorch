@@ -93,11 +93,13 @@ def drawObjects( offset=0 ):
 #####################
 
 excluded_features = np.array(list(set(np.argwhere(np.isnan(features))[:,1])))
-features = np.delete( features, excluded_features, axis=1)
-feature_names = np.delete( model.feature_names, excluded_features)
-
-print ("Excluded features because of NaNs: ", ", ".join( [model.feature_names[i] for i in excluded_features]) )
-
+if len(excluded_features)>0:
+    features = np.delete( features, excluded_features, axis=1)
+    feature_names = np.delete( model.feature_names, excluded_features)
+    print ("Excluded features because of NaNs: ", ", ".join( [model.feature_names[i] for i in excluded_features]) )
+else:
+    feature_names = model.feature_names
+    
 mask            = np.ones(len(features), np.bool)
 mask[np.argwhere(np.isnan(features))[:,0]] = 0
 features        = features[mask]
@@ -157,7 +159,8 @@ def ev_tex( ev ):
     return sstr.lstrip("+")
 
 FI_total = 1./total_yield*np.outer(total_der,total_der)
-var_mask = [v in ['ctGRe', 'cQj18', 'ctj8'] for v in model.weightInfo.variables]
+#var_mask = [v in ['ctGRe', 'cQj18', 'ctj8'] for v in model.weightInfo.variables]
+var_mask = [True for v in model.weightInfo.variables]
 FI_total = FI_total[:,var_mask][var_mask,:]
 
 #helpers.weighted_quantile( values=features[:,0], quantiles=np.linspace(0,1,11), sample_weights=sm_weights)

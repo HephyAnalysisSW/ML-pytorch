@@ -64,14 +64,25 @@ def make_combinations( coefficients ):
             combinations.append(comb)
     return combinations
 
-def getEvents( nTraining, return_observers = False):
-    data_generator.load(-1, small=nTraining )
-    combinations = make_combinations( wilson_coefficients )
-    coeffs = data_generator.vector_branch('p_C')
+#def getEvents( nTraining, return_observers = False):
+#    data_generator.load(-1, small=nTraining )
+#    combinations = make_combinations( wilson_coefficients )
+#    coeffs = data_generator.vector_branch('p_C')
+#    if return_observers:
+#        return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}, data_generator.scalar_branches( observers )
+#    else:
+#        return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
+
+def getEvents( nTraining, return_observers = False ):
+    coeffs       = data_generator.vector_branch( data_generator[-1], 'p_C', padding_target=len(weightInfo.combinations))[:nTraining]
+    features     = data_generator.scalar_branches( data_generator[-1], feature_names )[:nTraining]
+    vectors      = None #{key:model.data_generator.vector_branch(data, key ) for key in vector_branches}
+
     if return_observers:
-        return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}, data_generator.scalar_branches( observers )
-    else:
-        return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
+        observers = data_generator.scalar_branches( data_generator[-1], observers )[:nTraining]
+        return features, {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}, observers
+    else: 
+        return features, {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
 
 tex = {"ctGRe":"C_{tG}^{Re}", "cQj18":"c_{Qj}^{18}" ,"cQj38":"c_{Qj}^{38}" ,"cQj11":"c_{Qj}^{11}" ,"cjj31":"c_{jj}^{31}" ,"ctu8":"c_{tu}^{8}" ,"ctd8":"c_{td}^{8}" ,"ctj8":"c_{tj}^{8}" ,"cQu8":"c_{Qu}^{8}" ,"cQd8":"c_{Qd}^{8}" ,"ctu1":"c_{tu}^{1}" ,"ctd1":"c_{td}^{1}" ,"ctj1":"c_{tj}^{1}" ,"cQu1":"c_{Qu}^{1}" ,"cQd1":"c_{Qd}^{1}"}
 

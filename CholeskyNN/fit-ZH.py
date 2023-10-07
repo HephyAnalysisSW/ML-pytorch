@@ -1,7 +1,6 @@
 import torch
 import math
 import numpy as np
-from matplotlib import pyplot as plt
 import os
 
 import ROOT
@@ -16,7 +15,7 @@ from tools import helpers
 # Parser
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
-argParser.add_argument("--plot_directory",     action="store",      default="v1_3D",                       help="Plot sub-directory")
+argParser.add_argument("--plot_directory",     action="store",      default="v2_1D",                       help="Plot sub-directory")
 argParser.add_argument("--coefficients",       action="store",      default=['cHW', 'cHWtil', 'cHQ3'],  help="Which coefficients?")
 argParser.add_argument("--nEvents",            action="store",      type=int, default=300000,           help="nEvents")
 #argParser.add_argument("--device",             action="store",      default="cpu",  choices = ["cpu", "cuda"],  help="Device?")
@@ -28,40 +27,27 @@ n_epoch       = 10000
 plot_every    = 100
 
 # training data
-import models.ZH_Nakamura as model
+import toy_models.ZH_Nakamura as model
 
-model.feature_names = model.feature_names[0:6] # restrict features
-features   = model.getEvents(args.nEvents)[:,0:6]
-feature_names  = model.feature_names
-plot_options   = model.plot_options
-plot_vars      = model.feature_names
+features, weights = model.getEvents(args.nEvents)
+
+feature_names  = model.feature_names[:6]
+features       = features[:,:6]
 
 mask       = (features[:,feature_names.index('pT')]<900) & (features[:,feature_names.index('sqrt_s_hat')]<1800) 
 features = features[mask]
-
+weights = {key:value[mask] for key, value in weights.items()}
 n_features = len(features[0]) 
-weights    = model.getWeights(features, model.make_eft() )
 
-WC = 'cHW'
 features_train = torch.from_numpy(features).float().to(device)
 
 #coefficients   = ('cHW', ) 
-#combinations   =  [ ('cHW',), ('cHW', 'cHW')] 
-coefficients   =  ( 'cHW', 'cHWtil', 'cHQ3') 
-combinations   =  [ ('cHW',), ('cHWtil',), ('cHQ3',), ('cHW', 'cHW'), ('cHWtil', 'cHWtil'), ('cHQ3', 'cHQ3'), ('cHW', 'cHWtil'), ('cHQ3', 'cHW'), ('cHQ3', 'cHWtil')] 
+#combinations   = [ ('cHW',), ('cHW', 'cHW')] 
+#base_points    = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
 
-#base_points = [ {'cHW':value} for value in [-1.5, -.8, -.4, -.2, .2, .4, .8, 1.5] ]
-base_points = [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, -.2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, -.2, 0, .2, .8, 1.5]]
-base_points = list(filter( (lambda point: all([ coeff in args.coefficients or (not (coeff in point.keys() and point[coeff]!=0)) for coeff in point.keys()]) and any(map(bool, point.values()))), base_points)) 
-
-coefficients = tuple(filter( lambda coeff: coeff in args.coefficients, list(coefficients))) 
-combinations = tuple(filter( lambda comb: all([c in args.coefficients for c in comb]), combinations)) 
-
-#base_points    = [ { 'cHW':-1.5 }, {'cHW':-.8}, {'cHW':-.4}, {'cHW':-.2}, {'cHW':.2}, {'cHW':.4}, {'cHW':.8}, {'cHW':1.5} ]
-#base_points   += [ { 'cHWtil':-1.5 }, {'cHWtil':-.8}, {'cHWtil':-.4}, {'cHWtil':-.2}, {'cHWtil':.2}, {'cHWtil':.4}, {'cHWtil':.8}, {'cHWtil':1.5} ]
-#base_points   += [ { 'cHQ3':-.15 }, {'cHQ3':-.08}, {'cHQ3':-.04}, {'cHQ3':-.02}, {'cHQ3':.02}, {'cHQ3':.04}, {'cHQ3':.08}, {'cHQ3':0.15} ]
-
-base_points    = list(map( lambda b:model.make_eft(**b), base_points ))
+coefficients   =  ( 'cHW', 'cHWtil' ) 
+combinations   =  [ ('cHW',), ('cHWtil',), ('cHW', 'cHW'), ('cHWtil', 'cHWtil'), ('cHW', 'cHWtil')] 
+base_points    =  [ {'cHW':value1, 'cHWtil':value2} for value1 in [-1.5, -.8, -.2, 0., .2, .8, 1.5]  for value2 in [-1.5, -.8, -.2, 0, .2, .8, 1.5]]
 
 # make standard NN 
 def make_NN( hidden_layers  = [32, 32, 32, 32] ):
@@ -152,8 +138,8 @@ for epoch in range(n_epoch):
 
                 pred_s  = n_hat[comb](features_train).squeeze().cpu().detach().numpy()
 
-                for var in plot_vars:
-                    binning   = plot_options[var]['binning']
+                for var in feature_names:
+                    binning   = model.plot_options[var]['binning']
                     np_binning= np.linspace(binning[1], binning[2], 1+binning[0])
 
 
@@ -239,7 +225,6 @@ for epoch in range(n_epoch):
                     lines = [ 
                             (0.16, 0.965, 'Epoch %5i    Loss %6.4f'%( epoch, loss ))
                             ]
-
 
                     h_yield.Scale(max_/h_yield.GetMaximum())
                     for logY in [True, False]:

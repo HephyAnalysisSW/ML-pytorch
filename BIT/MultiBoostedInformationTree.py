@@ -18,12 +18,15 @@ default_cfg = {
     "n_trees" : 100,
     "learning_rate" : 0.2, 
     "loss" : "MSE", # or "CrossEntropy" 
+    #"biased": False, 
 #    "bagging_fraction": 1.,
 }
 
 class MultiBoostedInformationTree:
 
-    def __init__( self, training_features, training_weights, **kwargs ):
+    def __init__( self, training_features, training_weights, 
+                    #__bias=None, 
+                    **kwargs ):
 
         # make cfg and node_cfg from the kwargs keys known by the Node
         self.cfg = default_cfg
@@ -53,13 +56,23 @@ class MultiBoostedInformationTree:
         # Will hold the trees
         self.trees              = []
 
+#        # Holds the inclusive training cross section result
+#        self.biased = biased
+#        self.bias   = __bias
+#        # if NOT instanciate from load:
+#        if biased and if training_weights is not None:
+#            total_yield = self.training_weights[()].sum() 
+#            self.bias = { key:val.sum()/total_yield for key, val in self.training_weights.items()}
+
     @classmethod
     def load(cls, filename):
         with open(filename,'rb') as file_:
             old_instance = pickle.load(file_)
             new_instance = cls( None, None, 
                     n_trees = old_instance.n_trees, 
-                    learning_rate = old_instance.learning_rate, 
+                    learning_rate = old_instance.learning_rate,
+#                    biased  = old_instance.biased if hasattr( old_instance, "biased") else None,
+#                    __bias  = old_instance.bias if hasattr( old_instance, "bias") else None,
                     )
             new_instance.trees = old_instance.trees
 

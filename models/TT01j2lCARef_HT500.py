@@ -77,13 +77,13 @@ feature_names = [
 observers = []
 
 data_generator =  DataGenerator(
-    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v2/TT01j2l_HT500/TT01j2l_HT500_*.root"],
+    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v2/TT01j2lRef_HT500/TT01j2lRef_HT500_*.root"],
         n_split = 100,
         splitting_strategy = "events",
         selection   = selection,
         branches = ["p_C", "nrecoLep"] +feature_names   ) 
 
-reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/CA/TT01j2lCA_HT500_reweight_card.pkl'
+reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/CA/TT01j2lCARef_HT500_reweight_card.pkl'
 weightInfo = WeightInfo(reweight_pkl)
 weightInfo.set_order(2)
 default_eft_parameters = {p:0 for p in weightInfo.variables}
@@ -136,12 +136,13 @@ def getEvents( nTraining, return_observers = False ):
     else: 
         return features, {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
 
-tex = {"ctGRe":"C_{tG}^{Re}", "cQj18":"c_{Qj}^{18}" ,"cQj38":"c_{Qj}^{38}" ,"cQj11":"c_{Qj}^{11}" ,"cjj31":"c_{jj}^{31}" ,"ctu8":"c_{tu}^{8}" ,"ctd8":"c_{td}^{8}" ,"ctj8":"c_{tj}^{8}" ,"cQu8":"c_{Qu}^{8}" ,"cQd8":"c_{Qd}^{8}" ,"ctu1":"c_{tu}^{1}" ,"ctd1":"c_{td}^{1}" ,"ctj1":"c_{tj}^{1}" ,"cQu1":"c_{Qu}^{1}" ,"cQd1":"c_{Qd}^{1}"}
+tex = {"ctGIm":"C_{tG}^{Im}", "ctGRe":"C_{tG}^{Re}", "cQj18":"c_{Qj}^{18}" ,"cQj38":"c_{Qj}^{38}" ,"cQj11":"c_{Qj}^{11}" ,"cjj31":"c_{jj}^{31}" ,"ctu8":"c_{tu}^{8}" ,"ctd8":"c_{td}^{8}" ,"ctj8":"c_{tj}^{8}" ,"cQu8":"c_{Qu}^{8}" ,"cQd8":"c_{Qd}^{8}" ,"ctu1":"c_{tu}^{1}" ,"ctd1":"c_{td}^{1}" ,"ctj1":"c_{tj}^{1}" ,"cQu1":"c_{Qu}^{1}" ,"cQd1":"c_{Qd}^{1}"}
 
 eft_plot_points = [
     {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
 
     {'color':ROOT.kMagenta-4,   'eft':make_eft(ctGRe=1), 'tex':"C_{tG}^{Re}=1"},
+    {'color':ROOT.kMagenta-6,   'eft':make_eft(ctGIm=1), 'tex':"C_{tG}^{Im}=1"},
     {'color':ROOT.kMagenta+2,   'eft':make_eft(cQj18=10), 'tex':"c_{Qj}^{18}=10"},
     {'color':ROOT.kGreen-4,     'eft':make_eft(cQj38=10), 'tex':"c_{Qj}^{38}=10"},
     {'color':ROOT.kGreen+2,     'eft':make_eft(cQj11=10), 'tex':"c_{Qj}^{11}=10"},
@@ -153,8 +154,8 @@ eft_plot_points = [
     {'color':ROOT.kOrange+2,    'eft':make_eft(cQd8=10), 'tex':"c_{Qd}^{8}=10"  },
     {'color':ROOT.kCyan-4,      'eft':make_eft(ctu1=10), 'tex':"c_{tu}^{1}=10"  },
     {'color':ROOT.kCyan+2,      'eft':make_eft(ctd1=10), 'tex':"c_{td}^{1}=10"  },
-    {'color':ROOT.kYellow-4,    'eft':make_eft(ctj1=10), 'tex':"c_{tj}^{1}=10"  },
-    {'color':ROOT.kYellow+2,    'eft':make_eft(cQu1=10), 'tex':"c_{Qu}^{1}=10"  },
+#    {'color':ROOT.kYellow-4,    'eft':make_eft(ctj1=10), 'tex':"c_{tj}^{1}=10"  },
+#    {'color':ROOT.kYellow+2,    'eft':make_eft(cQu1=10), 'tex':"c_{Qu}^{1}=10"  },
     {'color':ROOT.kPink,        'eft':make_eft(cQd1=10), 'tex':"c_{Qd}^{1}=10"  },
 ]
 
