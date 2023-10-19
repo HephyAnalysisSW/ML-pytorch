@@ -18,7 +18,8 @@ default_cfg = {
     "feature_names":    None,
     "positive":         False,  # only perform node split when the resulting yields are positive definite. I do not recommend this, the bias-variance tradeoff is not favourable.
     "min_node_size_neg_adjust": False, # Increase the min_size parameter by (1+f)/(1-f) where f is n-/n+ where n- (n+) are the number of events with negative (positive) weight 
-    "loss" : "MSE", # or "CrossEntropy" # MSE for toys is fine, in real life CrossEntropy is a bit more stable against outliers 
+    "loss" : "MSE", # or "CrossEntropy" # MSE for toys is fine, in real life CrossEntropy is a bit more stable against outliers
+    "_get_only_score":False, 
 }
 
 class MultiNode:
@@ -239,6 +240,13 @@ class MultiNode:
 
         # Find the best split
         #tic = time.time()
+        if self.cfg["_get_only_score"]:
+            # This is the first time we see the data. We store just store the derivatives in the left box and do not split further 
+            self.split_i_feature, self.split_value, self.split_left_group = 0, +float('inf'), None
+            self.left        = ResultNode(derivatives=self.derivatives, **self.__store(np.ones(self.size,dtype=bool)))
+            self.right       = ResultNode(derivatives=self.derivatives, **self.__store(np.zeros(self.size,dtype=bool)))
+            return
+
         self.get_split_vectorized()
 
         # check for max depth or a 'no' split
@@ -248,9 +256,8 @@ class MultiNode:
             self.split_value = float('inf')
             self.left        = ResultNode(derivatives=self.derivatives, **self.__store(np.ones(self.size,dtype=bool)))
             self.right       = ResultNode(derivatives=self.derivatives, **self.__store(np.zeros(self.size,dtype=bool)))
-            # The split was good, but we stop splitting further. Put the result of the split in the left/right boxes.
-            #self.left, self.right = ResultNode(**{val:func(self.split_left_group) for val, func in result_funcs.iteritems()}), ResultNode(**{val:func(~self.split_left_group) for val, func in result_funcs.iteritems()})
             return
+
         # process left child
         if np.count_nonzero(self.split_left_group) < 2*self.min_size:
             #print ("Choice3", _depth, result_func(self.split_left_group) )

@@ -1,0 +1,1 @@
+python multi_bit_training.py --plot_directory multiBIT_genTops --prefix v1_genTops_clip  --model genTops --modelFile models --nTraining -1 --coefficients  ctWRe --loss CrossEntropy --debug --n_trees 200 --auto_clip 0.01 --feature_plots

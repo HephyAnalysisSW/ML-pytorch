@@ -43,8 +43,8 @@ def make_TH2F( h, ignore_binning = False):
         histo = ROOT.TH2F("h","h",len(vals[0]),0,len(vals[0]),len(vals),0,len(vals))
     else:
         histo = ROOT.TH2F("h","h",len(thrs_x)-1,array.array('d', thrs_x),len(thrs_y)-1,array.array('d', thrs_y))
-    for iy, _ in enumerate(vals):
-        for ix, v in enumerate(vals[iy]):
+    for ix, _ in enumerate(vals):
+        for iy, v in enumerate(vals[ix]):
             if v<float('inf'): # NAN protection
                 histo.SetBinContent(histo.FindBin(thrs_x[ix], thrs_y[iy]), v)
     return histo

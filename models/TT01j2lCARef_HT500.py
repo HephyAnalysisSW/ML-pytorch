@@ -69,15 +69,17 @@ feature_names = [
             "parton_top2_decayAngle_phi", 
 
             "parton_cosThetaPlus_n", "parton_cosThetaMinus_n", "parton_cosThetaPlus_r", "parton_cosThetaMinus_r", "parton_cosThetaPlus_k", "parton_cosThetaMinus_k", "parton_cosThetaPlus_r_star", "parton_cosThetaMinus_r_star", "parton_cosThetaPlus_k_star", "parton_cosThetaMinus_k_star", 
-            "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab",
-
+            
+            "parton_xi_nn", "parton_xi_rr", "parton_xi_kk", "parton_xi_nr_plus", "parton_xi_nr_minus", "parton_xi_rk_plus", "parton_xi_rk_minus", "parton_xi_nk_plus", "parton_xi_nk_minus", 
+            "parton_xi_r_star_k", "parton_xi_k_r_star", "parton_xi_kk_star",
+            "parton_cos_phi", "parton_cos_phi_lab", "parton_abs_delta_phi_ll_lab",
             "nBTag",
     ]
 
 observers = []
 
 data_generator =  DataGenerator(
-    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v2/TT01j2lRef_HT500/TT01j2lRef_HT500_*.root"],
+    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v4/TT01j2lRef_HT500/TT01j2lRef_HT500_*.root"],
         n_split = 100,
         splitting_strategy = "events",
         selection   = selection,
@@ -123,7 +125,7 @@ def make_combinations( coefficients ):
 #        return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
 def getEvents( nTraining, return_observers = False ):
 
-    index = 0
+    index = -1
 
     coeffs       = data_generator.vector_branch( data_generator[index], 'p_C', padding_target=len(weightInfo.combinations))[:nTraining]
     features     = data_generator.scalar_branches( data_generator[index], feature_names )[:nTraining]
@@ -211,6 +213,11 @@ plot_options =  {
     "parton_xi_rk_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{rk}^{-}'},
     "parton_xi_nk_plus"         :{'binning':[30,-1,1], 'tex':'#xi_{nk}^{+}'},
     "parton_xi_nk_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{nk}^{-}'},
+
+    "parton_xi_r_star_k"        :{'binning':[30,-1,1], 'tex':'#xi_{r^{*}k}'},
+    "parton_xi_k_r_star"        :{'binning':[30,-1,1], 'tex':'#xi_{kr^{*}}'},
+    "parton_xi_kk_star"         :{'binning':[30,-1,1], 'tex':'#xi_{kk^{*}}'},
+
     "parton_cos_phi"            :{'binning':[30,-1,1], 'tex':'cos(#phi)'},
     "parton_cos_phi_lab"        :{'binning':[30,-1,1], 'tex':'cos(#phi lab)'},
     "parton_abs_delta_phi_ll_lab":{'binning':[30,0,pi], 'tex':'|#Delta(#phi(l,l))|'},

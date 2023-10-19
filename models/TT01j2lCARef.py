@@ -78,13 +78,13 @@ feature_names = [
 observers = []
 
 data_generator =  DataGenerator(
-    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v4/TT01j2l_HT500/TT01j2l_HT500_*.root"],
+    input_files = ["/scratch-cbe/users/robert.schoefbeck/HadronicSMEFT/postprocessed/gen/v2/TT01j2lRef/TT01j2lRef_*.root"],
         n_split = 100,
         splitting_strategy = "events",
         selection   = selection,
         branches = ["p_C", "nrecoLep"] +feature_names   ) 
 
-reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/CA/TT01j2lCA_HT500_reweight_card.pkl'
+reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/CA/TT01j2lCARef_reweight_card.pkl'
 weightInfo = WeightInfo(reweight_pkl)
 weightInfo.set_order(2)
 default_eft_parameters = {p:0 for p in weightInfo.variables}

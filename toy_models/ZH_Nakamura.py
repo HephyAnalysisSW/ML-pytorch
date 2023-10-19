@@ -309,13 +309,19 @@ def _getWeights(features, eft):
     dsigmaZH  = {k:np.real(dsigmaZH[k])  for k in derivatives}
     return dsigmaZH
 
-def getEvents( nTraining, eft=default_eft_parameters, make_weights = True):
+def getEvents( nTraining, eft=default_eft_parameters, make_weights = True, return_observers=None):
 
     training_features = _getEvents(nTraining)
     if make_weights:
-        return training_features, _getWeights(training_features, eft=eft)
+        if return_observers:
+            return training_features, _getWeights(training_features, eft=eft), None
+        else:
+            return training_features, _getWeights(training_features, eft=eft)
     else:
-        return training_features
+        if return_observers:
+            return training_features
+        else:
+            return training_features, None
 
 Nbins = 20
 plot_options = {

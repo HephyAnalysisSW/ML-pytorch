@@ -24,7 +24,7 @@ import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="TTCA",     help="plot sub-directory")
 argParser.add_argument("--model",              action="store",      help="Which model?")
-argParser.add_argument("--prefix",             action="store",      default="v2", type=str,  help="prefix")
+argParser.add_argument("--prefix",             action="store",      default="v4", type=str,  help="prefix")
 argParser.add_argument("--small",              action="store_true"  )
 
 args = argParser.parse_args()
@@ -55,8 +55,8 @@ def getWeights( eft, coeffs, lin=False):
         combs = list(filter( lambda c:len(c)<2, model.weightInfo.combinations))
     else:
         combs = model.weightInfo.combinations
-    fac = np.array( [ functools.reduce( operator.mul, [ (float(eft[v]) - model.weightInfo.ref_point_coordinates[v]) for v in comb ], 1 ) for comb in combs], dtype='float')
-    #print (fac)
+    #fac = np.array( [ functools.reduce( operator.mul, [ (float(eft[v]) - model.weightInfo.ref_point_coordinates[v]) for v in comb ], 1 ) for comb in combs], dtype='float')
+    fac = np.array( [ functools.reduce( operator.mul, [ float(eft[v]) for v in comb ], 1 ) for comb in combs], dtype='float')
     return np.matmul(coeffs[:,:len(combs)], fac)
 
 def getDerivatives( eft, coeffs):
@@ -69,8 +69,8 @@ def getDerivatives( eft, coeffs):
             elif len(comb)==2:
                 if variable not in comb:
                     continue
-                coeff_mat[model.weightInfo.variables.index(comb[0]), i_comb] += (float(eft[comb[1]]) - model.weightInfo.ref_point_coordinates[comb[1]])
-                coeff_mat[model.weightInfo.variables.index(comb[1]), i_comb] += (float(eft[comb[0]]) - model.weightInfo.ref_point_coordinates[comb[0]])
+                coeff_mat[model.weightInfo.variables.index(comb[0]), i_comb] += float(eft[comb[1]]) 
+                coeff_mat[model.weightInfo.variables.index(comb[1]), i_comb] += float(eft[comb[0]]) 
     return np.dot( coeffs, coeff_mat.transpose()) 
 
 # Text on the plots

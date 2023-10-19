@@ -18,14 +18,13 @@ default_cfg = {
     "n_trees" : 100,
     "learning_rate" : 0.2, 
     "loss" : "MSE", # or "CrossEntropy" 
-    #"biased": False, 
 #    "bagging_fraction": 1.,
+    "learn_global_score": False,
 }
 
 class MultiBoostedInformationTree:
 
     def __init__( self, training_features, training_weights, 
-                    #__bias=None, 
                     **kwargs ):
 
         # make cfg and node_cfg from the kwargs keys known by the Node
@@ -56,14 +55,6 @@ class MultiBoostedInformationTree:
         # Will hold the trees
         self.trees              = []
 
-#        # Holds the inclusive training cross section result
-#        self.biased = biased
-#        self.bias   = __bias
-#        # if NOT instanciate from load:
-#        if biased and if training_weights is not None:
-#            total_yield = self.training_weights[()].sum() 
-#            self.bias = { key:val.sum()/total_yield for key, val in self.training_weights.items()}
-
     @classmethod
     def load(cls, filename):
         with open(filename,'rb') as file_:
@@ -71,8 +62,6 @@ class MultiBoostedInformationTree:
             new_instance = cls( None, None, 
                     n_trees = old_instance.n_trees, 
                     learning_rate = old_instance.learning_rate,
-#                    biased  = old_instance.biased if hasattr( old_instance, "biased") else None,
-#                    __bias  = old_instance.bias if hasattr( old_instance, "bias") else None,
                     )
             new_instance.trees = old_instance.trees
 
@@ -102,6 +91,10 @@ class MultiBoostedInformationTree:
 
             training_time = 0
 
+            # store the score vector in the first tree:
+            _get_only_score = ( (n_tree==0) and self.cfg["learn_global_score"] )
+            self.node_cfg["_get_only_score"] = _get_only_score 
+
             # fit to data
             time1 = time.process_time()
             root = MultiNode.MultiNode(   
@@ -125,8 +118,9 @@ class MultiBoostedInformationTree:
             prediction   = root.vectorized_predict(self.training_features)
             len_         = len(prediction)
             delta_weight = self.training_weights[tuple()].reshape(len_,-1)*prediction[:,1:]/prediction[:,0].reshape(len_,-1)
+            learning_rate = 1. if _get_only_score else self.learning_rate 
             for i_der, der in enumerate(root.derivatives[1:]):
-                self.training_weights[der] += -self.learning_rate*delta_weight[:,i_der]
+                self.training_weights[der] += -learning_rate*delta_weight[:,i_der]
 
             time2 = time.process_time()
             update_time   += time2 - time1
@@ -153,6 +147,9 @@ class MultiBoostedInformationTree:
         # keep the last tree?
         if last_tree_counts_full and (max_n_tree is None or max_n_tree==self.n_trees):
             learning_rates[-1] = 1
+        # Does the first tree hold the global score?
+        if self.cfg["learn_global_score"]:
+             learning_rates[0] = 1
             
         predictions = np.array([ tree.predict( feature_array ) for tree in self.trees[:max_n_tree] ])
         predictions = predictions[:,1:]/predictions[:,0].reshape(-1,1)
@@ -167,6 +164,9 @@ class MultiBoostedInformationTree:
         # keep the last tree?
         if last_tree_counts_full and (max_n_tree is None or max_n_tree==self.n_trees):
             learning_rates[-1] = 1
+        # Does the first tree hold the global score?
+        if self.cfg["learn_global_score"]:
+             learning_rates[0] = 1
             
         predictions = np.array([ tree.vectorized_predict( feature_array ) for tree in self.trees[:max_n_tree] ])
         predictions = predictions[:,:,1:]/np.expand_dims(predictions[:,:,0], -1)
@@ -176,11 +176,14 @@ class MultiBoostedInformationTree:
             return learning_rates.reshape(-1,1,1)*predictions 
 
     def losses( self, feature_array, weight_dict, max_n_tree = None, last_tree_counts_full = False):
-        # list learning rates
-        learning_rates = self.learning_rate*np.ones(max_n_tree if max_n_tree is not None else self.n_trees)
-        # keep the last tree?
-        if last_tree_counts_full and (max_n_tree is None or max_n_tree==self.n_trees):
-            learning_rates[-1] = 1
+        ## list learning rates
+        #learning_rates = self.learning_rate*np.ones(max_n_tree if max_n_tree is not None else self.n_trees)
+        ## keep the last tree?
+        #if last_tree_counts_full and (max_n_tree is None or max_n_tree==self.n_trees):
+        #    learning_rates[-1] = 1
+        ## Does the first tree hold the global score?
+        #if self.cfg["learn_global_score"]:
+        #     learning_rates[0] = 1
 
         # recover base points from tree
         base_points      = self.trees[0].base_points

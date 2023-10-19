@@ -1,4 +1,4 @@
-python multi_bit_training.py --plot_directory multiBIT_ZH_v4 --prefix v4_CE --overwrite training --model ZH_Nakamura --nTraining 100000 --coefficients  cHW --loss CrossEntropy --debug --n_trees 200  
+python multi_bit_training.py --plot_directory multiBIT_ZH_v5 --prefix v5_CE --overwrite training --model ZH_Nakamura --nTraining 100000 --coefficients  cHW  cHWtil cHQ3 --loss CrossEntropy --debug --n_trees 200  
 
 #python multi_bit_training.py --plot_directory multiBIT_ZH_v4 --prefix v4 --overwrite training --model ZH_Nakamura --nTraining 5000000 --coefficients cHW cHWtil cHQ3 --debug --n_trees 200 --feature_plots 
 #python multi_bit_training.py --plot_directory multiBIT_ZH_v4 --prefix v4 --overwrite training --model ZH_Nakamura --nTraining 5000000 --coefficients cHW cHWtil cHQ3 --debug --n_trees 200 --feature_plots --positive 1
