@@ -49,7 +49,8 @@ class MultiBoostedInformationTree:
 
         self.training_weights   = copy.deepcopy(training_weights)
         if training_weights is not None:
-            self.training_weights   = {tuple(sorted(key)):val for key,val in self.training_weights.items()}
+            self.training_weights = {tuple(sorted(key)):val for key,val in self.training_weights.items()}
+
         self.training_features  = training_features
 
         # Will hold the trees
@@ -60,8 +61,9 @@ class MultiBoostedInformationTree:
         with open(filename,'rb') as file_:
             old_instance = pickle.load(file_)
             new_instance = cls( None, None, 
-                    n_trees = old_instance.n_trees, 
-                    learning_rate = old_instance.learning_rate,
+                    n_trees             = old_instance.n_trees, 
+                    learning_rate       = old_instance.learning_rate,
+                    learn_global_score  = old_instance.learn_global_score,
                     )
             new_instance.trees = old_instance.trees
 

@@ -101,7 +101,7 @@ if args.overwrite in ["all", "data"] or not os.path.exists(training_data_filenam
 else:
     with open( training_data_filename, 'rb') as _file:
         training_features, training_weights = pickle.load( _file )
-        print ("Loaded training data from", training_data_filename)
+        print ("Loaded training data from ", training_data_filename, "with size", len(training_features))
 
 if args.auto_clip is not None:
     len_before = len(training_features)
@@ -341,7 +341,7 @@ if args.overwrite in ["all", "data"] or not os.path.exists(test_data_filename):
 else:
     with open( test_data_filename, 'rb') as _file:
         test_features, test_weights, test_observers = pickle.load( _file )
-        print ("Loaded test data from", test_data_filename)
+        print ("Loaded test data from ", test_data_filename, "with size", len(test_features))
 
 if args.auto_clip is not None:
     len_before = len(test_features)
@@ -603,7 +603,7 @@ if args.debug:
 
                     th1d_yield_min = th1d_yield.GetMinimum()
                     th1d_yield_max = th1d_yield.GetMaximum()
-                    for bin_ in range(1, th1d_yield.GetNbinsX() ):
+                    for bin_ in range(1, th1d_yield.GetNbinsX()+1 ):
                         th1d_yield.SetBinContent( bin_, (th1d_yield.GetBinContent( bin_ ) - th1d_yield_min)/th1d_yield_max*(max_-min_)*0.95 + min_  )
 
                     #th1d_yield.Scale(max_/th1d_yield.GetMaximum())

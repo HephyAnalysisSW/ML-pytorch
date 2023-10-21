@@ -355,6 +355,10 @@ class ResultNode:
         #f_poly_str = " f={:3.0%} ".format(self.f)
 
         #print_string = '%s(%5i) r = %s   c = %s' % ((_depth)*' ', self.size, r_poly_str, c_poly_str)
+        try:
+            unc = 1./sqrt(self.size)*sqrt((1+self.f)/(1-self.f))
+        except ZeroDivisionError:
+            unc = 0 
         print_string = '%s(%6i, unc=%1.3f) r = %s   c = %s' % ((_depth)*' ', self.size, 1./sqrt(self.size)*sqrt((1+self.f)/(1-self.f)), r_poly_str, c_poly_str)
         print(print_string)
 
