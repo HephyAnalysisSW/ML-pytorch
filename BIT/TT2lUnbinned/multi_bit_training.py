@@ -8,13 +8,14 @@ import cProfile
 import time
 import os, sys
 sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 from math import log, exp, sin, cos, sqrt, pi
 import copy
 import pickle
 import itertools
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../tools/scripts/tdrstyle.C"))
+ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../../tools/scripts/tdrstyle.C"))
 ROOT.setTDRStyle()
 
 from   tools import helpers
@@ -30,10 +31,9 @@ import tools.user as user
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="multiBIT_P3_VH",                 help="plot sub-directory")
-argParser.add_argument("--model",              action="store",      default="ZH_Nakamura",                 help="Which model?")
-argParser.add_argument("--modelFile",          action="store",      default="toy_models",                 help="Which model directory?")
 argParser.add_argument("--prefix",             action="store",      default=None, type=str,  help="prefix")
-argParser.add_argument("--nTraining",          action="store",      default=500000,        type=int,  help="number of training events")
+argParser.add_argument("--model",              action="store",      default="TT2lUnbinned", type=str,  help="model?")
+argParser.add_argument("--nTraining",          action="store",      default=-1,        type=int,  help="number of training events")
 argParser.add_argument("--coefficients",       action="store",      default=['cHW'],       nargs="*", help="Which coefficients?")
 argParser.add_argument("--plot_iterations",    action="store",      default=None,          nargs="*", type=int, help="Certain iterations to plot? If first iteration is -1, plot only list provided.")
 argParser.add_argument('--overwrite',          action='store',      default=None, choices = [None, "training", "data", "all"],  help="Overwrite output?")
@@ -41,6 +41,11 @@ argParser.add_argument('--bias',               action='store',      default=None
 argParser.add_argument('--debug',              action='store_true', help="Make debug plots?")
 argParser.add_argument('--feature_plots',      action='store_true', help="Feature plots?")
 argParser.add_argument('--auto_clip',          action='store',      default=None, type=float, help="Remove quantiles of the training variable?")
+
+argParser.add_argument('--top_kinematics',     action='store_true')
+argParser.add_argument('--lepton_kinematics',  action='store_true')
+argParser.add_argument('--asymmetry',          action='store_true')
+argParser.add_argument('--spin_correlation',   action='store_true')
 
 args, extra = argParser.parse_known_args(sys.argv[1:])
 
@@ -73,25 +78,23 @@ for key, val in extra_args.items():
     if type(val)==type([]) and len(val)==1:
         extra_args[key]=val[0]
 
-# import the model
-exec('import %s.%s as model'%(args.modelFile, args.model)) 
+exec("import models.%s as model"%args.model)
 
 model.multi_bit_cfg.update( extra_args )
-
-feature_names = model.feature_names
+data_model = model.DataModel(
+        top_kinematics      =   args.top_kinematics, 
+        lepton_kinematics   =   args.lepton_kinematics, 
+        asymmetry           =   args.asymmetry, 
+        spin_correlation    =   args.spin_correlation
+    )
 
 # directory for plots
 plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.model )
+os.makedirs( plot_directory, exist_ok=True)
 
-if not os.path.isdir(plot_directory):
-    try:
-        os.makedirs( plot_directory )
-    except IOError:
-        pass
-
-training_data_filename = os.path.join(user.data_directory, args.model, "training_%i"%args.nTraining)+'.pkl'
+training_data_filename = os.path.join(user.data_directory, args.model, data_model.name, "training_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(training_data_filename):
-    training_features, training_weights = model.getEvents(args.nTraining)
+    training_features, training_weights = data_model.getEvents(args.nTraining)
     print ("Created data set of size %i" % len(training_features) )
     if not os.path.exists(os.path.dirname(training_data_filename)):
         os.makedirs(os.path.dirname(training_data_filename))
@@ -148,7 +151,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
 
         eft['name'] = name
         
-        for i_feature, feature in enumerate(feature_names):
+        for i_feature, feature in enumerate(data_model.feature_names):
             h[name][feature]        = ROOT.TH1F(name+'_'+feature+'_nom',    name+'_'+feature, *model.plot_options[feature]['binning'] )
             h_lin[name][feature]    = ROOT.TH1F(name+'_'+feature+'_nom_lin',name+'_'+feature+'_lin', *model.plot_options[feature]['binning'] )
 
@@ -166,12 +169,8 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
                 reweight += (.5 if param1!=param2 else 1)*(eft[param1]-eft_sm[param1])*(eft[param2]-eft_sm[param2])*training_weights[tuple(sorted((param1,param2)))]
 
         sign_postfix = ""
-        #if False:
-        #    reweight_sign = np.sign(np.sin(2*np.arccos(training_features[:,feature_names.index('cos_theta')]))*np.sin(2*np.arccos(training_features[:,feature_names.index('cos_theta_hat')])))
-        #    reweight     *= reweight_sign
-        #    sign_postfix    = " weighted with sgn(sin(2#theta)sin(2#hat{#theta}))"
 
-        for i_feature, feature in enumerate(feature_names):
+        for i_feature, feature in enumerate(data_model.feature_names):
             binning = model.plot_options[feature]['binning']
 
             h[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight) )
@@ -188,7 +187,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
             h_lin[name][feature].SetMarkerColor(eft_plot_point['color'])
             h_lin[name][feature].legendText = tex_name+(" (lin)" if name!="SM" else "")
 
-    for i_feature, feature in enumerate(feature_names):
+    for i_feature, feature in enumerate(data_model.feature_names):
 
         for _h in [h, h_lin]:
             norm = _h[model.eft_plot_points[0]['eft']['name']][feature].Integral()
@@ -270,9 +269,9 @@ base_points = []
 for comb in list(itertools.combinations_with_replacement(args.coefficients,1))+list(itertools.combinations_with_replacement(args.coefficients,2)):
     base_points.append( {c:comb.count(c) for c in args.coefficients} )
 if args.prefix == None:
-    bit_name = "multiBit_%s_%s_nTraining_%i_nTrees_%i"%(args.model, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 else:
-    bit_name = "multiBit_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 
 # delete coefficients we don't need (the BIT coefficients are determined from the training weight keys)
 if args.coefficients is not None:
@@ -291,7 +290,7 @@ except (IOError, EOFError, ValueError):
 if args.bias is not None:
     if len(args.bias)!=2: raise RuntimeError ("Bias is defined by <var> <function>, i.e. 'x' '10**(({}-200)/200). Got instead %r"%args.bias)
     function     = eval( 'lambda x:'+args.bias[1].replace('{}','x') ) 
-    bias_weights = np.array(map( function, training_features[:, model.feature_names.index(args.bias[0])] ))
+    bias_weights = np.array(map( function, training_features[:, data_model.feature_names.index(args.bias[0])] ))
     bias_weights /= np.mean(bias_weights)
     training_weights = {k:v*bias_weights for k,v in training_weights.items()} 
 
@@ -301,7 +300,7 @@ if bit is None or args.overwrite in ["all", "training"]:
             training_features     = training_features,
             training_weights      = training_weights,
             base_points           = base_points,
-            feature_names         = model.feature_names,
+            feature_names         = data_model.feature_names,
             **model.multi_bit_cfg
                 )
     bit.boost()
@@ -312,12 +311,12 @@ if bit is None or args.overwrite in ["all", "training"]:
     boosting_time = time2 - time1
     print ("Boosting time: %.2f seconds" % boosting_time)
 
-test_data_filename = os.path.join(user.data_directory, args.model, "test_%i"%args.nTraining)+'.pkl'
+test_data_filename = os.path.join(user.data_directory, args.model, data_model.name, "test_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(test_data_filename):
-    test_features, test_weights, test_observers = model.getEvents(args.nTraining, return_observers=True)
+    test_features, test_weights, test_observers = data_model.getEvents(args.nTraining, return_observers=True)
     print ("Created data set of size %i" % len(test_features) )
     if not os.path.exists(os.path.dirname(test_data_filename)):
-        os.makedirs(os.path.dirname(test_data_filename))
+        os.makedirs(os.path.dirname(test_data_filename), exist_ok=True)
     with open( test_data_filename, 'wb' ) as _file:
         pickle.dump( [test_features, test_weights, test_observers], _file )
         print ("Written test data to", test_data_filename)
@@ -337,7 +336,7 @@ if args.auto_clip is not None:
     print ("Auto clip efficiency (test) %4.3f is %4.3f"%( args.auto_clip, len(test_features)/len_before ) )
 
 if args.bias is not None:
-    bias_weights = np.array(map( function, test_features[:, model.feature_names.index(args.bias[0])] ))
+    bias_weights = np.array(map( function, test_features[:, data_model.feature_names.index(args.bias[0])] ))
     bias_weights /= np.mean(bias_weights)
     test_weights = {k:v*bias_weights for k,v in test_weights.items()} 
 
@@ -485,19 +484,15 @@ if args.debug:
                 l.Draw()
 
             plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logZ else "lin" )
-            if not os.path.isdir(plot_directory_):
-                try:
-                    os.makedirs( plot_directory_ )
-                except IOError:
-                    pass
+            os.makedirs( plot_directory_, exist_ok=True)
             helpers.copyIndexPHP( plot_directory_ )
             c1.Print( os.path.join( plot_directory_, "training_2D_epoch_%05i.png"%(max_n_tree) ) )
             syncer.makeRemoteGif(plot_directory_, pattern="training_2D_epoch_*.png", name="training_2D_epoch" )
 
 
         for observables, features, postfix in [
-            ( model.observers if hasattr(model, "observers") else [], test_observers, "_observers"),
-            ( model.feature_names, test_features, ""),
+            #( model.observers if hasattr(model, "observers") else [], test_observers, "_observers"),
+            ( data_model.feature_names, test_features, ""),
             ]:
             # 1D feature plot animation
             h_w0, h_ratio_prediction, h_ratio_truth, lin_binning = {}, {}, {}, {}
@@ -606,134 +601,8 @@ if args.debug:
                     o.Draw()
 
                 plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logY else "lin" )
-                if not os.path.isdir(plot_directory_):
-                    try:
-                        os.makedirs( plot_directory_ )
-                    except IOError:
-                        pass
+                os.makedirs( plot_directory_, exist_ok=True)
                 helpers.copyIndexPHP( plot_directory_ )
                 c1.Print( os.path.join( plot_directory_, "epoch%s_%05i.png"%(postfix, max_n_tree) ) )
                 syncer.makeRemoteGif(plot_directory_, pattern="epoch%s_*.png"%postfix, name="epoch" )
             syncer.sync()
-
-## Animation of the learned BIT prediction
-#    # binning from truth
-#    derivative_binning = {der: [50]+list(np.quantile( (test_weights[der]/test_weights[()] if der in test_weights else test_weights[tuple(reversed(der))]) ,(0.005,0.995))) for der in bit.derivatives }
-#
-#    for max_n_tree in plot_iterations:
-#        if max_n_tree==0: max_n_tree=1
-#
-#        test_predictions = bit.vectorized_predict(test_features, max_n_tree = max_n_tree)
-#
-#        ## binning from the prediction
-#        derivative_binning = {der: np.quantile( (test_weights[der]/test_weights[()] if der in test_weights else test_weights[tuple(reversed(der))]),np.linspace(0.005,.995,21)) for der in bit.derivatives }
-#
-#        w0 = test_weights[()]
-#        h_w0, h_ratio_prediction, h_ratio_truth, lin_binning = {}, {}, {}, {}
-#        for i_derivative, derivative in enumerate(bit.derivatives):
-#            # root style binning
-#            #binning     = derivative_binning[derivative] 
-#            # linspace binning
-#            lin_binning[derivative] = derivative_binning[derivative] 
-#            #digitize feature
-#            binned      = np.digitize(test_predictions[:,i_derivative], lin_binning[derivative] )
-#            # for each digit, create a mask to select the corresponding event in the bin (e.g. test_features[mask[0]] selects features in the first bin
-#            mask        = np.transpose( binned.reshape(-1,1)==range(1,len(lin_binning[derivative])) )
-#
-#            h_w0[derivative]        = np.array([  w0[m].sum() for m in mask])
-#            #h_derivative_prediction = np.array([ (w0.reshape(-1,1)*test_predictions)[m].sum(axis=0) for m in mask])
-#            h_derivative_truth      = np.array([ (np.transpose(np.array([(test_weights[der]/test_weights[()] if der in test_weights else test_weights[tuple(reversed(der))]) for der in bit.derivatives])))[m].sum(axis=0) for m in mask])
-#
-#            #h_ratio_prediction[derivative] = h_derivative_prediction/h_w0[derivative].reshape(-1,1) 
-#            h_ratio_truth[derivative]      = h_derivative_truth/h_w0[derivative].reshape(-1,1)
-#
-#        n_pads = len(bit.derivatives)+1
-#        n_col  = min(4, n_pads)
-#        n_rows = n_pads//n_col
-#        if n_rows*n_col<n_pads: n_rows+=1
-#
-#        for logY in [False, True]:
-#            c1 = ROOT.TCanvas("c1","multipads",500*n_col,500*n_rows);
-#            c1.Divide(n_col,n_rows)
-#
-#            l = ROOT.TLegend(0.2,0.1,0.9,0.85)
-#            stuff.append(l)
-#            l.SetNColumns(2)
-#            l.SetFillStyle(0)
-#            l.SetShadowColor(ROOT.kWhite)
-#            l.SetBorderSize(0)
-#
-#            for i_derivative, derivative in enumerate(bit.derivatives):
-#
-#                th1d_yield       = helpers.make_TH1F( (h_w0[derivative], lin_binning[derivative]) )
-#                c1.cd(i_derivative+1)
-#                ROOT.gStyle.SetOptStat(0)
-#                th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[derivative][:,i_der], lin_binning[derivative])) for i_der, der in enumerate( bit.derivatives ) }
-#
-#                stuff.append(th1d_yield)
-#                stuff.append(th1d_ratio_truth)
-#
-#                texX = "BIT_{%s}"%(",".join( derivative ))
-#
-#                th1d_yield.SetLineColor(ROOT.kGray+2)
-#                th1d_yield.SetMarkerColor(ROOT.kGray+2)
-#                th1d_yield.SetMarkerStyle(0)
-#                th1d_yield.GetXaxis().SetTitle(texX)
-#                th1d_yield.SetTitle("")
-#
-#                th1d_yield.Draw("hist")
-#
-#                for i_der, der in enumerate(bit.derivatives):
-#                    th1d_ratio_truth[der].SetTitle("")
-#                    th1d_ratio_truth[der].SetLineColor(color[der])
-#                    th1d_ratio_truth[der].SetMarkerColor(color[der])
-#                    th1d_ratio_truth[der].SetMarkerStyle(0)
-#                    th1d_ratio_truth[der].SetLineWidth(2)
-#                    th1d_ratio_truth[der].SetLineStyle(ROOT.kDashed)
-#                    th1d_ratio_truth[der].GetXaxis().SetTitle(texX)
-#
-#                    #tex_name = "_{%s}"%(",".join([model.tex[c].lstrip("C_{")[:-1] if model.tex[c].startswith('C_') else model.tex[c] for c in der]))
-#                    tex_name = "%s"%(",".join( der ))
-#                    if i_derivative==0:
-#                        l.AddEntry( th1d_ratio_truth[der], tex_name)
-#
-#                if i_derivative==0:
-#                    l.AddEntry( th1d_yield, "yield (SM)")
-#
-#                max_ = max( map( lambda h:h.GetMaximum(), th1d_ratio_truth.values() ))
-#                max_ = 10**(1.5)*max_ if logY else 1.5*max_
-#                min_ = min( map( lambda h:h.GetMinimum(), th1d_ratio_truth.values() ))
-#                min_ = 0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_)
-#
-#                th1d_yield_min = th1d_yield.GetMinimum()
-#                th1d_yield_max = th1d_yield.GetMaximum()
-#                if th1d_yield_max>0:
-#                    for bin_ in range(1, th1d_yield.GetNbinsX()+1 ):
-#                        th1d_yield.SetBinContent( bin_, (th1d_yield.GetBinContent( bin_ ) - th1d_yield_min)/th1d_yield_max*(max_-min_)*0.95 + min_  )
-#
-#                #th1d_yield.Scale(max_/th1d_yield.GetMaximum())
-#                th1d_yield   .Draw("hist")
-#                ROOT.gPad.SetLogy(logY)
-#                th1d_yield   .GetYaxis().SetRangeUser(min_, max_)
-#                th1d_yield   .Draw("hist")
-#                for h in list(th1d_ratio_truth.values()):# + list(th1d_ratio_pred.values()):
-#                    h .Draw("hsame")
-#
-#            c1.cd(len(bit.derivatives)+1)
-#            l.Draw()
-#
-#            lines = [ (0.29, 0.9, 'N_{B} =%5i'%( max_n_tree )) ]
-#            drawObjects = [ tex.DrawLatex(*line) for line in lines ]
-#            for o in drawObjects:
-#                o.Draw()
-#
-#            plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logY else "lin" )
-#            if not os.path.isdir(plot_directory_):
-#                try:
-#                    os.makedirs( plot_directory_ )
-#                except IOError:
-#                    pass
-#            helpers.copyIndexPHP( plot_directory_ )
-#            c1.Print( os.path.join( plot_directory_, "BIT_epoch_%05i.png"%(max_n_tree) ) )
-#            syncer.makeRemoteGif(plot_directory_, pattern="BIT_epoch_*.png", name="BIT_epoch" )
-#        syncer.sync()

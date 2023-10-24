@@ -26,8 +26,6 @@ feature_names = [
             "recoLepPos_pt", 
             "recoLepNeg_pt", 
 
-            #"recoBj01_pt", 
-            #"recoBj01_mass", 
             "recoLep01_pt", 
             "recoLep01_mass", 
 
@@ -115,14 +113,6 @@ def make_combinations( coefficients ):
             combinations.append(comb)
     return combinations
 
-#def getEvents( nTraining, return_observers = False):
-#    #data_generator.load(-1, small=nTraining )
-#    combinations = make_combinations( wilson_coefficients )
-#    coeffs = data_generator.vector_branch('p_C')
-#    if return_observers:
-#        return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}, data_generator.scalar_branches( observers )
-#    else:
-#        return data_generator.scalar_branches( feature_names ), {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
 def getEvents( nTraining, return_observers = False ):
 
     index = -1
