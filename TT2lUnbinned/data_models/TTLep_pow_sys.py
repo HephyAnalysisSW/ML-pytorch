@@ -2,20 +2,20 @@ import os
 import numpy as np
 if __name__=="__main__":
     import sys
-    sys.path.append('../../..')
+    sys.path.append('..')
 
 from tools.DataGenerator import DataGenerator as _DataGenerator
 
 selection = lambda ar: (ar.ht>=500) 
 
 #feature_names = [ "ht" ]
-feature_names = [ "met", "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet2_pt", "jet3_pt"] #"jet4_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta", "jet4_eta" ]
+feature_names = [ "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet2_pt", "jet3_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta" ]
 encoding      = { 0.5 :("0p5", "Up"), 1.0 :("1p0", "Up"), 1.5 :("1p5", "Up"), 2.0 :("2p0", "Up"), -0.5 :("0p5", "Down"), -1.0 :("1p0", "Down"), -1.5 :("1p5", "Down"), -2.0 :("2p0", "Down")}
 
 #systematics   = ["jesTotal", "jesAbsoluteMPFBias", "jesAbsoluteScale", "jesAbsoluteStat", "jesRelativeBal", "jesRelativeFSR", "jesRelativeJEREC1", "jesRelativeJEREC2", "jesRelativeJERHF", "jesRelativePtBB", "jesRelativePtEC1", "jesRelativePtEC2", "jesRelativePtHF", "jesRelativeStatEC", "jesRelativeStatFSR", "jesRelativeStatHF", "jesPileDataMC", "jesPilePtBB", "jesPilePtEC1", "jesPilePtEC2", "jesPilePtHF", "jesPilePtRef", "jesFlavorQCD", "jesFragmentation", "jesSinglePionECAL", "jesSinglePionHCAL", "jesTimePtEta"]
 
-input_dir = "/eos/vbc/group/cms/robert.schoefbeck/tt-jec/training-ntuples/MVA-training/tt_jec_trg-dilepVL-minDLmass20-offZ1/"
-
+input_dir = "/eos/vbc/group/cms/robert.schoefbeck/tt-jec/training-ntuples-2/MVA-training/tt_jec_trg-dilepVL-minDLmass20-offZ1/"
+redirector = "root://eos.grid.vbc.ac.at/"
 def _generator( directory, n_split=1):
     print( "Loading", os.path.join( input_dir, directory) )
     return _DataGenerator(
@@ -23,7 +23,8 @@ def _generator( directory, n_split=1):
             n_split = n_split,
             splitting_strategy = "files",
             selection   = selection,
-            branches = feature_names)
+            branches = feature_names,
+            redirector=redirector)
 
 def _add_truth( data, truth ):
     return np.concatenate( (np.array(data), truth*np.ones((len(data),1))), axis=1 )
@@ -57,9 +58,9 @@ plot_options =  {
     "jet2_pt" :{'binning':[30,0,500], 'logY':True,  'tex':'p_{T}(jet 2)'},
     "jet3_pt" :{'binning':[30,0,500], 'logY':True,  'tex':'p_{T}(jet 3)'},
     "jet4_pt" :{'binning':[30,0,500], 'logY':True,  'tex':'p_{T}(jet 4)'},
-    "jet0_eta" :{'binning':[30,0,500],'logY':False,  'tex':'#eta(jet 0)'},
-    "jet1_eta" :{'binning':[30,0,500],'logY':False,  'tex':'#eta(jet 1)'},
-    "jet2_eta" :{'binning':[30,0,500],'logY':False,  'tex':'#eta(jet 2)'},
-    "jet3_eta" :{'binning':[30,0,500],'logY':False,  'tex':'#eta(jet 3)'},
-    "jet4_eta" :{'binning':[30,0,500],'logY':False,  'tex':'#eta(jet 4)'},
+    "jet0_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 0)'},
+    "jet1_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 1)'},
+    "jet2_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 2)'},
+    "jet3_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 3)'},
+    "jet4_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 4)'},
 }

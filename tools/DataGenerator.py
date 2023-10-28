@@ -40,6 +40,7 @@ class DataGenerator(Sequence):
             selection           = None,
             max_files           = None,
             verbose             = False,
+            redirector          = None,
                 ):
         '''
         DataGenerator for the keras training framework.
@@ -62,6 +63,10 @@ class DataGenerator(Sequence):
                 raise RuntimeError( "Don't know what to do with %r" % filename )
 
         self.input_files = self.input_files[:max_files]
+
+        # prepending redirector
+        if redirector is not None:
+            self.input_files = [redirector+file_ if file_.startswith('/eos/') else file_ for file_ in self.input_files]
 
         self.splitting_strategy = splitting_strategy
         if splitting_strategy.lower() not in ['files', 'events']:

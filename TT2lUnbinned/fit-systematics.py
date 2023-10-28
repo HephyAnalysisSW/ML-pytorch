@@ -2,12 +2,12 @@
 import ROOT, os
 ROOT.gStyle.SetOptStat(0)
 dir_path = os.path.dirname(os.path.realpath(__file__))
-ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../../../tools/scripts/tdrstyle.C"))
+ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../tools/scripts/tdrstyle.C"))
 ROOT.setTDRStyle()
 import numpy as np
 if __name__=="__main__":
     import sys
-    sys.path.append('../../..')
+    sys.path.append('..')
 
 import tools.syncer as syncer
 import tools.user as user 
@@ -26,6 +26,7 @@ argParser.add_argument('--prefix',             action='store', type=str,   defau
 argParser.add_argument('--data_model',         action='store', type=str,   default='TTLep_pow_sys', help="Which data model?")
 argParser.add_argument('--epochs',             action='store', type=int,   default=100, help="Number of epochs")
 argParser.add_argument('--small',              action='store_true', help="Small?")
+argParser.add_argument('--quadratic',              action='store_true', help="quadratic?")
 argParser.add_argument('--overwrite',          action='store_true', help="Overwrite?")
 argParser.add_argument('--output_directory',   action='store', type=str,   default='/eos/vbc/group/cms/robert.schoefbeck/tt-jec/models/')
 args = argParser.parse_args()
@@ -38,14 +39,11 @@ np.random.seed(1)
 
 exec( "import data_models.%s as data_model"%args.data_model )
 
-levels    = [1.0]
-quadratic = False
-
-generator = data_model.DataGenerator(maxN=200000 if args.small else None, levels = levels)
+generator = data_model.DataGenerator(maxN=200000 if args.small else None)#, levels = levels)
 
 # directories
-plot_directory   = os.path.join( user.plot_directory, 'tt-jec', 'training', args.prefix )
-output_directory = os.path.join( args.output_directory, args.prefix+'_small' if args.small else args.prefix) 
+plot_directory   = os.path.join( user.plot_directory, 'tt-jec', args.data_model, args.prefix+('_small' if args.small else "") + ("_quadratic" if args.quadratic else ""), 'training')
+output_directory = os.path.join( args.output_directory, args.data_model, args.prefix+('_small' if args.small else "") + ("_quadratic" if args.quadratic else "")) 
 
 #########################################################################################
 # define model (neural network)
@@ -63,7 +61,7 @@ x = Dense(n_var_flat*2, activation='sigmoid')(x)
 x = Dense(n_var_flat+5, activation='sigmoid')(x)
 #x = Dense(n_var_flat+5, activation='sigmoid')(x)
 
-outputs = Dense(2 if quadratic else 1, kernel_initializer='normal', activation=None)(x)
+outputs = Dense(2 if args.quadratic else 1, kernel_initializer='normal', activation=None)(x)
 model = Model( inputs, outputs )
 
 def loss(truth, prediction):
@@ -83,7 +81,7 @@ def loss(truth, prediction):
 
         nom = level*prediction_nominal[:,0]
         lev = level*prediction_level[:,0]
-        if quadratic:
+        if args.quadratic:
             nom += level**2*prediction_nominal[:,1]
             lev += level**2*prediction_level[:,1]
 
@@ -173,7 +171,7 @@ _prediction  = model(features[variations[:,0]==0]).numpy()
 
 print ("Mean prediction", _prediction.mean())
 def prediction( nu ):
-    return np.exp( nu*_prediction[:,0] + ( nu**2*_prediction[:,1] if quadratic else 0))
+    return np.exp( nu*_prediction[:,0] + ( nu**2*_prediction[:,1] if args.quadratic else 0))
 #def prediction( nu ):
 #    return np.exp( -nu*_prediction[:,0] - nu**2*_prediction[:,1]-1)
 
@@ -229,7 +227,7 @@ for i_feature, feature in enumerate(data_model.feature_names):
     h_nominal.Divide(ref)
     h_nominal.Draw()
     c1.SetLogy(0)
-    h_nominal.GetYaxis().SetRangeUser(0.8,2.4)
+    h_nominal.GetYaxis().SetRangeUser(0.8,1.4)
     for level in generator.levels:
         h_level_truth[level].Divide(ref)
         h_level_pred[level].Divide(ref)

@@ -183,14 +183,16 @@ class DataModel:
     def name(self):
         return "TK_%r_LK_%r_CA_%r_SC_%r"%( self.top_kinematics, self.lepton_kinematics, self.asymmetry, self.spin_correlation) 
 
-    def getEvents( self, nTraining, return_observers = False ):
+    def getEvents( self, nTraining, return_observers = False,  wilson_coefficients = None):
 
         index = -1
+        if wilson_coefficients is None:
+            wilson_coefficients = weightInfo.variables
 
         coeffs       = data_generator.vector_branch( data_generator[index], 'p_C', padding_target=len(weightInfo.combinations))[:nTraining]
         features     = data_generator.scalar_branches( data_generator[index], self.feature_names )[:nTraining]
         vectors      = None #{key:model.data_generator.vector_branch(data, key ) for key in vector_branches}
-        combinations = make_combinations( wilson_coefficients )
+        combinations = make_combinations( [ w for w in weightInfo.variables if w in wilson_coefficients] )
 
         if return_observers:
             observers_ = data_generator.scalar_branches( data_generator[index], observers )[:nTraining]

@@ -2,7 +2,6 @@ import   numpy as np
 import   ROOT
 import   array
 
-
 def clip_quantile( features, quantile, weights = None, return_selection=False):
 
     selected  = np.array(list(range(len(features)))).reshape(-1)

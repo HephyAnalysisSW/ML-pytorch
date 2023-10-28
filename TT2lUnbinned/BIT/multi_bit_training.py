@@ -22,7 +22,7 @@ from   tools import helpers
 import tools.syncer as syncer
 
 # BIT
-from MultiBoostedInformationTree import MultiBoostedInformationTree
+from BIT.MultiBoostedInformationTree import MultiBoostedInformationTree
 
 # User
 import tools.user as user
@@ -78,7 +78,7 @@ for key, val in extra_args.items():
     if type(val)==type([]) and len(val)==1:
         extra_args[key]=val[0]
 
-exec("import models.%s as model"%args.model)
+exec("import data_models.%s as model"%args.model)
 
 model.multi_bit_cfg.update( extra_args )
 data_model = model.DataModel(
@@ -269,9 +269,9 @@ base_points = []
 for comb in list(itertools.combinations_with_replacement(args.coefficients,1))+list(itertools.combinations_with_replacement(args.coefficients,2)):
     base_points.append( {c:comb.count(c) for c in args.coefficients} )
 if args.prefix == None:
-    bit_name = "multiBit_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 else:
-    bit_name = "multiBit_%s_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 
 # delete coefficients we don't need (the BIT coefficients are determined from the training weight keys)
 if args.coefficients is not None:

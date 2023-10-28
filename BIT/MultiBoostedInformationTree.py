@@ -49,12 +49,16 @@ class MultiBoostedInformationTree:
 
         self.training_weights   = copy.deepcopy(training_weights)
         if training_weights is not None:
-            self.training_weights = {tuple(sorted(key)):val for key,val in self.training_weights.items()}
+            self.training_weights = {self.sort_comb(key):val for key,val in self.training_weights.items()}
 
         self.training_features  = training_features
 
         # Will hold the trees
         self.trees              = []
+
+    @staticmethod 
+    def sort_comb( comb ):
+        return tuple(sorted(comb))
 
     @classmethod
     def load(cls, filename):

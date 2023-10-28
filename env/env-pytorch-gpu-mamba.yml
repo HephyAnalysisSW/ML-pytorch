@@ -16,3 +16,4 @@ awkward
 h5py
 jupyter
 cudatoolkit=11.3.1
+iminuit
