@@ -155,8 +155,6 @@ def make_combinations( coefficients ):
             combinations.append(comb)
     return combinations
 
-tex = {"ctGIm":"C_{tG}^{Im}", "ctGRe":"C_{tG}^{Re}", "cQj18":"c_{Qj}^{18}" ,"cQj38":"c_{Qj}^{38}" ,"cQj11":"c_{Qj}^{11}" ,"cjj31":"c_{jj}^{31}" ,"ctu8":"c_{tu}^{8}" ,"ctd8":"c_{td}^{8}" ,"ctj8":"c_{tj}^{8}" ,"cQu8":"c_{Qu}^{8}" ,"cQd8":"c_{Qd}^{8}" ,"ctu1":"c_{tu}^{1}" ,"ctd1":"c_{td}^{1}" ,"ctj1":"c_{tj}^{1}" ,"cQu1":"c_{Qu}^{1}" ,"cQd1":"c_{Qd}^{1}"}
-
 class DataModel:
     
     def __init__( self, top_kinematics=False, lepton_kinematics = False, asymmetry = False, spin_correlation = False):
@@ -183,14 +181,14 @@ class DataModel:
     def name(self):
         return "TK_%r_LK_%r_CA_%r_SC_%r"%( self.top_kinematics, self.lepton_kinematics, self.asymmetry, self.spin_correlation) 
 
-    def getEvents( self, nTraining, return_observers = False,  wilson_coefficients = None):
+    def getEvents( self, nTraining, return_observers = False,  wilson_coefficients = None, feature_names=None):
 
         index = -1
         if wilson_coefficients is None:
             wilson_coefficients = weightInfo.variables
 
         coeffs       = data_generator.vector_branch( data_generator[index], 'p_C', padding_target=len(weightInfo.combinations))[:nTraining]
-        features     = data_generator.scalar_branches( data_generator[index], self.feature_names )[:nTraining]
+        features     = data_generator.scalar_branches( data_generator[index], self.feature_names if feature_names is None else feature_names)[:nTraining]
         vectors      = None #{key:model.data_generator.vector_branch(data, key ) for key in vector_branches}
         combinations = make_combinations( [ w for w in weightInfo.variables if w in wilson_coefficients] )
 
@@ -221,85 +219,6 @@ eft_plot_points = [
 #    {'color':ROOT.kYellow+2,    'eft':make_eft(cQu1=10), 'tex':"c_{Qu}^{1}=10"  },
     {'color':ROOT.kPink,        'eft':make_eft(cQd1=10), 'tex':"c_{Qd}^{1}=10"  },
 ]
-
-plot_options =  {
-    "parton_top1_decayAngle_theta" :{'binning':[30,0,pi], 'tex':'#theta(t_{1})'},
-    "parton_top1_decayAngle_phi"   :{'binning':[30,-pi,pi], 'tex':'#phi(t_{1})'},
-    "parton_top1_pt" :{'binning':[50,0,1500], 'tex':'p_{T}(t_{1})'},
-    "parton_top1_eta" :{'binning':[30,-3,3], 'tex':'#eta(t_{1})'},
-    "parton_top1_f1_pt" :{'binning':[30,0,800], 'tex':'p_{T}(f_{1}(t_{1}))'},
-    "parton_top1_f1_eta" :{'binning':[30,-3,3], 'tex':'#eta(f_{2}(t_{1}))'},
-    "parton_top1_f2_pt" :{'binning':[30,0,800], 'tex':'p_{T}(f_{2} (t_{1}))'},
-    "parton_top1_f2_eta" :{'binning':[30,-3,3], 'tex':'#eta(f_{2}(t_{1}))'},
-    "parton_top1_b_pt" :{'binning':[50,0,800], 'tex':'p_{T}(b (t_{1}))'},
-    "parton_top1_b_eta" :{'binning':[30,-3,3], 'tex':'#eta(b(t_{1}))'},
-    "parton_top1_W_pt" :{'binning':[30,0,1000], 'tex':'p_{T}(W (t_{1}))'},
-    "parton_top1_W_eta" :{'binning':[30,-3,3], 'tex':'#eta(W(t_{1}))'},
-
-    "parton_top2_decayAngle_theta" :{'binning':[30,0,pi], 'tex':'#theta(t_{2})'},
-    "parton_top2_decayAngle_phi"   :{'binning':[30,-pi,pi], 'tex':'#phi(t_{2})'},
-    "parton_top2_pt" :{'binning':[50,0,1500], 'tex':'p_{T}(t_{2})'},
-    "parton_top2_eta" :{'binning':[30,-3,3], 'tex':'#eta(t_{2})'},
-    "parton_top2_f1_pt" :{'binning':[30,0,800], 'tex':'p_{T}(f_{1}(t_{2}))'},
-    "parton_top2_f1_eta" :{'binning':[30,-3,3], 'tex':'#eta(f_{1}(t_{2}))'},
-    "parton_top2_f2_pt" :{'binning':[30,0,800], 'tex':'p_{T}(f_{2} (t_{2}))'},
-    "parton_top2_f2_eta" :{'binning':[30,-3,3], 'tex':'#eta(f_{2}(t_{2}))'},
-    "parton_top2_b_pt" :{'binning':[50,0,800], 'tex':'p_{T}(b (t_{2}))'},
-    "parton_top2_b_eta" :{'binning':[30,-3,3], 'tex':'#eta(b(t_{2}))'},
-    "parton_top2_W_pt" :{'binning':[30,0,1000], 'tex':'p_{T}(W (t_{2}))'},
-    "parton_top2_W_eta" :{'binning':[30,-3,3], 'tex':'#eta(W(t_{2}))'},
-
-    "parton_top12_pt":{'binning':[50,0,1000], 'tex':'p_{T}(t#bar{t})'},
-    "parton_top12_mass":{'binning':[50,0,2000], 'tex':'M(t#bar{t})'},
-    "parton_top12_eta":{'binning':[30,-3,3], 'tex':'#eta(t#bar{t})'},
-    "parton_top12_dEta":{'binning':[30,-3,3], 'tex':'#Delta#eta(t#bar{t})'},
-    "parton_top12_dAbsEta":{'binning':[30,-3,3], 'tex':'#Delta|#eta|(t#bar{t})'},
-
-    "parton_cosThetaPlus_n"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{n}'},
-    "parton_cosThetaMinus_n"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{n}'},
-    "parton_cosThetaPlus_r"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{r}'},
-    "parton_cosThetaMinus_r"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{r}'},
-    "parton_cosThetaPlus_k"     :{'binning':[30,-1,1], 'tex':'cos#theta^{+}_{k}'},
-    "parton_cosThetaMinus_k"    :{'binning':[30,-1,1], 'tex':'cos#theta^{-}_{k}'},
-    "parton_cosThetaPlus_r_star"    :{'binning':[30,-1,1], 'tex':'cos#theta^{+*}_{n}'},
-    "parton_cosThetaMinus_r_star"   :{'binning':[30,-1,1], 'tex':'cos#theta^{-*}_{n}'},
-    "parton_cosThetaPlus_k_star"    :{'binning':[30,-1,1], 'tex':'cos#theta^{+*}_{k}'},
-    "parton_cosThetaMinus_k_star"   :{'binning':[30,-1,1], 'tex':'cos#theta^{-*}_{k}'},
-    "parton_xi_nn"              :{'binning':[30,-1,1], 'tex':'#xi_{nn}'},
-    "parton_xi_rr"              :{'binning':[30,-1,1], 'tex':'#xi_{rr}'},
-    "parton_xi_kk"              :{'binning':[30,-1,1], 'tex':'#xi_{kk}'},
-    "parton_xi_nr_plus"         :{'binning':[30,-1,1], 'tex':'#xi_{nr}^{+}'},
-    "parton_xi_nr_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{nr}^{-}'},
-    "parton_xi_rk_plus"         :{'binning':[30,-1,1], 'tex':'#xi_{rk}^{+}'},
-    "parton_xi_rk_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{rk}^{-}'},
-    "parton_xi_nk_plus"         :{'binning':[30,-1,1], 'tex':'#xi_{nk}^{+}'},
-    "parton_xi_nk_minus"        :{'binning':[30,-1,1], 'tex':'#xi_{nk}^{-}'},
-
-    "parton_xi_r_star_k"        :{'binning':[30,-1,1], 'tex':'#xi_{r^{*}k}'},
-    "parton_xi_k_r_star"        :{'binning':[30,-1,1], 'tex':'#xi_{kr^{*}}'},
-    "parton_xi_kk_star"         :{'binning':[30,-1,1], 'tex':'#xi_{kk^{*}}'},
-
-    "parton_cos_phi"            :{'binning':[30,-1,1], 'tex':'cos(#phi)'},
-    "parton_cos_phi_lab"        :{'binning':[30,-1,1], 'tex':'cos(#phi lab)'},
-    "parton_abs_delta_phi_ll_lab":{'binning':[30,0,pi], 'tex':'|#Delta(#phi(l,l))|'},
-
-    "recoBj01_pt"     :{'binning':[30,0,1500], 'tex':'p_{T}(bb)'},
-    "recoBj01_mass"   :{'binning':[30,0,1500], 'tex':'M(bb)'},
-    "nBTag"           :{'binning':[4,0,4], 'tex':'N_{b}'},
-    "recoLep0_pt"     :{'binning':[30,0,200], 'tex':'p_{T}(l_{1})'},
-    "recoLep0_eta"   :{'binning':[30,-3,3], 'tex':'#eta(l_{1})'},
-    "recoLep1_pt"   :{'binning':[30,0,200], 'tex':'p_{T}(l_{2})'},
-    "recoLep1_eta"   :{'binning':[30,-3,3], 'tex':'#eta(l_{2})'},
-    "recoLepPos_pt"   :{'binning':[30,0,200], 'tex':'p_{T}(l^{+})'},
-    "recoLepPos_eta"   :{'binning':[30,-3,3], 'tex':'#eta(l^{+})'},
-    "recoLepNeg_pt"   :{'binning':[30,0,200], 'tex':'p_{T}(l^{-})'},
-    "recoLepNeg_eta"   :{'binning':[30,-3,3], 'tex':'#eta(l^{-})'},
-    "recoLep01_pt"   :{'binning':[30,0,200], 'tex':'p_{T}(ll)'},
-    "recoLep01_mass"   :{'binning':[30,0,200], 'tex':'M(ll)'},
-    "recoLep_dPhi"     :{'binning':[30,-pi,pi], 'tex':'#Delta#phi(ll)'},
-    "recoLep_dEta"     :{'binning':[30,-2.5,2.5], 'tex':'#Delta#eta(ll)'},
-    "recoLep_dAbsEta"     :{'binning':[30,-2.5,2.5], 'tex':'#Delta|#eta|(ll)'},
-}
 
 multi_bit_cfg = {'n_trees': 300,
                  'max_depth': 4,

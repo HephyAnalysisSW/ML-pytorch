@@ -35,6 +35,10 @@ def make_TH1F( h, ignore_binning = False):
             histo.SetBinContent(i_v+1, v)
     return histo
 
+def make_TGraph( coords ):
+    tgraph = ROOT.TGraph(len(coords), array.array('d', [c[0] for c in coords]), array.array('d', [c[1] for c in coords]))
+    return tgraph
+
 def make_TH2F( h, ignore_binning = False):
     # remove infs from thresholds
     vals, thrs_x, thrs_y = h

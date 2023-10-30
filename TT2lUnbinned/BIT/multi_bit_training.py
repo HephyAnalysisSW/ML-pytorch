@@ -79,6 +79,7 @@ for key, val in extra_args.items():
         extra_args[key]=val[0]
 
 exec("import data_models.%s as model"%args.model)
+from data_models.plot_options import plot_options
 
 model.multi_bit_cfg.update( extra_args )
 data_model = model.DataModel(
@@ -152,8 +153,8 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
         eft['name'] = name
         
         for i_feature, feature in enumerate(data_model.feature_names):
-            h[name][feature]        = ROOT.TH1F(name+'_'+feature+'_nom',    name+'_'+feature, *model.plot_options[feature]['binning'] )
-            h_lin[name][feature]    = ROOT.TH1F(name+'_'+feature+'_nom_lin',name+'_'+feature+'_lin', *model.plot_options[feature]['binning'] )
+            h[name][feature]        = ROOT.TH1F(name+'_'+feature+'_nom',    name+'_'+feature, *plot_options[feature]['binning'] )
+            h_lin[name][feature]    = ROOT.TH1F(name+'_'+feature+'_nom_lin',name+'_'+feature+'_lin', *plot_options[feature]['binning'] )
 
         # make reweights for x-check
         reweight     = copy.deepcopy(training_weights[()])
@@ -171,7 +172,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
         sign_postfix = ""
 
         for i_feature, feature in enumerate(data_model.feature_names):
-            binning = model.plot_options[feature]['binning']
+            binning = plot_options[feature]['binning']
 
             h[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight) )
             h_lin[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight_lin) )
@@ -208,8 +209,8 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
                 l.SetShadowColor(ROOT.kWhite)
                 l.SetBorderSize(0)
                 for i_histo, histo in enumerate(reversed(histos)):
-                    histo.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
-                    histo.GetYaxis().SetTitle("1/#sigma_{SM}d#sigma/d%s"%model.plot_options[feature]['tex'])
+                    histo.GetXaxis().SetTitle(plot_options[feature]['tex'])
+                    histo.GetYaxis().SetTitle("1/#sigma_{SM}d#sigma/d%s"%plot_options[feature]['tex'])
                     if i_histo == 0:
                         histo.Draw('hist')
                         histo.GetYaxis().SetRangeUser( (0.001 if logY else 0), (10*max_ if logY else 1.3*max_))
@@ -246,7 +247,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
 
                 c1.SetLogy(logY)
                 for i_histo, histo in enumerate(reversed(histos)):
-                    histo.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                    histo.GetXaxis().SetTitle(plot_options[feature]['tex'])
                     histo.GetYaxis().SetTitle("shape wrt. SM")
                     if i_histo == 0:
                         histo.Draw('hist')
@@ -498,7 +499,7 @@ if args.debug:
             h_w0, h_ratio_prediction, h_ratio_truth, lin_binning = {}, {}, {}, {}
             for i_feature, feature in enumerate(observables):
                 # root style binning
-                binning     = model.plot_options[feature]['binning']
+                binning     = plot_options[feature]['binning']
                 # linspace binning
                 lin_binning[feature] = np.linspace(binning[1], binning[2], binning[0]+1)
                 #digitize feature
@@ -544,7 +545,7 @@ if args.debug:
                     th1d_yield.SetLineColor(ROOT.kGray+2)
                     th1d_yield.SetMarkerColor(ROOT.kGray+2)
                     th1d_yield.SetMarkerStyle(0)
-                    th1d_yield.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                    th1d_yield.GetXaxis().SetTitle(plot_options[feature]['tex'])
                     th1d_yield.SetTitle("")
 
                     th1d_yield.Draw("hist")
@@ -556,14 +557,14 @@ if args.debug:
                         th1d_ratio_truth[der].SetMarkerStyle(0)
                         th1d_ratio_truth[der].SetLineWidth(2)
                         th1d_ratio_truth[der].SetLineStyle(ROOT.kDashed)
-                        th1d_ratio_truth[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                        th1d_ratio_truth[der].GetXaxis().SetTitle(plot_options[feature]['tex'])
 
                         th1d_ratio_pred[der].SetTitle("")
                         th1d_ratio_pred[der].SetLineColor(color[der])
                         th1d_ratio_pred[der].SetMarkerColor(color[der])
                         th1d_ratio_pred[der].SetMarkerStyle(0)
                         th1d_ratio_pred[der].SetLineWidth(2)
-                        th1d_ratio_pred[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                        th1d_ratio_pred[der].GetXaxis().SetTitle(plot_options[feature]['tex'])
 
                         tex_name = "%s"%(",".join( der ))
      

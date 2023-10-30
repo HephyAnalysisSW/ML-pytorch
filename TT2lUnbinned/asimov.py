@@ -11,6 +11,7 @@ import operator
 import itertools
 import re
 import scipy
+import pickle
 
 sys.path.insert(0, '..')
 import tools.syncer as syncer
@@ -28,13 +29,36 @@ import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',      default='INFO',          nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
 argParser.add_argument("--plot_directory",     action="store",      default="TTCA",     help="plot sub-directory")
-argParser.add_argument("--data_model",              action="store",      default = "TT2lUnbinned", help="Which data model?")
-#argParser.add_argument("--physics_model"           action="store",      help="Which physics model?")
+argParser.add_argument("--data_model",         action="store",      default = "TT2lUnbinned", help="Which data model?")
 argParser.add_argument("--prefix",             action="store",      default="v2", type=str,  help="prefix")
+argParser.add_argument("--bit_name",           action="store",      default="multiBit_TT2lUnbinned_TK_False_LK_False_CA_False_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300", type=str,  help="prefix")
 argParser.add_argument("--small",              action="store_true"  )
+argParser.add_argument("--overwrite",          action="store_true", help = "Overwrite?"  )
+argParser.add_argument("--cmds",               action="store_true"  )
+
+argParser.add_argument("--wc1",                action="store",      default = "ctGRe", help="Which wilson coefficient?")
+argParser.add_argument("--low1",               action="store",      default = -0.7, type=float, help="Which wilson coefficient?")
+argParser.add_argument("--high1",              action="store",      default = 0.7, type=float, help="Which wilson coefficient?")
+argParser.add_argument("--nBins",              action="store",      default = 35, type=int, help="Which wilson coefficient?")
+argParser.add_argument("--wc2",                action="store",      default = None, help="Which wilson coefficient?")
+argParser.add_argument("--low2",               action="store",      default = -0.7, type=float, help="Which wilson coefficient?")
+argParser.add_argument("--high2",              action="store",      default = 0.7, type=float, help="Which wilson coefficient?")
 
 args = argParser.parse_args()
-    
+
+if args.cmds:
+    for TK in ["False", "True"]:
+        for LK in ["False", "True"]:
+            for CA in ["False", "True"]:
+                for SC in ["False", "True"]:
+                    if TK==LK==CA==SC=="True": continue
+                    for wc1 in ["ctGRe", "ctGIm", "cQj18", "cQj38", "ctj8"]:
+                        print("python asimov.py --bit_name multiBit_TT2lUnbinned_TK_{TK}_LK_{LK}_CA_{CA}_SC_{SC}_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300 --wc1 {wc1}".format(TK=TK, LK=LK, CA=CA, SC=SC, wc1=wc1))
+                        for wc2 in ["ctGRe", "ctGIm", "cQj18", "cQj38", "ctj8"]:
+                            if wc1>=wc2:continue
+                            print("python asimov.py --bit_name multiBit_TT2lUnbinned_TK_{TK}_LK_{LK}_CA_{CA}_SC_{SC}_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300 --wc1 {wc1} --wc2 {wc2}".format(TK=TK, LK=LK, CA=CA, SC=SC, wc1=wc1,wc2=wc2))
+    sys.exit(0)
+ 
 #Logger
 import tools.logger as logger_
 logger = logger_.get_logger(args.logLevel, logFile = None )
@@ -43,6 +67,27 @@ logger = logger_.get_logger(args.logLevel, logFile = None )
 plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.data_model)#, args.physics_model )
 os.makedirs( plot_directory, exist_ok=True)
 
+results_directory = os.path.join( user.results_directory, args.data_model, args.bit_name )
+os.makedirs( results_directory, exist_ok=True)
+results_filename = os.path.join( results_directory, args.wc1 + ("_vs_"+args.wc2 if args.wc2 is not None else"") + ".pkl")
+if os.path.exists( results_filename ) and not args.overwrite:
+    logger.info( "Found %s. Quit.", results_filename )
+    sys.exit(0)
+
+# BIT
+#bit_name = "multiBit_TT2lUnbinned_TK_False_LK_False_CA_False_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300"
+#bit_name = "multiBit_TT2lUnbinned_TK_False_LK_False_CA_True_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300"
+
+## FIXME ... this is bad
+#sstr  = re.sub(r'^.*?_TT2lUnbinned_', '', args.bit_name) 
+#flags = re.sub(r'_v.*_coeffs_.*', '', sstr).split('_')
+#data_model_flags = {key:val for key, val in zip( [ "top_kinematics", "lepton_kinematics", "asymmetry", "spin_correlation" ], list(map( (lambda f:f=="True"), flags[1::2])))}
+
+from BIT.MultiBoostedInformationTree import MultiBoostedInformationTree
+filename = os.path.join(user.model_directory, args.bit_name)+'.pkl'
+logger.info ("Loading %s for %s"%(args.bit_name, filename))
+bit = MultiBoostedInformationTree.load(filename)
+
 exec('import data_models.%s as data_model'%(args.data_model))
 data_model_ = data_model.DataModel()
 
@@ -50,10 +95,7 @@ if args.small:
    data_model.data_generator.input_files = data_model.data_generator.input_files[:10]
    args.plot_directory += '_small'
 
-# BIT
-bit_name = "multiBit_TT2lUnbinned_TK_False_LK_False_CA_False_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300"
-
-sstr                = re.sub(r'^.*?_coeffs_', '', bit_name)
+sstr                = re.sub(r'^.*?_coeffs_', '', args.bit_name)
 wilson_coefficients = re.sub(r'_nTraining_.*', '', sstr).split('_')
 
 def make_eft( **kwargs ):
@@ -65,14 +107,9 @@ def make_eft( **kwargs ):
 
 logger.info ("Loading events with WC %s"%(",".join(wilson_coefficients)))
 
-features, weights = data_model_.getEvents(-1, wilson_coefficients=wilson_coefficients )
+features, weights = data_model_.getEvents(-1, wilson_coefficients=wilson_coefficients, feature_names = bit.feature_names)
 
-from BIT.MultiBoostedInformationTree import MultiBoostedInformationTree
-filename = os.path.join(user.model_directory, bit_name)+'.pkl'
-logger.info ("Loading %s for %s"%(bit_name, filename))
-bit = MultiBoostedInformationTree.load(filename)
-
-logger.info ("Computing BIT predictions for %i events."%features.shape[0])
+logger.info ("Computing BIT predictions for %i events from these %i features: %s"%( features.shape[0], features.shape[1], ", ".join(bit.feature_names)) )
 bit_predictions = bit.vectorized_predict( features )
 logger.info ("Done.")
 
@@ -146,12 +183,13 @@ class CrossSection:
 crossSection = CrossSection( value=20000, weights=bit_predicted_weights, wilson_coefficients=wilson_coefficients, uncertainty=1.5)
 crossSection()
  
-# lepton efficiency uncertainty
-lepton_weights = 1.01 + 0.04*( features[:, data_model_.feature_names.index('recoLep0_pt')] -10 )/300
-lepton_weights[lepton_weights>1.1]=1.1
-lepton_weights[lepton_weights<0.9]=0.9
+# lepton efficiency uncertainty # FIXME need a better data model
+if 'recoLep0_pt' in data_model_.feature_names: 
+    lepton_weights = 1.01 + 0.04*( features[:, data_model_.feature_names.index('recoLep0_pt')] -10 )/300
+    lepton_weights[lepton_weights>1.1]=1.1
+    lepton_weights[lepton_weights<0.9]=0.9
 
-crossSection.addLnN( "lepId", lepton_weights )
+    crossSection.addLnN( "lepId", lepton_weights )
 
 lumi         = Lumi( value=1, uncertainty=1.04)
 
@@ -181,8 +219,8 @@ class MakeHypothesis:
 
 makeHypo = MakeHypothesis(lumi, crossSection)
 
-null = makeHypo()
-alt  = makeHypo(ctGRe = 1)
+#null = makeHypo()
+#alt  = makeHypo(ctGRe = 1)
 
 from iminuit import Minuit
 from iminuit.util import describe
@@ -321,32 +359,41 @@ class MinuitInterface:
 
         return m.values.to_dict()
 
-wc = 'ctGRe'
+results = []
 
-for wc_val in [0]: #np.linspace(-2,2,21):
+#assert False, ""
 
-    print (wc, wc_val)
-    asimovNonCentrality = AsimovNonCentrality(
-        lumi=lumi, 
-        crossSection=crossSection,
-        null = makeHypo(),
-        alt  = makeHypo(),
-        )
+for wc1_val in np.linspace(args.low1,args.high1,args.nBins):
+    for wc2_val in ( np.linspace(args.low2,args.high2,args.nBins) if args.wc2 is not None else [None]):
 
-    frozen_param = {wc:wc_val}
-    #asimovNonCentrality.ignore( asimovNonCentrality.nuisances )
-    asimovNonCentrality.freeze( **frozen_param )
-    asimovNonCentrality.float("xsec")
+        logger.info ("WC: %s=%3.2f"%(args.wc1, wc1_val) +" "+("%s=%3.2f"%(args.wc2, wc2_val) if  args.wc2 is not None else "" ))
+        asimovNonCentrality = AsimovNonCentrality(
+            lumi=lumi, 
+            crossSection=crossSection,
+            null = makeHypo(),
+            alt  = makeHypo(),
+            )
 
-    prefit = asimovNonCentrality()
+        frozen_param = {args.wc1:wc1_val}
+        if args.wc2 is not None:
+            frozen_param[args.wc2] = wc2_val
+        #asimovNonCentrality.ignore( asimovNonCentrality.nuisances )
+        asimovNonCentrality.freeze( **frozen_param )
+        asimovNonCentrality.float("xsec")
 
-    asimovNonCentrality_interface = MinuitInterface( asimovNonCentrality )
+        prefit = asimovNonCentrality()
 
-    fit_result = asimovNonCentrality_interface.fit()
+        asimovNonCentrality_interface = MinuitInterface( asimovNonCentrality )
 
-    logger.info ("Prefit %5.4f " %prefit)
-    non_centrality = asimovNonCentrality( makeHypo(**fit_result, **frozen_param) )
-    logger.info ("Postfit %5.4f" % non_centrality)
+        fit_result = asimovNonCentrality_interface.fit()
 
-    median_qTheta_Alt = scipy.stats.ncx2.median(df=1,nc=non_centrality)
-    logger.info("median_qTheta_Alt %5.4f" % median_qTheta_Alt)
+        logger.info ("Prefit %5.4f " %prefit)
+        non_centrality = asimovNonCentrality( makeHypo(**fit_result, **frozen_param) )
+        logger.info ("Postfit %5.4f" % non_centrality)
+
+        median_qTheta_Alt = scipy.stats.ncx2.median(df=1,nc=non_centrality)
+        logger.info("median_qTheta_Alt %5.4f" % median_qTheta_Alt)
+
+        results.append( {'wc1':args.wc1, 'val1':wc1_val, 'wc2':args.wc2, 'val2':wc2_val, 'prefit':prefit, 'postfit':non_centrality, 'median_qTheta_Alt':median_qTheta_Alt} )
+
+pickle.dump( results, open(results_filename, 'wb') ) 
