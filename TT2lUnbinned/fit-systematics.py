@@ -28,7 +28,7 @@ argParser.add_argument('--epochs',             action='store', type=int,   defau
 argParser.add_argument('--small',              action='store_true', help="Small?")
 argParser.add_argument('--quadratic',              action='store_true', help="quadratic?")
 argParser.add_argument('--overwrite',          action='store_true', help="Overwrite?")
-argParser.add_argument('--output_directory',   action='store', type=str,   default='/eos/vbc/group/cms/robert.schoefbeck/tt-jec/models/')
+argParser.add_argument('--output_directory',   action='store', type=str,   default=os.path.join(user.model_directory,'tt-jec/models/') )
 args = argParser.parse_args()
 
 # fix random seed for reproducibility
