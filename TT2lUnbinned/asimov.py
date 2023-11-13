@@ -30,11 +30,14 @@ argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',      default='INFO',          nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
 argParser.add_argument("--plot_directory",     action="store",      default="TTCA",     help="plot sub-directory")
 argParser.add_argument("--data_model",         action="store",      default = "TT2lUnbinned", help="Which data model?")
-argParser.add_argument("--prefix",             action="store",      default="v2", type=str,  help="prefix")
-argParser.add_argument("--bit_name",           action="store",      default="multiBit_TT2lUnbinned_TK_False_LK_False_CA_False_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300", type=str,  help="prefix")
+argParser.add_argument("--prefix",             action="store",      default="v1", type=str,  help="prefix")
+argParser.add_argument("--bit_name",           action="store",      default="multiBit_TT2lUnbinned_TK_False_LK_False_CA_False_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300", type=str,  help="BIT")
 argParser.add_argument("--small",              action="store_true"  )
 argParser.add_argument("--overwrite",          action="store_true", help = "Overwrite?"  )
 argParser.add_argument("--cmds",               action="store_true"  )
+argParser.add_argument("--linear",             action="store_true", help = "reduce prediction to linear?")
+argParser.add_argument("--others_frozen",      action="store_true", help = "Freeze other WC?")
+argParser.add_argument("--prefit",             action="store_true", help = "Do not run any fit?")
 
 argParser.add_argument("--wc1",                action="store",      default = "ctGRe", help="Which wilson coefficient?")
 argParser.add_argument("--low1",               action="store",      default = -0.7, type=float, help="Which wilson coefficient?")
@@ -66,8 +69,14 @@ logger = logger_.get_logger(args.logLevel, logFile = None )
 # directory for plots
 plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.data_model)#, args.physics_model )
 os.makedirs( plot_directory, exist_ok=True)
+if args.linear:
+    args.prefix+="-linear"
+if args.others_frozen:
+    args.prefix+="-others-frozen"
+if args.prefit:
+    args.prefix+="-prefit"
 
-results_directory = os.path.join( user.results_directory, args.data_model, args.bit_name )
+results_directory = os.path.join( user.results_directory, args.data_model, args.prefix, args.bit_name )
 os.makedirs( results_directory, exist_ok=True)
 results_filename = os.path.join( results_directory, args.wc1 + ("_vs_"+args.wc2 if args.wc2 is not None else"") + ".pkl")
 if os.path.exists( results_filename ) and not args.overwrite:
@@ -77,11 +86,6 @@ if os.path.exists( results_filename ) and not args.overwrite:
 # BIT
 #bit_name = "multiBit_TT2lUnbinned_TK_False_LK_False_CA_False_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300"
 #bit_name = "multiBit_TT2lUnbinned_TK_False_LK_False_CA_True_SC_False_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300"
-
-## FIXME ... this is bad
-#sstr  = re.sub(r'^.*?_TT2lUnbinned_', '', args.bit_name) 
-#flags = re.sub(r'_v.*_coeffs_.*', '', sstr).split('_')
-#data_model_flags = {key:val for key, val in zip( [ "top_kinematics", "lepton_kinematics", "asymmetry", "spin_correlation" ], list(map( (lambda f:f=="True"), flags[1::2])))}
 
 from BIT.MultiBoostedInformationTree import MultiBoostedInformationTree
 filename = os.path.join(user.model_directory, args.bit_name)+'.pkl'
@@ -133,7 +137,7 @@ class Lumi:
         return self.value*unc_fac
 
 class CrossSection:
-    def __init__( self, value, uncertainty, weights, wilson_coefficients):
+    def __init__( self, value, uncertainty, weights, wilson_coefficients, linear=False):
         self.value        = value
         self.wilson_coefficients = wilson_coefficients
         #self.combinations = [tuple()] + make_combinations(self.wilson_coefficients)  
@@ -144,6 +148,7 @@ class CrossSection:
 
         self.uncertainty_reweights = {}
         self.nuisances             = ["xsec"]
+        self.linear     = linear
 
     @property
     def parameters( self ):
@@ -153,13 +158,13 @@ class CrossSection:
         self.uncertainty_reweights[name] = ( weights )
         self.nuisances.append( name )
 
-    def __call__( self, lin=False, **kwargs ):
+    def __call__( self, **kwargs ):
       
         eft_keys = [k for k in self.wilson_coefficients if k in kwargs.keys()]
         sys_keys = [k for k in kwargs.keys() if k not in self.wilson_coefficients and k in self.nuisances]
 
         combs = [tuple()] + make_combinations(eft_keys)
-        if lin:
+        if self.linear:
             combs = [ comb for comb in combs if len(comb)<2 ]
         #print (combs)
         fac = np.array( [ functools.reduce( operator.mul, [ float(kwargs[c]) for c in comb ], 1 ) for comb in combs], dtype='float')
@@ -180,7 +185,7 @@ class CrossSection:
 #crossSection()
 
 # using predictions
-crossSection = CrossSection( value=20000, weights=bit_predicted_weights, wilson_coefficients=wilson_coefficients, uncertainty=1.5)
+crossSection = CrossSection( value=20000, weights=bit_predicted_weights, wilson_coefficients=wilson_coefficients, uncertainty=1.5, linear = args.linear)
 crossSection()
  
 # lepton efficiency uncertainty # FIXME need a better data model
@@ -299,16 +304,18 @@ class AsimovNonCentrality:
     def _penalized(self):
         return [v for v in self.parameters if v not in self._ignore+self._frozen+self.wilson_coefficients+self._floating]
 
-    def __call__( self, null=None):
+    def __call__( self, null=None, return_neg_frac = False):
         _null = null if null is not None else self.null
         w_null = self.crossSection(**_null) 
         w_alt  = self.crossSection(**self.alt)
         l_null = self.lumi(**_null)
         l_alt  = self.lumi(**self.alt)
 
-        disc_frac = (w_alt<0).sum()/len(w_alt)
-        if disc_frac>0.01: 
-            logger.warning ( "Discarded fraction of events because prediction is negative: %4.3f" % disc_frac ) 
+        neg_frac = (w_null<0).sum()/len(w_null)
+        if return_neg_frac: return neg_frac
+
+        if neg_frac>0.01: 
+            logger.warning ( "Discarded fraction of events because prediction is negative: %4.3f" % neg_frac ) 
         penalties = np.sum( [_null[var]**2 for var in self._penalized ] ) 
         return -2*( 
                       -l_null*w_null.sum() +l_alt*w_alt.sum() +
@@ -361,8 +368,6 @@ class MinuitInterface:
 
 results = []
 
-#assert False, ""
-
 for wc1_val in np.linspace(args.low1,args.high1,args.nBins):
     for wc2_val in ( np.linspace(args.low2,args.high2,args.nBins) if args.wc2 is not None else [None]):
 
@@ -377,23 +382,36 @@ for wc1_val in np.linspace(args.low1,args.high1,args.nBins):
         frozen_param = {args.wc1:wc1_val}
         if args.wc2 is not None:
             frozen_param[args.wc2] = wc2_val
+
+        if args.others_frozen:
+            for _wc in wilson_coefficients:
+                if _wc not in frozen_param:
+                    frozen_param[_wc] = 0
+        
         #asimovNonCentrality.ignore( asimovNonCentrality.nuisances )
         asimovNonCentrality.freeze( **frozen_param )
         asimovNonCentrality.float("xsec")
 
         prefit = asimovNonCentrality()
-
+        if args.prefit:
+            neg_frac       = asimovNonCentrality( return_neg_frac=True )
+            results.append( {'wc1':args.wc1, 'val1':wc1_val, 'wc2':args.wc2, 'val2':wc2_val, 'prefit':prefit, 'neg_frac':neg_frac} )
+            continue
+            
         asimovNonCentrality_interface = MinuitInterface( asimovNonCentrality )
 
         fit_result = asimovNonCentrality_interface.fit()
 
         logger.info ("Prefit %5.4f " %prefit)
         non_centrality = asimovNonCentrality( makeHypo(**fit_result, **frozen_param) )
+        neg_frac       = asimovNonCentrality( makeHypo(**fit_result, **frozen_param), return_neg_frac=True)
+        
         logger.info ("Postfit %5.4f" % non_centrality)
 
         median_qTheta_Alt = scipy.stats.ncx2.median(df=1,nc=non_centrality)
         logger.info("median_qTheta_Alt %5.4f" % median_qTheta_Alt)
 
-        results.append( {'wc1':args.wc1, 'val1':wc1_val, 'wc2':args.wc2, 'val2':wc2_val, 'prefit':prefit, 'postfit':non_centrality, 'median_qTheta_Alt':median_qTheta_Alt} )
+        results.append( {'wc1':args.wc1, 'val1':wc1_val, 'wc2':args.wc2, 'val2':wc2_val, 'prefit':prefit, 'postfit':non_centrality,
+                         'median_qTheta_Alt':median_qTheta_Alt, 'neg_frac':neg_frac} )
 
 pickle.dump( results, open(results_filename, 'wb') ) 

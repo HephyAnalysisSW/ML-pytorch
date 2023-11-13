@@ -23,10 +23,9 @@ import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument('--logLevel',           action='store',      default='INFO',          nargs='?', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG', 'TRACE', 'NOTSET'], help="Log level for logging")
 argParser.add_argument("--plot_directory",     action="store",      default="limit-1D",     help="plot sub-directory")
-argParser.add_argument("--prefix",             action="store",      default="v2", type=str,  help="prefix")
+argParser.add_argument("--prefix",             action="store",      default="v1", type=str,  help="prefix")
 
 #argParser.add_argument("--wc",                action="store",      default = "ctGRe", choices = ["cQj18", "cQj38", "ctGIm", "ctGRe", "ctj8"], help="Which wilson coefficient?")
-
 
 args = argParser.parse_args()
 
@@ -34,15 +33,13 @@ args = argParser.parse_args()
 import tools.logger as logger_
 logger = logger_.get_logger(args.logLevel, logFile = None )
 
-                #( " t kin.", ROOT.kBlue, ["True", "False", "False", "False"]),
-                #( "+l kin",  ROOT.kGreen, ["True", "True", "False", "False"]),
-                #( "+ CA",    ROOT.kMagenta, ["True", "True", "True", "False"]),
-                #( "+ SC",    ROOT.kRed, ["True", "True", "True", "True"]),
-                #( "all",     ROOT.kBlack, ["False", "False", "False", "False"]),
-
 # directory for plots
-plot_directory = os.path.join( user.plot_directory, args.plot_directory)#, args.physics_model )
+plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.prefix)#, args.physics_model )
 os.makedirs( plot_directory, exist_ok=True)
+
+isPrefit = "prefit" in args.prefix.lower()
+
+import data_models.plot_options as plot_options
 
 for wc in ["cQj18", "cQj38", "ctGIm", "ctGRe", "ctj8"]:
     c1 = ROOT.TCanvas()
@@ -63,13 +60,13 @@ for wc in ["cQj18", "cQj38", "ctGIm", "ctGRe", "ctj8"]:
                 ( "+l kin",  ROOT.kGreen,   ["True", "True", "True", "True"]),
                 ( "all",     ROOT.kBlack,   ["False", "False", "False", "False"]),
             ]:
-                filename = os.path.join( user.results_directory, "TT2lUnbinned", "multiBit_TT2lUnbinned_TK_%s_LK_%s_CA_%s_SC_%s_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300/%s.pkl"% (TK, LK, CA, SC, wc) )
+                filename = os.path.join( user.results_directory, "TT2lUnbinned", args.prefix, "multiBit_TT2lUnbinned_TK_%s_LK_%s_CA_%s_SC_%s_v1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300/%s.pkl"% (TK, LK, CA, SC, wc) )
                 try: 
                     results = pickle.load( open( filename, 'rb'))
                 except FileNotFoundError:
                     continue
-
-                tgr = helpers.make_TGraph([(r['val'], r['postfit']) for r in results])
+                key = 'prefit' if isPrefit else 'postfit'
+                tgr = helpers.make_TGraph([(r['val1'], r[key]) for r in results if r[key]>0])
 
                 tgr.SetLineWidth(2)
                 tgr.SetLineColor(color)
@@ -81,14 +78,14 @@ for wc in ["cQj18", "cQj38", "ctGIm", "ctGRe", "ctj8"]:
                 else:
                     tgr.Draw("L")
                 tgr.GetYaxis().SetTitle( "-2 #Delta log L" )
-                tgr.GetXaxis().SetTitle( wc )
+                tgr.GetXaxis().SetTitle( plot_options.tex[wc] )
 
                 l.AddEntry( tgr, legendText )
                 
                 stuff.append( tgr )
     l.Draw()
-
-    c1.Print(os.path.join(plot_directory, wc + '.png'))
+    if not first:
+        c1.Print(os.path.join(plot_directory, wc + '.png'))
 
 helpers.copyIndexPHP( plot_directory )
 syncer.sync()
