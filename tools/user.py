@@ -5,6 +5,11 @@ if os.environ['USER'] in ['robert.schoefbeck']:
     model_directory        = "/groups/hephy/cms/robert.schoefbeck/NN/models/"
     results_directory      = "/groups/hephy/cms/robert.schoefbeck/NN/results/"
     data_directory         = "/groups/hephy/cms/robert.schoefbeck/NN/data/"
+elif os.environ['USER'] in ['raphael.gurschl']:
+    plot_directory         = "/groups/hephy/cms/raphael.gurschl/www/pytorch/"
+    model_directory        = "/groups/hephy/cms/raphael.gurschl/NN/models/"
+    results_directory      = "/groups/hephy/cms/raphael.gurschl/NN/results/"
+    data_directory         = "/groups/hephy/cms/raphael.gurschl/NN/data/"
 elif os.environ['USER'] in ['oskar.rothbacher']:
     plot_directory         = "/groups/hephy/cms/oskar.rothbacher/www/pytorch/"
     model_directory        = "/groups/hephy/cms/oskar.rothbacher/NN/models/"

@@ -9,7 +9,7 @@ if __name__=="__main__":
     import sys
     sys.path.append('..')
 
-import tools.syncer as syncer
+#import tools.syncer as syncer
 import tools.user as user 
 import tools.helpers as helpers 
 import tensorflow as tf
@@ -237,4 +237,4 @@ for i_feature, feature in enumerate(data_model.feature_names):
     c1.Print(os.path.join( plot_directory, "variation_"+feature+'.png'))
 
 helpers.copyIndexPHP( plot_directory )
-syncer.sync()
+#syncer.sync()
