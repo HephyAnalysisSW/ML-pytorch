@@ -8,11 +8,13 @@ import matplotlib.pyplot as plt
 if __name__=="__main__":
     import sys
     sys.path.append('..')
+    sys.path.append('../..')
+    #sys.path.append('../../..')
 
 
 sys.path.insert(0,os.path.expanduser("~/ML-pytorch/"))
 
-import data_models.TTLep_pow_sys as data_model
+import TT2lUnbinned.data_models.TTLep_pow_sys as data_model
 
 generator = data_model.DataGenerator() #maybe add a maxN argument
 features, variations = generator[0]
