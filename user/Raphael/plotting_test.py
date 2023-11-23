@@ -69,7 +69,8 @@ for i_feature, feature in enumerate(feature_names):
         normalized_histogram = n / n_nominal
         label = f'$\sigma = {variation_value}$'
         color = plt.cm.viridis(variation_value / np.max(unique_variations))
-        plt.plot(bins[:-1], normalized_histogram, label=label, color=color, linestyle='-', marker='o')
+        #plt.hlines(normalized_histogram, bins[:-1], bins[1:], label=label, color=color, linestyle='-')
+        plt.stairs(normalized_histogram, bins, color = color, label=label)
 
     plt.xlabel(plot_options[feature]['tex'])
     plt.ylabel('Normalized events')
