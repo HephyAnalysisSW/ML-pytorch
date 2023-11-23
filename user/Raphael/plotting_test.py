@@ -4,21 +4,20 @@ import os
 import matplotlib
 import matplotlib.pyplot as plt
 
-
 if __name__=="__main__":
     import sys
     sys.path.append('..')
     sys.path.append('../..')
-    #sys.path.append('../../..')
-
 
 sys.path.insert(0,os.path.expanduser("~/ML-pytorch/"))
 
 import TT2lUnbinned.data_models.TTLep_pow_sys as data_model
+import tools.helpers as helpers
 
 generator = data_model.DataGenerator() #maybe add a maxN argument
 features, variations = generator[0]
 column_arrays=np.split(features,features.shape[1],axis=1)
+unique_variations=np.unique(variations)
 
 feature_names = [ "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet2_pt", "jet3_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta" ]
 
@@ -41,20 +40,45 @@ plot_options =  {
 output_folder = 'Plots'
 os.makedirs(output_folder, exist_ok=True)
 
-for i in range(len(feature_names)):
-    binning_info = plot_options[feature_names[i]]['binning']
+for i_feature, feature in enumerate(feature_names):
+    binning_info = plot_options[feature]['binning']
     bins = np.linspace(binning_info[1], binning_info[2], binning_info[0] + 1)
-    n, bins = np.histogram(column_arrays[i], bins=bins)
-    plt.hlines(n, bins[:-1], bins[1:], color='black')
-    plt.xlabel(plot_options[feature_names[i]]['tex'])
+    nominal_data = column_arrays[i_feature][variations == 0]
+    n_nominal, _ = np.histogram(nominal_data, bins=bins)
+    for variation_value in unique_variations:
+        selected_data=column_arrays[i_feature][variations==variation_value]
+        color = plt.cm.viridis(variation_value / np.max(unique_variations))
+        label = f'$\sigma = {variation_value}$'
+        plt.hist(selected_data, bins=bins, histtype='step', stacked=True, fill=False, color=color, label=label)
+
+    plt.xlabel(plot_options[feature]['tex'])
     plt.ylabel('Number of events')
-    scale_info = plot_options[feature_names[i]]['logY']
+    scale_info = plot_options[feature]['logY']
     if scale_info == True:
         plt.yscale('log')
     else:
         plt.yscale('linear')
-    #plt.ylim(10**3,10**7)
-    output_path = os.path.join(output_folder, feature_names[i] + '.png')
-    plt.savefig(output_path)
+    output_path1 = os.path.join(output_folder, feature + '.png')
+    plt.legend(loc='best')
+    plt.savefig(output_path1)
     plt.clf()
 
+    for variation_value in unique_variations:
+        selected_data = column_arrays[i_feature][variations == variation_value]
+        n, _ = np.histogram(selected_data, bins=bins)
+        normalized_histogram = n / n_nominal
+        label = f'$\sigma = {variation_value}$'
+        color = plt.cm.viridis(variation_value / np.max(unique_variations))
+        plt.plot(bins[:-1], normalized_histogram, label=label, color=color, linestyle='-', marker='o')
+
+    plt.xlabel(plot_options[feature]['tex'])
+    plt.ylabel('Normalized events')
+    scale_info = plot_options[feature]['logY']
+    if scale_info == True:
+        plt.yscale('log')
+    else:
+        plt.yscale('linear')
+    output_path2 = os.path.join(output_folder, 'variation_'+ feature + '.png')
+    plt.legend(loc='best')
+    plt.savefig(output_path2)
+    plt.clf()
