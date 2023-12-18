@@ -344,14 +344,14 @@ plot_options = {
     'ftildeTTprime':{'binning':[Nbins,-1,1],        'tex':'#tilde{f}_{TT}',},
     }
 
-eft_plot_points = [
-    {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
-    {'color':ROOT.kBlue+2,      'eft':make_eft(cHQ3 = .02),  'tex':"c_{HQ}^{(3)} = 0.03"},
-    {'color':ROOT.kBlue-4,      'eft':make_eft(cHQ3 = -.02), 'tex':"c_{HQ}^{(3)} = -0.03"},
-    {'color':ROOT.kGreen+2,     'eft':make_eft(cHW = 0.3),   'tex':"c_{HW} = 0.3"},
-    {'color':ROOT.kGreen-4,     'eft':make_eft(cHW = -0.3),  'tex':"c_{HW} = -0.3"},
-    {'color':ROOT.kMagenta+2,   'eft':make_eft(cHWtil = 0.3),   'tex':"c_{H#tilde{W}} = 0.3"},
-    {'color':ROOT.kMagenta-4,   'eft':make_eft(cHWtil = -0.3),  'tex':"c_{H#tilde{W}} = -0.3"},
+plot_points = [
+    {'color':ROOT.kBlack,       'point':sm, 'tex':"SM"},
+    {'color':ROOT.kBlue+2,      'point':make_eft(cHQ3 = .02),  'tex':"c_{HQ}^{(3)} = 0.03"},
+    {'color':ROOT.kBlue-4,      'point':make_eft(cHQ3 = -.02), 'tex':"c_{HQ}^{(3)} = -0.03"},
+    {'color':ROOT.kGreen+2,     'point':make_eft(cHW = 0.3),   'tex':"c_{HW} = 0.3"},
+    {'color':ROOT.kGreen-4,     'point':make_eft(cHW = -0.3),  'tex':"c_{HW} = -0.3"},
+    {'color':ROOT.kMagenta+2,   'point':make_eft(cHWtil = 0.3),   'tex':"c_{H#tilde{W}} = 0.3"},
+    {'color':ROOT.kMagenta-4,   'point':make_eft(cHWtil = -0.3),  'tex':"c_{H#tilde{W}} = -0.3"},
 ]
 
 multi_bit_cfg = {'n_trees': 100,

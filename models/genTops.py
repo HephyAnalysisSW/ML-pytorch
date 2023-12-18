@@ -76,13 +76,13 @@ tex = {"ctWRe":"C_{tW}^{Re}", "ctWIm":"C_{tW}^{Im}", "ctBIm":"C_{tB}^{Im}", "ctB
 
 #['ctWRe', 'ctBRe', 'cHQ3', 'cHt', 'cHtbRe', 'ctWIm', 'ctBIm', 'cHtbIm']
 
-eft_plot_points = [
-    {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
-    {'color':ROOT.kMagenta-4,   'eft':make_eft(ctWRe=3),   'tex':"c_{tW}^{Re}=3",   },
-    {'color':ROOT.kMagenta+2,   'eft':make_eft(ctWIm=5),   'tex':"c_{tW}^{Im}=5",   },
-    {'color':ROOT.kGreen-4,     'eft':make_eft(cHtbRe=5),  'tex':"c_{Htb}^{Re}=5",  },
-    {'color':ROOT.kGreen+2,     'eft':make_eft(cHtbIm=5),  'tex':"c_{Htb}^{Im}=5",  },
-    {'color':ROOT.kBlue+2,      'eft':make_eft(cHQ3=5),    'tex':"c_{HQ}^{(3)}=5",  },
+plot_points = [
+    {'color':ROOT.kBlack,       'point':sm, 'tex':"SM"},
+    {'color':ROOT.kMagenta-4,   'point':make_eft(ctWRe=3),   'tex':"c_{tW}^{Re}=3",   },
+    {'color':ROOT.kMagenta+2,   'point':make_eft(ctWIm=5),   'tex':"c_{tW}^{Im}=5",   },
+    {'color':ROOT.kGreen-4,     'point':make_eft(cHtbRe=5),  'tex':"c_{Htb}^{Re}=5",  },
+    {'color':ROOT.kGreen+2,     'point':make_eft(cHtbIm=5),  'tex':"c_{Htb}^{Im}=5",  },
+    {'color':ROOT.kBlue+2,      'point':make_eft(cHQ3=5),    'tex':"c_{HQ}^{(3)}=5",  },
     ]
 plot_options =  {
     "genJet_pt"                 :{'binning':[50,500,2000], 'tex':'p_{T}(jet)'},

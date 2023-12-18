@@ -75,17 +75,17 @@ tex = {"ctWRe":"C_{tW}^{Re}", "ctWIm":"C_{tW}^{Im}", "ctGRe":"C_{tG}^{Re}", "ctG
 
 #['ctWRe', 'ctBRe', 'cHQ3', 'cHt', 'cHtbRe', 'ctWIm', 'ctBIm', 'cHtbIm']
 
-eft_plot_points = [
-    {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
+plot_points = [
+    {'color':ROOT.kBlack,       'point':sm, 'tex':"SM"},
 
-    {'color':ROOT.kMagenta-4,   'eft':make_eft(ctWRe=-1),  'tex':"Re(c_{tW})=-1", },
-    {'color':ROOT.kMagenta+2,   'eft':make_eft(ctWRe=1),   'tex':"Re(c_{tW})=1",  },
-    {'color':ROOT.kOrange-4,   'eft':make_eft(ctWIm=-1),  'tex':"Im(c_{tW})=-1", },
-    {'color':ROOT.kOrange+2,   'eft':make_eft(ctWIm=1),   'tex':"Im(c_{tW})=1",  },
-    {'color':ROOT.kGreen-4,     'eft':make_eft(ctGRe=-1),  'tex':"Re(c_{tG})=-1", },
-    {'color':ROOT.kGreen+2,     'eft':make_eft(ctGRe=1),   'tex':"Re(c_{tG})=1",  },
-    {'color':ROOT.kBlue-4,      'eft':make_eft(ctGIm=-1),  'tex':"Im(c_{tG})=-1", },
-    {'color':ROOT.kBlue+2,      'eft':make_eft(ctGIm=1),   'tex':"Im(c_{tG})=1",  },
+    {'color':ROOT.kMagenta-4,   'point':make_eft(ctWRe=-1),  'tex':"Re(c_{tW})=-1", },
+    {'color':ROOT.kMagenta+2,   'point':make_eft(ctWRe=1),   'tex':"Re(c_{tW})=1",  },
+    {'color':ROOT.kOrange-4,   'point':make_eft(ctWIm=-1),  'tex':"Im(c_{tW})=-1", },
+    {'color':ROOT.kOrange+2,   'point':make_eft(ctWIm=1),   'tex':"Im(c_{tW})=1",  },
+    {'color':ROOT.kGreen-4,     'point':make_eft(ctGRe=-1),  'tex':"Re(c_{tG})=-1", },
+    {'color':ROOT.kGreen+2,     'point':make_eft(ctGRe=1),   'tex':"Re(c_{tG})=1",  },
+    {'color':ROOT.kBlue-4,      'point':make_eft(ctGIm=-1),  'tex':"Im(c_{tG})=-1", },
+    {'color':ROOT.kBlue+2,      'point':make_eft(ctGIm=1),   'tex':"Im(c_{tG})=1",  },
     ]
 
 plot_options =  {

@@ -38,7 +38,7 @@ np.random.seed(1)
 #########################################################################################
 # Training data 
 
-exec( "import data_models.%s as data_model"%args.data_model )
+exec( "import models.%s as data_model"%args.data_model )
 
 generator = data_model.DataGenerator(maxN=200000 if args.small else None)#, levels = levels)
 

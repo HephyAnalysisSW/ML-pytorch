@@ -84,7 +84,7 @@ class DataGenerator(Sequence):
         # Into how many chunks we split
         self.n_split        = n_split
         if not n_split>0 or not type(n_split)==int:
-            raise RuntimeError( "Need to split in positive integer. Got %r"%n )
+            raise RuntimeError( "Need to split in positive integer. Got %r"%n_split )
             
         # variables to return 
         self.branches = branches 

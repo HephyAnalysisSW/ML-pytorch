@@ -128,11 +128,11 @@ def drawObjects( offset=0 ):
 ###############
 
 stuff = []
-if args.feature_plots and hasattr( model, "eft_plot_points"):
+if args.feature_plots and hasattr( model, "plot_points"):
     h    = {}
     h_lin= {}
-    for i_eft, eft_plot_point in enumerate(model.eft_plot_points):
-        eft = eft_plot_point['eft']
+    for i_eft, eft_plot_point in enumerate(model.plot_points):
+        eft = eft_plot_point['point']
 
         if i_eft == 0:
             eft_sm     = eft
@@ -191,13 +191,13 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
     for i_feature, feature in enumerate(feature_names):
 
         for _h in [h, h_lin]:
-            norm = _h[model.eft_plot_points[0]['eft']['name']][feature].Integral()
+            norm = _h[model.plot_points[0]['point']['name']][feature].Integral()
             if norm>0:
-                for eft_plot_point in model.eft_plot_points:
-                    _h[eft_plot_point['eft']['name']][feature].Scale(1./norm) 
+                for eft_plot_point in model.plot_points:
+                    _h[eft_plot_point['point']['name']][feature].Scale(1./norm) 
 
         for postfix, _h in [ ("", h), ("_linEFT", h_lin)]:
-            histos = [_h[eft_plot_point['eft']['name']][feature] for eft_plot_point in model.eft_plot_points]
+            histos = [_h[eft_plot_point['point']['name']][feature] for eft_plot_point in model.plot_points]
             max_   = max( map( lambda h__:h__.GetMaximum(), histos ))
 
             for logY in [True, False]:
@@ -251,7 +251,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
                     histo.GetYaxis().SetTitle("shape wrt. SM")
                     if i_histo == 0:
                         histo.Draw('hist')
-                        histo.GetYaxis().SetRangeUser( (0.01 if logY else 0), (10 if logY else 2))
+                        histo.GetYaxis().SetRangeUser( (0.1 if logY else 0.8), (10 if logY else 1.4))
                         histo.Draw('hist')
                     else:
                         histo.Draw('histsame')
