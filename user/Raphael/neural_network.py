@@ -44,7 +44,7 @@ np.random.seed(1)
 #########################################################################################
 # Training data 
 
-import TT2lUnbinned.data_models.TTLep_pow_sys as data_model
+import models.TTLep_pow_sys as data_model
 
 generator = data_model.DataGenerator(maxN=200000 if args.small else None)#, levels = levels)
 

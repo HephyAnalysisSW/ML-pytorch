@@ -25,7 +25,7 @@ sys.path.insert(0,os.path.expanduser("~/ML-pytorch/"))
 
 import tools.user as user 
 import tools.helpers as helpers 
-import TT2lUnbinned.data_models.TTLep_pow_sys as data_model
+import models.TTLep_pow_sys as data_model
 
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
