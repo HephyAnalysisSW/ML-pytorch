@@ -24,8 +24,7 @@ default_cfg = {
 
 class BPT:
 
-    def __init__( self, training_data, combinations, nominal_base_point, 
-                    **kwargs ):
+    def __init__( self, training_data, combinations, nominal_base_point, parameters, **kwargs ):
 
         # make cfg and node_cfg from the kwargs keys known by the Node
         self.cfg = default_cfg
@@ -38,6 +37,7 @@ class BPT:
                 self.cfg[key]      = val
             else:
                 raise RuntimeError( "Got unexpected keyword arg: %s:%r" %( key, val ) )
+
         self.node_cfg['loss'] = self.cfg['loss'] 
 
         for (key, val) in self.cfg.items():
@@ -47,10 +47,18 @@ class BPT:
         if self.learning_rate == "auto":
             self.learning_rate = 1-0.02**(1./self.n_trees)
 
-        # Make sure of the format 
-        self.base_points        = np.array( sorted(list(training_data.keys())), dtype='float')
+        # Make sure of the format
+        if "base_points" in kwargs:
+            self.base_points = kwargs["base_points"]
+        elif training_data is not None: 
+            self.base_points = np.array( sorted(list(training_data.keys())), dtype='float')
+        else:
+            raise RuntimeError("Did not find base_points.")
+        self.n_base_points = len(self.base_points)
+
         self.nominal_base_point = np.array( nominal_base_point, dtype='float')
         self.combinations       = combinations
+        self.parameters         = parameters
 
         # Base point matrix
         self.VkA  = np.zeros( [len(self.base_points), len(self.combinations) ], dtype='float64')
@@ -94,31 +102,31 @@ class BPT:
         self.MkA  = np.dot(self.VKA, self.CInv).transpose()
         self.Mkkp = np.dot(self.VKA, self.MkA )
 
-        # Complement training data
-        for k, v in training_data.items():
-            if "features" not in v and "weights" not in v:
-                raise RuntimeError( "Key %r has neither features nor weights" %k  )
-            if k == self.nominal_base_point_key:
-                if 'features' not in v:
-                    raise RuntimeError( "Nominal base point does not have features!" )
-            else:
-                if (not 'weights' in training_data[self.nominal_base_point_key].keys()) and 'weights' in v:
-                    raise RuntimeError( "Found no weights for nominal base point, but for a variation. This is not allowed" )
-
-                if not 'weights' in v:
-                    v['weights'] = np.ones(v['features'].shape[0])
-                elif not 'features' in v:
-                    v['features'] = training_data[self.nominal_base_point_key]['features']
+        if training_data is not None:
+            # Complement training data
+            for k, v in training_data.items():
+                if "features" not in v and "weights" not in v:
+                    raise RuntimeError( "Key %r has neither features nor weights" %k  )
+                if k == self.nominal_base_point_key:
+                    if 'features' not in v:
+                        raise RuntimeError( "Nominal base point does not have features!" )
                 else:
-                    if len(v['weights'])!=len(v['features']):
-                        raise RuntimeError("Key %r has unequal length of weights and features: %i != %i" % (k, len(v['weights']), len(v['features'])) )
-        if 'weights' not in training_data[self.nominal_base_point_key]:
-            training_data[self.nominal_base_point_key]['weights'] = np.ones(v['features'].shape[0])
+                    if (not 'weights' in training_data[self.nominal_base_point_key].keys()) and 'weights' in v:
+                        raise RuntimeError( "Found no weights for nominal base point, but for a variation. This is not allowed" )
 
-        self.n_base_points = len(self.base_points)
-        self.enumeration = np.concatenate( [ np.array( [i_base_point for _ in training_data[tuple(base_point)]['features']]) for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
-        self.features    = np.concatenate( [ training_data[tuple(base_point)]['features'] for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
-        self.weights     = np.concatenate( [ training_data[tuple(base_point)]['weights'] for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
+                    if not 'weights' in v:
+                        v['weights'] = np.ones(v['features'].shape[0])
+                    elif not 'features' in v:
+                        v['features'] = training_data[self.nominal_base_point_key]['features']
+                    else:
+                        if len(v['weights'])!=len(v['features']):
+                            raise RuntimeError("Key %r has unequal length of weights and features: %i != %i" % (k, len(v['weights']), len(v['features'])) )
+            if 'weights' not in training_data[self.nominal_base_point_key]:
+                training_data[self.nominal_base_point_key]['weights'] = np.ones(v['features'].shape[0])
+
+            self.enumeration = np.concatenate( [ np.array( [i_base_point for _ in training_data[tuple(base_point)]['features']]) for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
+            self.features    = np.concatenate( [ training_data[tuple(base_point)]['features'] for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
+            self.weights     = np.concatenate( [ training_data[tuple(base_point)]['weights'] for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
 
         # Will hold the trees
         self.trees              = []
@@ -131,16 +139,19 @@ class BPT:
     def load(cls, filename):
         with open(filename,'rb') as file_:
             old_instance = pickle.load(file_)
-            new_instance = cls( None, None, 
+            new_instance = cls( None,  
                     n_trees             = old_instance.n_trees, 
                     learning_rate       = old_instance.learning_rate,
+                    nominal_base_point  = old_instance.nominal_base_point,
+                    parameters          = old_instance.parameters,
+                    combinations        = old_instance.combinations,
+                    base_points         = old_instance.base_points,
                     learn_global_param  = old_instance.learn_global_param if hasattr( old_instance, "learn_global_param") else False,
                     feature_names       = old_instance.feature_names if hasattr( old_instance, "feature_names") else None,
                     )
             new_instance.trees = old_instance.trees
 
-            raise NotImplementedError
-            new_instance.derivatives = old_instance.trees[0].derivatives[1:]
+            #new_instance.derivatives = old_instance.trees[0].derivatives[1:]
 
             return new_instance  
 
@@ -202,10 +213,10 @@ class BPT:
             learning_rate = 1. if _get_only_param else self.learning_rate 
             self.weights[reweight_mask] *=\
                 np.exp(-learning_rate*np.einsum('ij,ij->i',  
-                    root.vectorized_predict( bpt.features[reweight_mask] ), 
-                    bpt.VkA[bpt.enumeration[reweight_mask]])
+                    root.vectorized_predict( self.features[reweight_mask] ), 
+                    self.VkA[self.enumeration[reweight_mask]])
                     )
-            print( list((e, bpt.weights[bpt.enumeration==e].sum()) for e in np.unique(bpt.enumeration)) )
+            #print( list((e, self.weights[self.enumeration==e].sum()) for e in np.unique(self.enumeration)) )
 
             time2 = time.process_time()
             update_time   += time2 - time1
@@ -222,10 +233,10 @@ class BPT:
         print ("weak learner time: %.2f" % weak_learner_time)
         print ("update time: %.2f" % update_time)
        
-        ## purge training data
-        #del self.enumeration
-        #del self.features   
-        #del self.weights    
+        # purge training data
+        del self.enumeration
+        del self.features   
+        del self.weights    
 
     def predict( self, feature_array, max_n_tree = None, summed = True, last_tree_counts_full = False):
         # list learning rates
@@ -297,6 +308,7 @@ if __name__=='__main__':
     bpt = BPT(
              training_data      = training_data,
              nominal_base_point = nominal_base_point,
+             parameters         = parameters,
              combinations       = combinations,
              feature_names      = data_model.feature_names,
              **default_cfg,

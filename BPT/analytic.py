@@ -85,7 +85,10 @@ plot_points = [
     {'color':ROOT.kGreen-4,     'point':make_parameters(nu1=0.5), 'tex':"#nu_{1} =+.5"},
 ]
 
-#multi_bit_cfg = {'n_trees': 250,
-#                 'max_depth': 4,
-#                 'learning_rate': 0.20,
-#                 'min_size': 15 }
+bpt_cfg = {
+    "n_trees" : 100,
+    "learning_rate" : 0.2, 
+    "loss" : "CrossEntropy", 
+    "learn_global_param": False,
+    "min_size": 50,
+}
