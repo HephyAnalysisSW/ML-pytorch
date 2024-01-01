@@ -162,9 +162,8 @@ class Node:
 
             value = feature_values[feature_sorted_indices[argmin_split]]
 
-            Delta_left  = np.dot( self.MkA, np.log( sorted_weight_sums_left[argmin_split]/sorted_weight_sums_nominal_left[argmin_split] ))
-            Delta_right = np.dot( self.MkA, np.log( sorted_weight_sums_right[argmin_split]/sorted_weight_sums_nominal_right[argmin_split] ))
-
+            #Delta_left  = np.dot( self.MkA, np.log( sorted_weight_sums_left[argmin_split]/sorted_weight_sums_nominal_left[argmin_split] ))
+            #Delta_right = np.dot( self.MkA, np.log( sorted_weight_sums_right[argmin_split]/sorted_weight_sums_nominal_right[argmin_split] ))
             #print ("Node depth", self._depth)
             #print ("Split at position ",argmin_split, "left (nominal/var)", sorted_weight_sums_nominal_left[argmin_split], sorted_weight_sums_left[argmin_split],
             #       "right (nominal/var)", sorted_weight_sums_nominal_right[argmin_split], sorted_weight_sums_right[argmin_split])
@@ -181,7 +180,7 @@ class Node:
             #    print ("Do not take this split.")
 
             if np.count_nonzero(self.features[:,self.split_i_feature]<=self.split_value) == 1: #self.split_value <= 3.26e-05:
-                assert False, "single-entry node!!"
+                print ("Warning! Single-entry node!!")
 
         assert not np.isnan(self.split_value)
 
@@ -412,63 +411,63 @@ if __name__=='__main__':
 
     ### BELOW IN THE LOOP  
 
-    #feature_values = features[:,0]
+    feature_values = features[:,0]
 
-    #feature_sorted_indices  = np.argsort(feature_values)
-    #sorted_weight_sums_left = np.cumsum(
-    #    np.multiply( weights[feature_sorted_indices][:,np.newaxis], np.eye(n_base_points)[enumeration[feature_sorted_indices]]), axis=0 )
-    #total_weight_sum         = sorted_weight_sums_left[-1]
-    #sorted_weight_sums_left  = sorted_weight_sums_left[0:-1]
-    #sorted_weight_sums_right = total_weight_sum-sorted_weight_sums_left 
+    feature_sorted_indices  = np.argsort(feature_values)
+    sorted_weight_sums_left = np.cumsum(
+        np.multiply( weights[feature_sorted_indices][:,np.newaxis], np.eye(n_base_points)[enumeration[feature_sorted_indices]]), axis=0 )
+    total_weight_sum         = sorted_weight_sums_left[-1]
+    sorted_weight_sums_left  = sorted_weight_sums_left[0:-1]
+    sorted_weight_sums_right = total_weight_sum-sorted_weight_sums_left 
 
-    #sorted_weight_sums_nominal_left  = sorted_weight_sums_left[:, nominal_base_point_index]
-    #sorted_weight_sums_nominal_right = sorted_weight_sums_right[:, nominal_base_point_index]
+    sorted_weight_sums_nominal_left  = sorted_weight_sums_left[:, nominal_base_point_index]
+    sorted_weight_sums_nominal_right = sorted_weight_sums_right[:, nominal_base_point_index]
 
-    #sorted_weight_sums_left  = sorted_weight_sums_left[:, nu_mask] 
-    #sorted_weight_sums_right = sorted_weight_sums_right[:, nu_mask] 
+    sorted_weight_sums_left  = sorted_weight_sums_left[:, nu_mask] 
+    sorted_weight_sums_right = sorted_weight_sums_right[:, nu_mask] 
 
-    #with np.errstate(divide='ignore', invalid='ignore'):
-    #    exponent_left  = np.dot( Mkkp, np.log(sorted_weight_sums_left/sorted_weight_sums_nominal_left[:,None]).transpose())
-    #    exponent_right = np.dot( Mkkp, np.log(sorted_weight_sums_right/sorted_weight_sums_nominal_right[:,None]).transpose())
+    with np.errstate(divide='ignore', invalid='ignore'):
+        exponent_left  = np.dot( Mkkp, np.log(sorted_weight_sums_left/sorted_weight_sums_nominal_left[:,None]).transpose())
+        exponent_right = np.dot( Mkkp, np.log(sorted_weight_sums_right/sorted_weight_sums_nominal_right[:,None]).transpose())
 
-    #    l_left  = sorted_weight_sums_nominal_left    *(-np.math.log(2) + np.log1p( np.exp(  exponent_left )))\
-    #             +sorted_weight_sums_left.transpose()*(-np.math.log(2) + np.log1p( np.exp( -exponent_left )))
-    #    l_right = sorted_weight_sums_nominal_right    *(-np.math.log(2) + np.log1p( np.exp(  exponent_right )))\
-    #             +sorted_weight_sums_right.transpose()*(-np.math.log(2) + np.log1p( np.exp( -exponent_right )))
+        l_left  = sorted_weight_sums_nominal_left    *(-np.math.log(2) + np.log1p( np.exp(  exponent_left )))\
+                 +sorted_weight_sums_left.transpose()*(-np.math.log(2) + np.log1p( np.exp( -exponent_left )))
+        l_right = sorted_weight_sums_nominal_right    *(-np.math.log(2) + np.log1p( np.exp(  exponent_right )))\
+                 +sorted_weight_sums_right.transpose()*(-np.math.log(2) + np.log1p( np.exp( -exponent_right )))
 
 
-    #loss = (l_left+l_right).sum(axis=0)
+    loss = (l_left+l_right).sum(axis=0)
 
-    ## cumulative unweighted sum (for min size!)
-    #sorted_count_sums_left = np.cumsum( np.eye(n_base_points)[enumeration[feature_sorted_indices]], axis=0)
-    #total_count_sum         = sorted_count_sums_left[-1]
-    #sorted_count_sums_left  = sorted_count_sums_left[0:-1]
-    #sorted_count_sums_right = total_count_sum-sorted_count_sums_left
+    # cumulative unweighted sum (for min size!)
+    sorted_count_sums_left = np.cumsum( np.eye(n_base_points)[enumeration[feature_sorted_indices]], axis=0)
+    total_count_sum         = sorted_count_sums_left[-1]
+    sorted_count_sums_left  = sorted_count_sums_left[0:-1]
+    sorted_count_sums_right = total_count_sum-sorted_count_sums_left
 
-    #plateau_and_split_range_mask  = ((np.all(sorted_count_sums_left>=default_cfg['min_size'], axis=1)) & (np.all(sorted_count_sums_right>=default_cfg['min_size'], axis=1))).astype('bool')
-    #plateau_and_split_range_mask &= (np.diff(feature_values[feature_sorted_indices]) != 0)
+    plateau_and_split_range_mask  = ((np.all(sorted_count_sums_left>=default_cfg['min_size'], axis=1)) & (np.all(sorted_count_sums_right>=default_cfg['min_size'], axis=1))).astype('bool')
+    plateau_and_split_range_mask &= (np.diff(feature_values[feature_sorted_indices]) != 0)
 
-    #argmin_split = np.nanargmin(loss*plateau_and_split_range_mask)
-    #Delta_left  = np.dot( MkA, np.log( sorted_weight_sums_left[argmin_split]/sorted_weight_sums_nominal_left[argmin_split] ))
-    #Delta_right = np.dot( MkA, np.log( sorted_weight_sums_right[argmin_split]/sorted_weight_sums_nominal_right[argmin_split] ))
+    argmin_split = np.nanargmin(loss*plateau_and_split_range_mask)
+    Delta_left  = np.dot( MkA, np.log( sorted_weight_sums_left[argmin_split]/sorted_weight_sums_nominal_left[argmin_split] ))
+    Delta_right = np.dot( MkA, np.log( sorted_weight_sums_right[argmin_split]/sorted_weight_sums_nominal_right[argmin_split] ))
 
-    #print ("Split at position ",argmin_split, "left (nominal/var)", sorted_weight_sums_nominal_left[argmin_split], sorted_weight_sums_left[argmin_split], 
-    #       "right (nominal/var)", sorted_weight_sums_nominal_right[argmin_split], sorted_weight_sums_right[argmin_split])
-    #print ("Delta_left",Delta_left,"Delta_right",Delta_right)
+    print ("Split at position ",argmin_split, "left (nominal/var)", sorted_weight_sums_nominal_left[argmin_split], sorted_weight_sums_left[argmin_split], 
+           "right (nominal/var)", sorted_weight_sums_nominal_right[argmin_split], sorted_weight_sums_right[argmin_split])
+    print ("Delta_left",Delta_left,"Delta_right",Delta_right)
 
     ## Now doe the SAME with the node    
 
-    node = Node( features     = features,
-                 weights      = weights,
-                 enumeration  = enumeration,
-                 max_depth    = 4,
-                 Mkkp         = Mkkp,
-                 MkA          = MkA,
-                 n_base_points=n_base_points,
-                 nominal_base_point_index=nominal_base_point_index,
-                 feature_names= data_model.feature_names if hasattr( data_model, "feature_names") else None,
-                 combinations = combinations,
-                 )
+    #node = Node( features     = features,
+    #             weights      = weights,
+    #             enumeration  = enumeration,
+    #             max_depth    = 4,
+    #             Mkkp         = Mkkp,
+    #             MkA          = MkA,
+    #             n_base_points=n_base_points,
+    #             nominal_base_point_index=nominal_base_point_index,
+    #             feature_names= data_model.feature_names if hasattr( data_model, "feature_names") else None,
+    #             combinations = combinations,
+    #             )
 
     #base_point_indices = {tuple(v):i_v for i_v,v in enumerate(base_points)}
     #def vector_cumsum( weights, variations ): 

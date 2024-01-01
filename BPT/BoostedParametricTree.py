@@ -22,7 +22,7 @@ default_cfg = {
     "min_size": 50,
 }
 
-class BPT:
+class BoostedParametricTree:
 
     def __init__( self, training_data, combinations, nominal_base_point, parameters, **kwargs ):
 
@@ -90,20 +90,23 @@ class BPT:
         self.CInv = np.linalg.inv(C)
 
         # Compute matrix Mkk from non-nominal base_points
-        self.VKA = np.zeros( (len(masked_base_points), len(self.combinations)) )
+        self._VKA = np.zeros( (len(masked_base_points), len(self.combinations)) )
         for i_base_point, base_point in enumerate(masked_base_points):
             for i_combination, combination in enumerate(self.combinations):
                 res=1
                 for var in combination:
                     res*=base_point[parameters.index(var)]
 
-                self.VKA[i_base_point, i_combination ] = res
+                self._VKA[i_base_point, i_combination ] = res
 
-        self.MkA  = np.dot(self.VKA, self.CInv).transpose()
-        self.Mkkp = np.dot(self.VKA, self.MkA )
+        self.MkA  = np.dot(self._VKA, self.CInv).transpose()
+        self.Mkkp = np.dot(self._VKA, self.MkA )
 
         if training_data is not None:
             # Complement training data
+            if 'weights' not in training_data[self.nominal_base_point_key]:
+                training_data[self.nominal_base_point_key]['weights'] = np.ones(training_data[self.nominal_base_point_key]['features'].shape[0])
+
             for k, v in training_data.items():
                 if "features" not in v and "weights" not in v:
                     raise RuntimeError( "Key %r has neither features nor weights" %k  )
@@ -111,18 +114,19 @@ class BPT:
                     if 'features' not in v:
                         raise RuntimeError( "Nominal base point does not have features!" )
                 else:
+                    if not 'features' in v:
+                        # we must have weights
+                        v['features'] = training_data[self.nominal_base_point_key]['features']
+                        if len(v['features'])!=len(v['weights']):
+                            raise runtimeerror("key %r has inconsistent length in weights"%v) 
                     if (not 'weights' in training_data[self.nominal_base_point_key].keys()) and 'weights' in v:
                         raise RuntimeError( "Found no weights for nominal base point, but for a variation. This is not allowed" )
 
                     if not 'weights' in v:
                         v['weights'] = np.ones(v['features'].shape[0])
-                    elif not 'features' in v:
-                        v['features'] = training_data[self.nominal_base_point_key]['features']
-                    else:
-                        if len(v['weights'])!=len(v['features']):
-                            raise RuntimeError("Key %r has unequal length of weights and features: %i != %i" % (k, len(v['weights']), len(v['features'])) )
-            if 'weights' not in training_data[self.nominal_base_point_key]:
-                training_data[self.nominal_base_point_key]['weights'] = np.ones(v['features'].shape[0])
+
+                if len(v['weights'])!=len(v['features']):
+                    raise RuntimeError("Key %r has unequal length of weights and features: %i != %i" % (k, len(v['weights']), len(v['features'])) )
 
             self.enumeration = np.concatenate( [ np.array( [i_base_point for _ in training_data[tuple(base_point)]['features']]) for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
             self.features    = np.concatenate( [ training_data[tuple(base_point)]['features'] for i_base_point, base_point in enumerate( self.base_points)] , axis=0)
@@ -216,7 +220,6 @@ class BPT:
                     root.vectorized_predict( self.features[reweight_mask] ), 
                     self.VkA[self.enumeration[reweight_mask]])
                     )
-            #print( list((e, self.weights[self.enumeration==e].sum()) for e in np.unique(self.enumeration)) )
 
             time2 = time.process_time()
             update_time   += time2 - time1
@@ -239,7 +242,7 @@ class BPT:
         del self.weights    
 
     def predict( self, feature_array, max_n_tree = None, summed = True, last_tree_counts_full = False):
-        # list learning rates
+        # list learning rtes
         learning_rates = self.learning_rate*np.ones(max_n_tree if max_n_tree is not None else self.n_trees)
         # keep the last tree?
         if last_tree_counts_full and (max_n_tree is None or max_n_tree==self.n_trees):
@@ -249,7 +252,6 @@ class BPT:
              learning_rates[0] = 1
             
         predictions = np.array([ tree.predict( feature_array ) for tree in self.trees[:max_n_tree] ])
-        predictions = predictions[:,1:]/predictions[:,0].reshape(-1,1)
         if summed:
             return np.dot(learning_rates, predictions)
         else:
@@ -266,11 +268,21 @@ class BPT:
              learning_rates[0] = 1
             
         predictions = np.array([ tree.vectorized_predict( feature_array ) for tree in self.trees[:max_n_tree] ])
-        predictions = predictions[:,:,1:]/np.expand_dims(predictions[:,:,0], -1)
+        #predictions = predictions[:,:,1:]/np.expand_dims(predictions[:,:,0], -1)
         if summed:
             return np.sum(learning_rates.reshape(-1,1,1)*predictions, axis=0)
         else:
             return learning_rates.reshape(-1,1,1)*predictions 
+
+
+    #def vectorized_predict_r( self, feature_array, last_tree_counts_full = False):
+    #    return np.exp(  self.vectorized_predict( self.feature_array), 
+
+    #        self.weights[reweight_mask] *=\
+    #            np.exp(-learning_rate*np.einsum('ij,ij->i',  
+    #                root.vectorized_predict( self.features[reweight_mask] ), 
+    #                self.VkA[self.enumeration[reweight_mask]])
+    #                )
 
 if __name__=='__main__':
 
@@ -305,7 +317,7 @@ if __name__=='__main__':
 
     # Precompute all the ingredients MOVE TO TREE INIT
 
-    bpt = BPT(
+    bpt = BoostedParametricTree(
              training_data      = training_data,
              nominal_base_point = nominal_base_point,
              parameters         = parameters,

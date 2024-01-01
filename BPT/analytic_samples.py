@@ -58,13 +58,11 @@ class PDF:
 
 nominal_PDF = PDF(nominal_base_point)
 
-def getEvents( N_events_requested, weighted=True):
+def getEvents( N_events_requested, weighted=False):
 
     if weighted:
         x  = nominal_PDF.getFeatures( N_events_requested )
         res = {tuple(bp):{'weights':nominal_PDF.generic_pdf( x[:,0], bp)} for bp in base_points}
-        #res = {tuple(bp):{'weights':np.exp(1.+bp[0]*x)*np.ones((len(x),))} for bp in base_points}
-        #res = {tuple(bp):{'weights':np.exp( (.2*bp[0]-0.3*bp[0]**2+0.0*bp[0]**3))*np.ones((len(x),) )} for bp in base_points}
         res[nominal_base_point]['features'] = x
     else:
         res = {tuple(bp):{'features': PDF(bp).getFeatures( N_events_requested )} for bp in base_points}
