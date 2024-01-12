@@ -31,8 +31,6 @@ class MultiNode:
         for attr, val in self.cfg.items():
             setattr( self, attr, val )
 
-        self.epsilon                      = 1e-10
-
         # data set
         self.features           = features
         self.size               = len(self.features)

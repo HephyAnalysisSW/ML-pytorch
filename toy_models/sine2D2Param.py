@@ -63,14 +63,14 @@ plot_options = {
     'y': {'binning':[50,0,2*pi],      'tex':"y",},
     }
 
-eft_plot_points = [
-    {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
-    {'color':ROOT.kBlue+2,      'eft':make_eft(theta1=-1),  'tex':"#theta_{1} = -1"},
-    {'color':ROOT.kBlue-4,      'eft':make_eft(theta1=+1),  'tex':"#theta_{1} = +1"},
-    {'color':ROOT.kMagenta+2,   'eft':make_eft(theta2=-1),'tex':"#theta_{2} = -1"},
-    {'color':ROOT.kMagenta-4,   'eft':make_eft(theta2=+1), 'tex':"#theta_{2} = +1"},
-#    {'color':ROOT.kGreen+2,     'eft':make_eft(theta1=-0.5),'tex':"#theta_{1} =-.5"},
-#    {'color':ROOT.kGreen-4,     'eft':make_eft(theta1=0.5), 'tex':"#theta_{1} =+.5"},
+plot_points = [
+    {'color':ROOT.kBlack,       'point':sm, 'tex':"SM"},
+    {'color':ROOT.kBlue+2,      'point':make_eft(theta1=-1),  'tex':"#theta_{1} = -1"},
+    {'color':ROOT.kBlue-4,      'point':make_eft(theta1=+1),  'tex':"#theta_{1} = +1"},
+    {'color':ROOT.kMagenta+2,   'point':make_eft(theta2=-1),'tex':"#theta_{2} = -1"},
+    {'color':ROOT.kMagenta-4,   'point':make_eft(theta2=+1), 'tex':"#theta_{2} = +1"},
+#    {'color':ROOT.kGreen+2,     'point':make_eft(theta1=-0.5),'tex':"#theta_{1} =-.5"},
+#    {'color':ROOT.kGreen-4,     'point':make_eft(theta1=0.5), 'tex':"#theta_{1} =+.5"},
 ]
 
 multi_bit_cfg = {'n_trees': 250,

@@ -11,7 +11,7 @@ if __name__=="__main__":
 
 sys.path.insert(0,os.path.expanduser("~/ML-pytorch/"))
 
-import TT2lUnbinned.data_models.TTLep_pow_sys as data_model
+import models.TTLep_pow_sys as data_model
 import tools.helpers as helpers
 
 generator = data_model.DataGenerator() #maybe add a maxN argument

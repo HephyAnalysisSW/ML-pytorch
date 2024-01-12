@@ -67,7 +67,7 @@ class MultiBoostedInformationTree:
             new_instance = cls( None, None, 
                     n_trees             = old_instance.n_trees, 
                     learning_rate       = old_instance.learning_rate,
-                    learn_global_score  = old_instance.learn_global_score,
+                    learn_global_score  = old_instance.learn_global_score if hasattr( old_instance, "learn_global_score") else False,
                     feature_names       = old_instance.feature_names if hasattr( old_instance, "feature_names") else None,
                     )
             new_instance.trees = old_instance.trees

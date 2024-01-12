@@ -86,24 +86,24 @@ def getEvents( nTraining, return_observers = False ):
 
 tex = {"ctGRe":"C_{tG}^{Re}", "cQj18":"c_{Qj}^{18}" ,"cQj38":"c_{Qj}^{38}" ,"cQj11":"c_{Qj}^{11}" ,"cjj31":"c_{jj}^{31}" ,"ctu8":"c_{tu}^{8}" ,"ctd8":"c_{td}^{8}" ,"ctj8":"c_{tj}^{8}" ,"cQu8":"c_{Qu}^{8}" ,"cQd8":"c_{Qd}^{8}" ,"ctu1":"c_{tu}^{1}" ,"ctd1":"c_{td}^{1}" ,"ctj1":"c_{tj}^{1}" ,"cQu1":"c_{Qu}^{1}" ,"cQd1":"c_{Qd}^{1}"}
 
-eft_plot_points = [
-    {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
+plot_points = [
+    {'color':ROOT.kBlack,       'point':sm, 'tex':"SM"},
 
-    {'color':ROOT.kMagenta-4,   'eft':make_eft(ctGRe=1), 'tex':"C_{tG}^{Re}=1"},
-    {'color':ROOT.kMagenta+2,   'eft':make_eft(cQj18=10), 'tex':"c_{Qj}^{18}=10"},
-    {'color':ROOT.kGreen-4,     'eft':make_eft(cQj38=10), 'tex':"c_{Qj}^{38}=10"},
-    {'color':ROOT.kGreen+2,     'eft':make_eft(cQj11=10), 'tex':"c_{Qj}^{11}=10"},
-    {'color':ROOT.kBlue-4,      'eft':make_eft(cjj31=10), 'tex':"c_{jj}^{31}=10"},
-    {'color':ROOT.kBlue+2,      'eft':make_eft(ctu8=10), 'tex':"c_{tu}^{8}=10"  },
-    {'color':ROOT.kRed-4,       'eft':make_eft(ctd8=10), 'tex':"c_{td}^{8}=10"  },
-    {'color':ROOT.kRed+2,       'eft':make_eft(ctj8=10), 'tex':"c_{tj}^{8}=10"  },
-    {'color':ROOT.kOrange-4,    'eft':make_eft(cQu8=10), 'tex':"c_{Qu}^{8}=10"  },
-    {'color':ROOT.kOrange+2,    'eft':make_eft(cQd8=10), 'tex':"c_{Qd}^{8}=10"  },
-    {'color':ROOT.kCyan-4,      'eft':make_eft(ctu1=10), 'tex':"c_{tu}^{1}=10"  },
-    {'color':ROOT.kCyan+2,      'eft':make_eft(ctd1=10), 'tex':"c_{td}^{1}=10"  },
-    {'color':ROOT.kYellow-4,    'eft':make_eft(ctj1=10), 'tex':"c_{tj}^{1}=10"  },
-    {'color':ROOT.kYellow+2,    'eft':make_eft(cQu1=10), 'tex':"c_{Qu}^{1}=10"  },
-    {'color':ROOT.kPink,        'eft':make_eft(cQd1=10), 'tex':"c_{Qd}^{1}=10"  },
+    {'color':ROOT.kMagenta-4,   'point':make_eft(ctGRe=1), 'tex':"C_{tG}^{Re}=1"},
+    {'color':ROOT.kMagenta+2,   'point':make_eft(cQj18=10), 'tex':"c_{Qj}^{18}=10"},
+    {'color':ROOT.kGreen-4,     'point':make_eft(cQj38=10), 'tex':"c_{Qj}^{38}=10"},
+    {'color':ROOT.kGreen+2,     'point':make_eft(cQj11=10), 'tex':"c_{Qj}^{11}=10"},
+    {'color':ROOT.kBlue-4,      'point':make_eft(cjj31=10), 'tex':"c_{jj}^{31}=10"},
+    {'color':ROOT.kBlue+2,      'point':make_eft(ctu8=10), 'tex':"c_{tu}^{8}=10"  },
+    {'color':ROOT.kRed-4,       'point':make_eft(ctd8=10), 'tex':"c_{td}^{8}=10"  },
+    {'color':ROOT.kRed+2,       'point':make_eft(ctj8=10), 'tex':"c_{tj}^{8}=10"  },
+    {'color':ROOT.kOrange-4,    'point':make_eft(cQu8=10), 'tex':"c_{Qu}^{8}=10"  },
+    {'color':ROOT.kOrange+2,    'point':make_eft(cQd8=10), 'tex':"c_{Qd}^{8}=10"  },
+    {'color':ROOT.kCyan-4,      'point':make_eft(ctu1=10), 'tex':"c_{tu}^{1}=10"  },
+    {'color':ROOT.kCyan+2,      'point':make_eft(ctd1=10), 'tex':"c_{td}^{1}=10"  },
+    {'color':ROOT.kYellow-4,    'point':make_eft(ctj1=10), 'tex':"c_{tj}^{1}=10"  },
+    {'color':ROOT.kYellow+2,    'point':make_eft(cQu1=10), 'tex':"c_{Qu}^{1}=10"  },
+    {'color':ROOT.kPink,        'point':make_eft(cQd1=10), 'tex':"c_{Qd}^{1}=10"  },
 ]
 
 plot_options =  {
