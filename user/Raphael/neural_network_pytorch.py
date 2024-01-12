@@ -1,9 +1,7 @@
-#This script is a neural network 
+#This script for training with a neural network
 
 #Settings
-Plot_loss = 1
-Plot_y_pred_hist=0
-Plot_weighted=0
+epochs = 100
 
 
 #!/usr/bin/env python
@@ -45,25 +43,6 @@ argParser.add_argument('--overwrite',          action='store_true', help="Overwr
 argParser.add_argument('--output_directory',   action='store', type=str,   default=os.path.join(user.model_directory,'tt-jec/models/') )
 args = argParser.parse_args()
 
-feature_names = [ "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet2_pt", "jet3_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta" ]
-
-plot_options =  {
-    "met": {'binning': [20, 100, 500], 'logY': True, 'tex': r'$E_{T}^{\mathrm{miss}}$'},
-    "ht": {'binning': [20, 500, 1500], 'logY': True, 'tex': r'$H_{T}$'},
-    "nJetGood": {'binning': [7, 3, 10], 'logY': True, 'tex': r'$N_{\mathrm{jet}}$'},
-    "jet0_pt": {'binning': [30, 0, 1000], 'logY': True, 'tex': r'$p_{T}(\mathrm{jet\ 0})$'},
-    "jet1_pt": {'binning': [30, 0, 1000], 'logY': True, 'tex': r'$p_{T}(\mathrm{jet\ 1})$'},
-    "jet2_pt": {'binning': [30, 0, 500], 'logY': True, 'tex': r'$p_{T}(\mathrm{jet\ 2})$'},
-    "jet3_pt": {'binning': [30, 0, 500], 'logY': True, 'tex': r'$p_{T}(\mathrm{jet\ 3})$'},
-    "jet4_pt": {'binning': [30, 0, 500], 'logY': True, 'tex': r'$p_{T}(\mathrm{jet\ 4})$'},
-    "jet0_eta": {'binning': [30, -4, 4], 'logY': False, 'tex': r'$\eta(\mathrm{jet\ 0})$'},
-    "jet1_eta": {'binning': [30, -4, 4], 'logY': False, 'tex': r'$\eta(\mathrm{jet\ 1})$'},
-    "jet2_eta": {'binning': [30, -4, 4], 'logY': False, 'tex': r'$\eta(\mathrm{jet\ 2})$'},
-    "jet3_eta": {'binning': [30, -4, 4], 'logY': False, 'tex': r'$\eta(\mathrm{jet\ 3})$'},
-    "jet4_eta": {'binning': [30, -4, 4], 'logY': False, 'tex': r'$\eta(\mathrm{jet\ 4})$'},
-}
-
-
 # directories
 plot_directory   = os.path.join( user.plot_directory, 'tt-jec', args.data_model, args.prefix+('_small' if args.small else "") + ("_quadratic" if args.quadratic else ""), 'training')
 output_directory = os.path.join( args.output_directory, args.data_model, args.prefix+('_small' if args.small else "") + ("_quadratic" if args.quadratic else "")) 
@@ -100,15 +79,36 @@ def loss(x,y):
     return loss
 
 
-generator = data_model.DataGenerator(200000)  # Adjust maxN as needed
+generator = data_model.DataGenerator()  # Adjust maxN as needed
 features, variations = generator[0]
 all_features=features
 all_variations=variations
+"""
+count1=(variations==-2).sum()
+print(count1)
+count2=(variations==-1.5).sum()
+print(count2)
+count3=(variations==-1).sum()
+print(count3)
+count4=(variations==-0.5).sum()
+print(count4)
+count5=(variations==0).sum()
+print(count5)
+count6=(variations==0.5).sum()
+print(count6)
+count7=(variations==1).sum()
+print(count7)
+count8=(variations==1.5).sum()
+print(count8)
+count9=(variations==2).sum()
+print(count9)
+"""
 
-epochs = 1000
 sigma_range = np.arange(-2, 2.5, 0.5)
 loss_matrix = np.zeros((len(sigma_range), epochs))
 ratio_array=[]
+delta_array=[]
+y_pred_array=[]
 
 print("Training starts")
 
@@ -118,14 +118,21 @@ for i,sigma in enumerate(sigma_range):
     print("Now training with sigma= " + str(sigma))
     model = NeuralNetwork(n_var_flat, args.quadratic)   #Reset
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    #sigma=2 #Value filtered
     features=all_features       #Reset
     variations=all_variations
     features = features[(variations[:, 0] == sigma) | (variations[:, 0] == 0)] #filter the needed variations and the nominal data
     variations = variations[(variations[:, 0] == sigma) | (variations[:, 0] == 0)]
     features_train, features_test, variations_train, variations_test = train_test_split(features, variations) #Seperates the data into a training and a test set
 
+
     # Training loop
+    features_tensor   = torch.tensor(features, dtype=torch.float32)
+    variations_tensor = torch.tensor(variations, dtype=torch.float32)
+    features_tensor =   torch.where(torch.isnan(features_tensor), torch.tensor(0.0), features_tensor) 
+    variations_tensor  = torch.where(torch.isnan(variations_tensor), torch.tensor(0.0), variations_tensor)
+    variations_tensor   = torch.where(variations_tensor==sigma, torch.tensor(1.0), variations_tensor)   #Replace sigmas with 1 to ensure correct Cross entropy
+
+
     features_train_tensor   = torch.tensor(features_train, dtype=torch.float32)
     variations_train_tensor = torch.tensor(variations_train, dtype=torch.float32)
     features_test_tensor    = torch.tensor(features_test, dtype=torch.float32)
@@ -141,10 +148,10 @@ for i,sigma in enumerate(sigma_range):
 
     for epoch in range(epochs):
         # Forward pass
-        predictions = model(features_train_tensor)
+        predictions = model(features_tensor)
         #print(predictions)
         # Compute the loss
-        loss_value = loss(predictions, variations_train_tensor)
+        loss_value = loss(predictions, variations_tensor)
         loss_array.append(loss_value.item())
         #Zero the gradients
         optimizer.zero_grad()
@@ -156,77 +163,21 @@ for i,sigma in enumerate(sigma_range):
         print(f'Epoch {epoch+1}/{epochs}, Loss: {loss_value.item()}')
 
 
-    y_pred=model(features_test_tensor)
-    #print(y_pred)
-    ratio=1/y_pred-1
-    ratio_array.append(ratio)
-    #print(ratio)
-    #print(variations_test_tensor)
-    num_1= torch.sum(variations_test_tensor==1)
-    print(num_1)
-    num_0= torch.sum(variations_test_tensor==0)
-    print(num_0)
-    accuracy = (y_pred.round() == variations_test_tensor).float().mean() #Converts to float and does mean
-    print("Accuracy: " + str(accuracy.item()))
+    y_pred=model(features_tensor)
+    y_pred_0=y_pred[variations_tensor==0].detach().numpy()
+    y_pred_array.append(y_pred_0)
+    ratio=(1-y_pred)/(y_pred)
+    #accuracy = (y_pred.round() == variations_tensor).float().mean() #Converts to float and does mean
+    #print("Accuracy: " + str(accuracy.item()))
     loss_matrix[i, :] = loss_array      #Add the loss array to the matrix
-
+    ratio_0 = ratio[variations_tensor == 0].detach().numpy()    #Only add the ratios corresponding to the nominal data
+    ratio_array.append(ratio_0)
+    delta=1/sigma*np.log(ratio_0)
+    delta_array.append(delta)
 print("Training finished")
 
-### Plotting
-output_folder = 'Plots'
-os.makedirs(output_folder, exist_ok=True)
-
-# Create Histogramm for y_pred values
-if Plot_y_pred_hist:
-    plt.hist(y_pred.detach().numpy(), bins=10)
-    plt.title('Y Pred Values')
-    plt.xlabel('Values')
-    plt.ylabel('Number')
-    output_path1 = os.path.join(output_folder, 'Histo.png')
-    plt.savefig(output_path1)
-    plt.clf()
-
-#Create loss plots
-if Plot_loss:
-    for i,sigma in enumerate(sigma_range):
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss Value')
-        plt.title('Loss Function for $\sigma$= ' + str(sigma))
-        plt.plot(loss_matrix[i,:])
-        output_path2= os.path.join(output_folder, str(sigma) + ' Loss.png')
-        plt.savefig(output_path2)
-        plt.clf()
-
-# Create weighted Histogramms
-if Plot_weighted:
-    column_arrays=np.split(all_features,all_features.shape[1],axis=1)
-    unique_variations=np.unique(all_variations)
-    for i_feature, feature in enumerate(feature_names):
-        binning_info = plot_options[feature]['binning']
-        bins = np.linspace(binning_info[1], binning_info[2], binning_info[0] + 1)
-        nominal_data = column_arrays[i_feature][all_variations == 0]
-        n_nominal, _ = np.histogram(nominal_data, bins=bins)
-        n_nominal_safe = np.where(n_nominal == 0, 1, n_nominal)     #avoid division by 0
-        for variation_value in unique_variations:
-            selected_data = column_arrays[i_feature][all_variations == variation_value]
-            n, _ = np.histogram(selected_data, bins=bins)
-            normalized_histogram = n / n_nominal_safe
-            label = f'$\sigma = {variation_value}$'
-            color = plt.cm.viridis(variation_value / np.max(unique_variations))
-            plt.stairs(normalized_histogram, bins, color = color, label=label)
-
-        plt.xlabel(plot_options[feature]['tex'])
-        plt.ylabel('Normalized events weighted')
-        scale_info = plot_options[feature]['logY']
-        if scale_info == True:
-            plt.yscale('log')
-        else:
-            plt.yscale('linear')
-        output_path3 = os.path.join(output_folder, 'weightedvariation_'+ feature + '.png')
-        plt.legend(loc='best')
-        plt.savefig(output_path3)
-        plt.clf()
-
+#Save the data
+np.savez('training_data.npz', loss_matrix=loss_matrix, ratio_array=ratio_array, delta_array=delta_array, y_pred_array=y_pred_array, sigma_range=sigma_range, all_features=all_features, all_variations=all_variations)
 
 """
 # Save the model
