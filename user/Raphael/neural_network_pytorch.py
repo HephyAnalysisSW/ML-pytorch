@@ -1,4 +1,4 @@
-#This script for training with a neural network
+#This script for training with a neural network (Regressor)
 
 #Settings
 epochs = 30
@@ -129,10 +129,10 @@ def train():
     print("Training finished")
 
     #Save the data
-    np.savez('training_data.npz', loss_array=loss_array)
-    output_file = 'best_model.pth'
+    np.savez('loss_data_regressor.npz', loss_array=loss_array)
+    output_file = 'best_regressor_model.pth'
     torch.save(best_model.state_dict(), output_file)
-    print(f'Best model saved. Best Loss: {best_loss} in Epoch: {best_epoch}')
+    print(f'Best regressor model saved. Best Loss: {best_loss} in Epoch: {best_epoch}')
 
 if __name__ == "__main__":
     train()
