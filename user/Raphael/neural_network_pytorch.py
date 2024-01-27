@@ -1,8 +1,8 @@
 #This script for training with a neural network (Regressor)
 
 #Settings
-epochs = 30
-
+epochs = 300
+save=1 #Save model?
 
 #!/usr/bin/env python
 import ROOT, os
@@ -65,27 +65,30 @@ class NeuralNetwork(nn.Module):
         self.output_layer = nn.Linear(n_var_flat+5, 2 if quadratic else 1)
         self.act_output=nn.Sigmoid()
 
-    def forward(self, x, nu):   #is executed every time model(...) is called
+    def forward(self, x):   #is executed every time model(...) is called
         x = self.batch_norm(x)
         x = self.act1(self.fc1(x))  #sigmoid transforms the input data to data between 0 and 1
         x = self.act2(self.fc2(x))
-        x = self.act_output(self.output_layer(x))   #returns value between 0 and 1, is equal to 1/(1+r_v)
-        x = 1/nu *torch.log(1/x -1)
+        x = self.act_output(self.output_layer(x))   #returns value between 0 and 1, is equal to 1/(1+r_v)#NN
         return x     #Returns Delta Value! 
     
 #Define Loss Function
 def loss(Delta,nu):
-    soft=torch.nn.Softplus(nu)
-    loss = nu*(soft(Delta)+soft(-Delta))
+    soft=torch.nn.Softplus()
+    loss = soft(nu*Delta)
     loss = torch.sum(loss)
     return loss
 
 def train():
     generator = data_model.DataGenerator()  # Adjust maxN as needed
     features, variations = generator[0]
+    nominal_features=features[variations[:, 0] == 0]
+    nominal_variations=variations[variations[:,0]==0]
+    nominal_features_tensor=torch.tensor(nominal_features, dtype=torch.float32)
+    nominal_features_tensor = torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor)   #Replace missing values with 0
+    nominal_variations_tensor=torch.tensor(nominal_variations,dtype=torch.float32)
 
     sigma_range = np.arange(-2, 2.5, 0.5)
-    loss_matrix = np.zeros((len(sigma_range), epochs))
     loss_array=[]
     best_loss=float('inf')
 
@@ -99,19 +102,19 @@ def train():
     for epoch in range(epochs):
         # Training loop
         Loss = 0
+        total_loss=torch.tensor(0.0)
         # Forward pass
         for i,sigma in enumerate(sigma_range):
             if sigma !=0:
-                selected_features = features[(variations[:, 0] == sigma) | (variations[:, 0] == 0)] #filter the needed variations and the nominal data
-                selected_variations = variations[(variations[:, 0] == sigma) | (variations[:, 0] == 0)]
+                selected_features = features[(variations[:, 0] == sigma)] #filter the needed variations
                 selected_features_tensor   = torch.tensor(selected_features, dtype=torch.float32)
-                selected_variations_tensor = torch.tensor(selected_variations, dtype=torch.float32)
                 selected_features_tensor =   torch.where(torch.isnan(selected_features_tensor), torch.tensor(0.0), selected_features_tensor)   #Replace missing values with 0
-                predictions = model(selected_features_tensor,sigma)
-                #print(predictions)
+                predictions_nu = model(selected_features_tensor)
+                predictions_0=model(nominal_features_tensor)
                 # Compute the loss
-                loss_value = loss(predictions, sigma)
-                Loss+=loss_value.item()
+                loss_value = loss(predictions_0, sigma) + loss(predictions_nu, -sigma)
+                total_loss+=loss_value
+        Loss=total_loss.item()
         if Loss < best_loss:
             best_loss = Loss
             best_model = NeuralNetwork(n_var_flat, args.quadratic)
@@ -120,7 +123,7 @@ def train():
         #Zero the gradients
         optimizer.zero_grad()
         # Backward pass
-        loss_value.backward()
+        total_loss.backward()
         # Update weights
         optimizer.step()
         
@@ -129,10 +132,11 @@ def train():
     print("Training finished")
 
     #Save the data
-    np.savez('loss_data_regressor.npz', loss_array=loss_array)
-    output_file = 'best_regressor_model.pth'
-    torch.save(best_model.state_dict(), output_file)
-    print(f'Best regressor model saved. Best Loss: {best_loss} in Epoch: {best_epoch}')
+    if save:
+        np.savez('loss_data_regressor.npz', loss_array=loss_array)
+        output_file = 'best_regressor_model.pth'
+        torch.save(best_model.state_dict(), output_file)
+        print(f'Best regressor model saved. Best Loss: {best_loss} in Epoch: {best_epoch}')
 
 if __name__ == "__main__":
     train()
