@@ -12,14 +12,14 @@ import classifier_weighted as wcf
 #Settings 
 shuffle=0   #creates Plots with shuffle in name (check training if shuffle is on!) Shuffeling does not make a difference in result!
 
-Plot_loss_regressor = 0
-Plot_loss_classifier=1
-Plot_loss_weighted_classifier=1
+Plot_loss_regressor = 1
+Plot_loss_classifier=0
+Plot_loss_weighted_classifier=0
 
-Plot_weighted_regressor=0   #Plots validation of training
+Plot_weighted_regressor=1   #Plots validation of training
 
-Plot_classifier_distribution=1
-Plot_weighted_classifier_distribution=1
+Plot_classifier_distribution=0
+Plot_weighted_classifier_distribution=0
 
 Plot_y_pred_hist=0
 Plot_ratio_hist=0
@@ -238,7 +238,7 @@ if Plot_weighted_regressor:
         if variation_value ==0:
             ratio_array.append(0)
         if variation_value != 0:
-            delta=loaded_regressor(nominal_features_tensor,variation_value)
+            delta=loaded_regressor(nominal_features_tensor)
             ratio=torch.exp(variation_value*delta)
             ratio_array.append(ratio)
     column_arrays=np.split(features,features.shape[1],axis=1)
@@ -252,13 +252,13 @@ if Plot_weighted_regressor:
             selected_data = column_arrays[i_feature][variations == variation_value]
             n, _ = np.histogram(selected_data, bins=bins) 
             normalized_histogram= n /n_nominal_safe  #Truth  
-            if i_variation_value != 4:
+            if i_variation_value != 4: #dont include 0
                 weights=ratio_array[i_variation_value]
                 weights=weights.detach().numpy()
                 weights=np.squeeze(weights, axis=1)
-                n_nominal_w, _ = np.histogram(nominal_data,bins=bins, weights=weights)
-                n_nominal_w_safe = np.where(n_nominal_w == 0, 1, n_nominal_w)
-                normalized_histogram_w = n / n_nominal_w_safe   #Prediction
+                n_w, _ = np.histogram(nominal_data,bins=bins, weights=weights)  #weighted Histogramm
+                n_w_safe = np.where(n_w == 0, 1, n_w)
+                normalized_histogram_w = n_w / n_nominal_safe   #Prediction
             label = f'$\sigma = {variation_value}$ (Pred)'
             color = plt.cm.viridis(i_variation_value/len(unique_variations))
             if i_variation_value != 4:
