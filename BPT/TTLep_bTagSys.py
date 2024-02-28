@@ -70,20 +70,20 @@ tex = {"hf":"HF", "lf":"LF", "cferr1":"cferr1", "cferr2":"cferr2", "lfstats1":"l
 
 plot_options =  {
 
-     "nJetGood":    {'binning':[10,0,10],       'tex':"N_{jet}"},
-     "nBTag":       {'binning':[5,0,5],       'tex':"N_{b-tag}"},
+     "nJetGood":    {'binning':[7,3,10],       'tex':"N_{jet}"},
+     "nBTag":       {'binning':[4,1,5],       'tex':"N_{b-tag}"},
      "met":         {'binning': [20,0,500],     'tex':"E_{T}^{miss}"},
      "ht":          {'binning': [20,500,2500],  'tex':"H_{T}"},
-     "jet0_pt":     {'binning': [20,0,500], 'tex':"p_{T}(j_{0})"},
-     "jet0_eta":    {'binning': [20,-3,3],  'tex':"#eta(j_{0})"},
-     "jet1_pt":     {'binning': [20,0,500], 'tex':"p_{T}(j_{1})"},
-     "jet1_eta":    {'binning': [20,-3,3],  'tex':"#eta(j_{1})"},
-     "jet2_pt":     {'binning': [20,0,500], 'tex':"p_{T}(j_{2})"},
-     "jet2_eta":    {'binning': [20,-3,3],  'tex':"#eta(j_{2})"},
-     "jet3_pt":     {'binning': [20,0,500], 'tex':"p_{T}(j_{3})"},
-     "jet3_eta":    {'binning': [20,-3,3],  'tex':"#eta(j_{3})"},
+     "jet0_pt":     {'binning': [17,75,500], 'tex':"p_{T}(j_{0})"},
+     "jet0_eta":    {'binning': [20,-2.4,2.4],  'tex':"#eta(j_{0})"},
+     "jet1_pt":     {'binning': [19,25,500], 'tex':"p_{T}(j_{1})"},
+     "jet1_eta":    {'binning': [20,-2.4,2.4],  'tex':"#eta(j_{1})"},
+     "jet2_pt":     {'binning': [18,50,500], 'tex':"p_{T}(j_{2})"},
+     "jet2_eta":    {'binning': [20,-2.4,2.4],  'tex':"#eta(j_{2})"},
+     "jet3_pt":     {'binning': [19,25,500], 'tex':"p_{T}(j_{3})"},
+     "jet3_eta":    {'binning': [20,-2.4,2.4],  'tex':"#eta(j_{3})"},
      "jet4_pt":     {'binning': [20,0,500], 'tex':"p_{T}(j_{4})"},
-     "jet4_eta":    {'binning': [20,-3,3],  'tex':"#eta(j_{4})"},
+     "jet4_eta":    {'binning': [20,-2.4,2.4],  'tex':"#eta(j_{4})"},
 }
 
 bpt_cfg = {

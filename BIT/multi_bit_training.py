@@ -40,8 +40,10 @@ argParser.add_argument('--overwrite',          action='store',      default=None
 argParser.add_argument('--bias',               action='store',      default=None, nargs = "*",  help="Bias training? Example:  --bias 'pT' '10**(({}-200)/200) ")
 argParser.add_argument('--debug',              action='store_true', help="Make debug plots?")
 argParser.add_argument('--feature_plots',      action='store_true', help="Feature plots?")
-argParser.add_argument('--auto_clip',          action='store',      default=None, type=float, help="Remove quantiles of the training variable?")
-
+#argParser.add_argument('--auto_clip',          action='store',      default=None, type=float, help="Remove quantiles of the training variable?")
+argParser.add_argument('--nJobs',       action='store',         nargs='?',  type=int, default=0,                                    help="EFT interpolation order" )
+argParser.add_argument('--job',         action='store',                     type=int, default=0,                                    help="Run only jobs i" )
+ 
 args, extra = argParser.parse_known_args(sys.argv[1:])
 
 def parse_value( s ):
@@ -91,22 +93,30 @@ if not os.path.isdir(plot_directory):
 
 training_data_filename = os.path.join(user.data_directory, args.model, "training_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(training_data_filename):
-    training_features, training_weights = model.getEvents(args.nTraining)
+    training_features, training_weights, observer_features = model.getEvents(args.nTraining, return_observers=True)
     print ("Created data set of size %i" % len(training_features) )
     if not os.path.exists(os.path.dirname(training_data_filename)):
         os.makedirs(os.path.dirname(training_data_filename))
     with open( training_data_filename, 'wb' ) as _file:
-        pickle.dump( [training_features, training_weights], _file )
+        pickle.dump( [training_features, training_weights, observer_features], _file )
         print ("Written training data to", training_data_filename)
 else:
     with open( training_data_filename, 'rb') as _file:
-        training_features, training_weights = pickle.load( _file )
+        training_features, training_weights, observer_features = pickle.load( _file )
         print ("Loaded training data from ", training_data_filename, "with size", len(training_features))
 
-if args.auto_clip is not None:
-    len_before = len(training_features)
-    training_features, training_weights = helpers.clip_quantile(training_features, args.auto_clip, training_weights )
-    print ("Auto clip efficiency (training) %4.3f is %4.3f"%( args.auto_clip, len(training_features)/len_before ) )
+#if args.auto_clip is not None:
+#    len_before = len(training_features)
+#    training_features, training_weights = helpers.clip_quantile(training_features, args.auto_clip, training_weights )
+#    print ("Auto clip efficiency (training) %4.3f is %4.3f"%( args.auto_clip, len(training_features)/len_before ) )
+
+# Resample for bootstrapping
+if args.nJobs>0:
+    from sklearn.utils import resample
+    rs_mask = resample(range(training_features.shape[0]))
+    training_features = training_features[rs_mask]
+    training_weights = {key:val[rs_mask] for key, val in training_weights.items()}
+    print("Bootstrapping training data for job %i/%i"%( args.job, args.nJobs) )
 
 # Text on the plots
 def drawObjects( offset=0 ):
@@ -148,7 +158,7 @@ if args.feature_plots and hasattr( model, "plot_points"):
 
         eft['name'] = name
         
-        for i_feature, feature in enumerate(feature_names):
+        for i_feature, feature in enumerate(feature_names+model.observers):
             h[name][feature]        = ROOT.TH1F(name+'_'+feature+'_nom',    name+'_'+feature, *model.plot_options[feature]['binning'] )
             h_lin[name][feature]    = ROOT.TH1F(name+'_'+feature+'_nom_lin',name+'_'+feature+'_lin', *model.plot_options[feature]['binning'] )
 
@@ -171,24 +181,26 @@ if args.feature_plots and hasattr( model, "plot_points"):
         #    reweight     *= reweight_sign
         #    sign_postfix    = " weighted with sgn(sin(2#theta)sin(2#hat{#theta}))"
 
-        for i_feature, feature in enumerate(feature_names):
-            binning = model.plot_options[feature]['binning']
+        for names, values in [( feature_names, training_features), (model.observers, observer_features)]:
 
-            h[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight) )
-            h_lin[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight_lin) )
+            for i_feature, feature in enumerate(names):
+                binning = model.plot_options[feature]['binning']
 
-            h[name][feature].SetLineWidth(2)
-            h[name][feature].SetLineColor( eft_plot_point['color'] )
-            h[name][feature].SetMarkerStyle(0)
-            h[name][feature].SetMarkerColor(eft_plot_point['color'])
-            h[name][feature].legendText = tex_name
-            h_lin[name][feature].SetLineWidth(2)
-            h_lin[name][feature].SetLineColor( eft_plot_point['color'] )
-            h_lin[name][feature].SetMarkerStyle(0)
-            h_lin[name][feature].SetMarkerColor(eft_plot_point['color'])
-            h_lin[name][feature].legendText = tex_name+(" (lin)" if name!="SM" else "")
+                h[name][feature] = helpers.make_TH1F( np.histogram(values[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight) )
+                h_lin[name][feature] = helpers.make_TH1F( np.histogram(values[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight_lin) )
 
-    for i_feature, feature in enumerate(feature_names):
+                h[name][feature].SetLineWidth(2)
+                h[name][feature].SetLineColor( eft_plot_point['color'] )
+                h[name][feature].SetMarkerStyle(0)
+                h[name][feature].SetMarkerColor(eft_plot_point['color'])
+                h[name][feature].legendText = tex_name
+                h_lin[name][feature].SetLineWidth(2)
+                h_lin[name][feature].SetLineColor( eft_plot_point['color'] )
+                h_lin[name][feature].SetMarkerStyle(0)
+                h_lin[name][feature].SetMarkerColor(eft_plot_point['color'])
+                h_lin[name][feature].legendText = tex_name+(" (lin)" if name!="SM" else "")
+
+    for i_feature, feature in enumerate(feature_names+model.observers):
 
         for _h in [h, h_lin]:
             norm = _h[model.plot_points[0]['point']['name']][feature].Integral()
@@ -266,13 +278,17 @@ if args.feature_plots and hasattr( model, "plot_points"):
 print ("Done with plots")
 syncer.sync()
 
+postfix = ""
+if args.nJobs>0:
+    postfix  = "_resample%05i"%args.job
+
 base_points = []
 for comb in list(itertools.combinations_with_replacement(args.coefficients,1))+list(itertools.combinations_with_replacement(args.coefficients,2)):
     base_points.append( {c:comb.count(c) for c in args.coefficients} )
 if args.prefix == None:
-    bit_name = "multiBit_%s_%s_nTraining_%i_nTrees_%i"%(args.model, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 else:
-    bit_name = "multiBit_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 
 # delete coefficients we don't need (the BIT coefficients are determined from the training weight keys)
 if args.coefficients is not None:
@@ -326,15 +342,15 @@ else:
         test_features, test_weights, test_observers = pickle.load( _file )
         print ("Loaded test data from ", test_data_filename, "with size", len(test_features))
 
-if args.auto_clip is not None:
-    len_before = len(test_features)
-
-    selected = helpers.clip_quantile(test_features, args.auto_clip, return_selection = True)
-    test_features = test_features[selected]
-    test_weights = {k:test_weights[k][selected] for k in test_weights.keys()}
-    if test_observers.size:
-        test_observers = test_observers[selected] 
-    print ("Auto clip efficiency (test) %4.3f is %4.3f"%( args.auto_clip, len(test_features)/len_before ) )
+#if args.auto_clip is not None:
+#    len_before = len(test_features)
+#
+#    selected = helpers.clip_quantile(test_features, args.auto_clip, return_selection = True)
+#    test_features = test_features[selected]
+#    test_weights = {k:test_weights[k][selected] for k in test_weights.keys()}
+#    if test_observers.size:
+#        test_observers = test_observers[selected] 
+#    print ("Auto clip efficiency (test) %4.3f is %4.3f"%( args.auto_clip, len(test_features)/len_before ) )
 
 if args.bias is not None:
     bias_weights = np.array(map( function, test_features[:, model.feature_names.index(args.bias[0])] ))

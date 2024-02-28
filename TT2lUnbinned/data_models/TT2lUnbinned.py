@@ -37,7 +37,6 @@ asymmetry_features = [
 
             "recoLep_dEta", 
             "recoLep_dAbsEta",
-
 ]
 
 spin_correlation_features = [
