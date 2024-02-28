@@ -1,8 +1,8 @@
-#This script for training with a neural network (Regressor)
+#This script is a classifier for \nu=1(nominal) and \nu=1 (weighted with regressor)
 
 #Settings
-epochs = 300
-save=1 #Save model?
+epochs = 100
+shuffle=0   #Shuffeling does not make a difference!
 
 #!/usr/bin/env python
 import ROOT, os
@@ -11,8 +11,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
+import neural_network_pytorch as nnp
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -65,78 +66,91 @@ class NeuralNetwork(nn.Module):
         self.output_layer = nn.Linear(n_var_flat+5, 2 if quadratic else 1)
         self.act_output=nn.Sigmoid()
 
-    def forward(self, x):   #is executed every time model(...) is called
+    def forward(self, x, nu):   #is executed every time model(...) is called
         x = self.batch_norm(x)
         x = self.act1(self.fc1(x))  #sigmoid transforms the input data to data between 0 and 1
         x = self.act2(self.fc2(x))
-        x = self.act_output(self.output_layer(x))   #returns value between 0 and 1, is equal to 1/(1+r_v)#NN
+        x = self.act_output(self.output_layer(x))   #returns value between 0 and 1, is equal to 1/(1+r_v)
+        x = 1/nu *torch.log(1/x -1)
         return x     #Returns Delta Value! 
     
 #Define Loss Function
-def loss(Delta,nu):
-    soft=torch.nn.Softplus()
-    loss = soft(nu*Delta)
+def loss(x,y):
+    loss = - (y * torch.log(x) + (1 - y) * torch.log(1 - x))    #Binary Cross Entropy
     loss = torch.sum(loss)
     return loss
 
+
+
+#Define Training
 def train():
+    np.random.seed(1)
+    torch.manual_seed(1)
+    # Load model data and data
+    loaded_regressor= nnp.NeuralNetwork(nnp.n_var_flat, nnp.args.quadratic)
+    loaded_regressor.load_state_dict(torch.load('best_regressor_model.pth'))
+    loaded_regressor.eval()
+
     generator = data_model.DataGenerator()  # Adjust maxN as needed
     features, variations = generator[0]
-    nominal_features=features[variations[:, 0] == 0]
-    nominal_variations=variations[variations[:,0]==0]
+    nominal_features=features[(variations[:,0]==0)]
     nominal_features_tensor=torch.tensor(nominal_features, dtype=torch.float32)
-    nominal_features_tensor = torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor)   #Replace missing values with 0
-    nominal_variations_tensor=torch.tensor(nominal_variations,dtype=torch.float32)
+    nominal_features_tensor=torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor) 
 
-    sigma_range = np.arange(-2, 2.5, 0.5)
+    features_nominal_1 = features[(variations[:, 0] == 1)] #filter the needed variations
+    variations_nominal_1 = variations[(variations[:, 0] == 1)]
+
+    delta=loaded_regressor(nominal_features_tensor,1)
+    weights=torch.exp(delta)
+    weights=weights.detach().numpy()
+    features_weighted_1= nominal_features * weights
+    variations_weighted_1= np.zeros_like(features_weighted_1)   #Use 0 as reference for weighted distribution
+    variations_weighted_1 = variations_weighted_1[:, 0].reshape(-1, 1)
+
+    new_features=np.concatenate([features_nominal_1,features_weighted_1],axis=0)    #make one array
+    new_variations=np.concatenate([variations_nominal_1,variations_weighted_1], axis=0)
+    if shuffle:
+        new_features, new_variations = shuffle(new_features,new_variations, random_state=0) #shuffle the data
+    new_features_tensor=torch.tensor(new_features,dtype=torch.float32)
+    new_features_tensor=torch.where(torch.isnan(new_features_tensor), torch.tensor(0.0), new_features_tensor)
+    new_variations_tensor=torch.tensor(new_variations,dtype=torch.float32)
+
+    model = NeuralNetwork(n_var_flat, args.quadratic)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    print("Training starts")
+    # Training loop
     loss_array=[]
     best_loss=float('inf')
 
-    print("Training starts")
-    np.random.seed(1)
-    torch.manual_seed(1)
-    model = NeuralNetwork(n_var_flat, args.quadratic)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    print(model)
-
     for epoch in range(epochs):
-        # Training loop
-        Loss = 0
-        total_loss=torch.tensor(0.0)
         # Forward pass
-        for i,sigma in enumerate(sigma_range):
-            if sigma !=0:
-                selected_features = features[(variations[:, 0] == sigma)] #filter the needed variations
-                selected_features_tensor   = torch.tensor(selected_features, dtype=torch.float32)
-                selected_features_tensor =   torch.where(torch.isnan(selected_features_tensor), torch.tensor(0.0), selected_features_tensor)   #Replace missing values with 0
-                predictions_nu = model(selected_features_tensor)
-                predictions_0=model(nominal_features_tensor)
-                # Compute the loss
-                loss_value = loss(predictions_0, sigma) + loss(predictions_nu, -sigma)
-                total_loss+=loss_value
-        Loss=total_loss.item()
+        predictions = model(new_features_tensor,1)  #gives delta value
+        predictions=1/(1+torch.exp(predictions))
+        # Compute the loss
+        loss_value = loss(predictions, new_variations_tensor)
+        Loss=loss_value.item()
+        loss_array.append(Loss)
         if Loss < best_loss:
             best_loss = Loss
             best_model = NeuralNetwork(n_var_flat, args.quadratic)
             best_model.load_state_dict(model.state_dict())
-            best_epoch=epoch       
+            best_epoch=epoch   
         #Zero the gradients
         optimizer.zero_grad()
         # Backward pass
-        total_loss.backward()
+        loss_value.backward()
         # Update weights
         optimizer.step()
-        
-        loss_array.append(Loss)
-        print(f'Epoch {epoch+1}/{epochs}, Loss: {Loss}')
-    print("Training finished")
 
+        print(f'Epoch {epoch+1}/{epochs}, Loss: {loss_value.item()}')
+
+    print("Training finished")
+    
     #Save the data
-    if save:
-        np.savez('loss_data_regressor.npz', loss_array=loss_array)
-        output_file = 'best_regressor_model.pth'
-        torch.save(best_model.state_dict(), output_file)
-        print(f'Best regressor model saved. Best Loss: {best_loss} in Epoch: {best_epoch}')
+    np.savez('loss_data_weighted_classifier.npz', loss_array=loss_array)
+    output_file = 'best_weighted_classifier_model.pth'
+    torch.save(best_model.state_dict(), output_file)
+    print(f'Best weighted classifier model saved. Best Loss: {best_loss} in Epoch: {best_epoch}')
 
 if __name__ == "__main__":
     train()
