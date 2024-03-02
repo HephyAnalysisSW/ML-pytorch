@@ -220,13 +220,18 @@ if args.feature_plots:
             l.SetShadowColor(ROOT.kWhite)
             l.SetBorderSize(0)
 
+            lower, higher = 0.8, 1.2
+            if logY:
+                if hasattr(model, "shape_user_range"):
+                    lower, higher = model.shape_user_range["log"]
+
             c1.SetLogy(logY)
             for i_histo, histo in enumerate(reversed(histos)):
                 histo.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
                 histo.GetYaxis().SetTitle("shape wrt. SM")
                 if i_histo == 0:
                     histo.Draw('hist')
-                    histo.GetYaxis().SetRangeUser( (0.1 if logY else 0.8), (10 if logY else 1.4))
+                    histo.GetYaxis().SetRangeUser( (0.1 if logY else lower), (10 if logY else higher) )
                     histo.Draw('hist')
                 else:
                     histo.Draw('histsame')

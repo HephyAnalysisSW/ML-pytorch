@@ -7,8 +7,7 @@ import ROOT
 
 from tools.DataGenerator import DataGenerator as _DataGenerator
 
-#feature_names = [ "ht" ]
-feature_names = [ "nJetGood", "ht", "jet0_pt"]#, "jet1_pt", "jet2_pt", "jet3_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta" ]
+from defaults import selection, feature_names
 
 encoding      = { 0.5 :("0p5", "Up"), 1.0 :("1p0", "Up"), 1.5 :("1p5", "Up"), 2.0 :("2p0", "Up"), -0.5 :("0p5", "Down"), -1.0 :("1p0", "Down"), -1.5 :("1p5", "Down"), -2.0 :("2p0", "Down")}
 
@@ -39,7 +38,7 @@ def _getEvents( systematic = "jesTotal", level = 0, n_split=1, maxN=None):
             n_split = n_split,
             splitting_strategy = "files",
             selection   = selection, #getSelection( systematic=systematic, level=level),
-            branches = feature_names,
+            branches = feature_names + ["weight", "overflow_counter"],
             redirector=redirector)
 
     return generator.scalar_branches( generator[-1], feature_names )[:maxN]
@@ -57,21 +56,7 @@ default_parameters.update( {var:0. for var in parameters} )
 def getEvents( N_events_requested, systematic = systematic):
     return { tuple(bp):{'features':np.nan_to_num( _getEvents( systematic = systematic, level=bp[0], maxN=N_events_requested)) } for bp in base_points }
 
-plot_options =  {
-    "met" :{'binning':[20,100,500],   'logY':True,  'tex':'E_{T}^{miss}'},
-    "ht"  :{'binning':[20,500,1500],  'logY':True,  'tex':'H_{T}'},
-    "nJetGood"  :{'binning':[7,3,10], 'logY':True,  'tex':'N_{jet}'},
-    "jet0_pt" :{'binning':[30,0,1000],'logY':True,  'tex':'p_{T}(jet 0)'},
-    "jet1_pt" :{'binning':[30,0,1000],'logY':True,  'tex':'p_{T}(jet 1)'},
-    "jet2_pt" :{'binning':[30,0,500], 'logY':True,  'tex':'p_{T}(jet 2)'},
-    "jet3_pt" :{'binning':[30,0,500], 'logY':True,  'tex':'p_{T}(jet 3)'},
-    "jet4_pt" :{'binning':[30,0,500], 'logY':True,  'tex':'p_{T}(jet 4)'},
-    "jet0_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 0)'},
-    "jet1_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 1)'},
-    "jet2_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 2)'},
-    "jet3_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 3)'},
-    "jet4_eta" :{'binning':[30,-4,4],'logY':False,  'tex':'#eta(jet 4)'},
-}
+from plot_options import plot_options
 
 bpt_cfg = {
     "n_trees" : 300,

@@ -12,9 +12,8 @@ from tools.WeightInfo    import WeightInfo
 
 from defaults import selection, feature_names
 
-systematics = ["hf", "lf",  "cferr1", "cferr2", "lfstats1", "lfstats2", "hfstats1", "hfstats2"]
+systematics = ["scale_%i"%i for i in [0,1,3,5,6,7,8]]
 wilson_coefficients = systematics
-weight_branches = ["reweightBTagSF_central"] + ["reweightBTagSF_%s_%s"%(ud, sys) for ud in ["up","down"] for sys in systematics ]
 
 observers = []
 
@@ -23,13 +22,13 @@ data_generator  =  DataGenerator(
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + weight_branches + ["overflow_counter"]  ) 
+        branches  = feature_names + ["scale_Weight", "overflow_counter", "weight"] ) 
 
-systematic         = "hf"
-base_points        = [  [-1.],  [0.], [1.], ]
-parameters         = ['nu']
-combinations       = [('nu',), ('nu', 'nu'),] #('nu', 'nu', 'nu'), ('nu', 'nu', 'nu', 'nu')]
-tex                = {"nu":"#nu"}
+systematic         = "scale001"
+base_points        = [ [0.], [1.] ]
+parameters         = [ 'nu' ]
+combinations       = [ ('nu',), ] #('nu', 'nu'),] #('nu', 'nu', 'nu'), ('nu', 'nu', 'nu', 'nu')]
+tex                = { "nu": "#nu" }
 nominal_base_point = (0.,)
 
 default_parameters = {  }
@@ -41,14 +40,22 @@ def getEvents( N_events_requested, systematic = systematic):
     res = {tuple(bp):{} for bp in base_points}
     
     res[tuple(nominal_base_point)]['features']  = data_generator.scalar_branches( data_generator[index], feature_names )[:N_events_requested]
-    coeffs      = data_generator.scalar_branches( data_generator[index], weight_branches)[:N_events_requested] 
-    res[tuple(nominal_base_point)]['weights'] = coeffs[:,weight_branches.index("reweightBTagSF_central")]
-    res[(-1.0,)]['weights'] = coeffs[:,weight_branches.index("reweightBTagSF_down_%s"%(systematic))]
-    res[( 1.0,)]['weights'] = coeffs[:,weight_branches.index("reweightBTagSF_up_%s"%(systematic))]
+    scale_Weight = data_generator.vector_branch( data_generator[index], "scale_Weight", padding_target=102)[:N_events_requested] 
+    res[tuple(nominal_base_point)]['weights'] = scale_Weight[:,4] 
+    res[( 1.0,)]['weights']                   = scale_Weight[:,int( systematic.replace('scale_','')) ] 
 
     return res 
 
-tex = {"hf":"HF", "lf":"LF", "cferr1":"cferr1", "cferr2":"cferr2", "lfstats1":"lfstats1", "lfstats2":"lfstats2", "hfstats1":"hfstats1", "hfstats2":"hfstats2"}
+tex.update( { 
+    "scale_0":"Ren. Down, Fact. Down",
+    "scale_1":"Ren. Down, Fact. Nom",
+    "scale_3":"Ren. Nom, Fact. Down",
+    "scale_5":"Ren. Nom, Fact. Up" ,
+    "scale_7":"Ren. Up, Fact. Nom" ,
+    "scale_8":"Ren. Up, Fact. Up",  },
+    )
+
+shape_user_range = {'log':(0.8, 1.2)}
 
 from plot_options import plot_options
 

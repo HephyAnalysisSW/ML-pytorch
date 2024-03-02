@@ -19,11 +19,11 @@ weight_branches = ["reweightBTagSF_central"] + ["reweightBTagSF_%s_%s"%(ud, sys)
 observers = []
 
 data_generator  =  DataGenerator(
-    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TTLep/TTLep.root"],
+    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/tt-jec/training-ntuples-3/MVA-training/tt_jec_trg-dilepVL-minDLmass20-offZ1/TTLep_nominal/TTLep_nominal.root"],
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + weight_branches + ["overflow_counter"]  ) 
+        branches  = feature_names + weight_branches + ["weight", "overflow_counter"]  ) 
 
 systematic         = "hf"
 base_points        = [  [-1.],  [0.], [1.], ]
