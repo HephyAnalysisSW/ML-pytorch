@@ -29,6 +29,7 @@ import tools.user as user
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="BPT",                 help="plot sub-directory")
+argParser.add_argument("--version",            action="store",      default="",                 help="Which version?")
 argParser.add_argument("--model",              action="store",      default="analytic",                 help="Which model?")
 #argParser.add_argument("--modelFile",          action="store",      default="toy_models",                 help="Which model directory?")
 argParser.add_argument("--variation",          action="store",      default=None, type=str,  help="variation")
@@ -79,7 +80,11 @@ cfg.update( extra_args )
 feature_names = model.feature_names
 
 # directory for plots
-plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.model+("_"+args.variation if args.variation is not None else "") )
+plot_directory = os.path.join( user.plot_directory, args.plot_directory,
+    args.version, 
+    args.model
+        + ("_"+args.variation if args.variation is not None else "")
+    )
 
 if not os.path.isdir(plot_directory):
     try:
@@ -87,7 +92,7 @@ if not os.path.isdir(plot_directory):
     except IOError:
         pass
 
-training_data_filename = os.path.join(user.data_directory, args.model+("_"+args.variation if args.variation is not None else ""), "training_%i"%args.nTraining)+'.pkl'
+training_data_filename = os.path.join(user.data_directory, args.version, args.model+("_"+args.variation if args.variation is not None else ""), "training_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(training_data_filename):
     training_data = model.getEvents(args.nTraining, systematic=args.variation)
     total_size    =  sum([len(s['features']) for s in training_data.values() if 'features' in s ])
@@ -221,9 +226,10 @@ if args.feature_plots:
             l.SetBorderSize(0)
 
             lower, higher = 0.8, 1.2
-            if logY:
-                if hasattr(model, "shape_user_range"):
-                    lower, higher = model.shape_user_range["log"]
+            try:
+                lower, higher = model.shape_user_range["log" if logY else "lin"]
+            except:
+                pass
 
             c1.SetLogy(logY)
             for i_histo, histo in enumerate(reversed(histos)):
@@ -231,7 +237,7 @@ if args.feature_plots:
                 histo.GetYaxis().SetTitle("shape wrt. SM")
                 if i_histo == 0:
                     histo.Draw('hist')
-                    histo.GetYaxis().SetRangeUser( (0.1 if logY else lower), (10 if logY else higher) )
+                    histo.GetYaxis().SetRangeUser(lower, higher)
                     histo.Draw('hist')
                 else:
                     histo.Draw('histsame')
@@ -246,10 +252,11 @@ if args.feature_plots:
 print ("Done with plots")
 syncer.sync()
 
+postfix = ("_"+args.version if args.version != "" else "")
 if args.variation == None:
-    bpt_name = "BPT_%s_nTraining_%i_nTrees_%i"%(args.model, args.nTraining, cfg["n_trees"])
+    bpt_name = "BPT_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, args.nTraining, cfg["n_trees"])
 else:
-    bpt_name = "BPT_%s_%s_nTraining_%i_nTrees_%i"%(args.model, args.variation, args.nTraining, cfg["n_trees"])
+    bpt_name = "BPT_%s_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, args.variation, args.nTraining, cfg["n_trees"])
 
 filename = os.path.join(user.model_directory, 'BPT', bpt_name)+'.pkl'
 try:

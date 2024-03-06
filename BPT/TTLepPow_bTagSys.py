@@ -50,6 +50,8 @@ def getEvents( N_events_requested, systematic = systematic):
 
 tex = {"hf":"HF", "lf":"LF", "cferr1":"cferr1", "cferr2":"cferr2", "lfstats1":"lfstats1", "lfstats2":"lfstats2", "hfstats1":"hfstats1", "hfstats2":"hfstats2"}
 
+shape_user_range = {'log':(0.8, 1.2), 'lin':(0.8, 1.4)}
+
 from plot_options import plot_options
 
 bpt_cfg = {

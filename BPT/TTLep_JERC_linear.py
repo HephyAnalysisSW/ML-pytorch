@@ -7,7 +7,8 @@ import ROOT
 
 from tools.DataGenerator import DataGenerator as _DataGenerator
 
-from defaults import selection, feature_names
+feature_names = [ "nJetGood", "ht", "jet0_pt"]#, "jet1_pt", "jet2_pt", "jet3_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta" ]
+selection = lambda ar:ar.ht>500
 
 encoding      = { 0.5 :("0p5", "Up"), 1.0 :("1p0", "Up"), 1.5 :("1p5", "Up"), 2.0 :("2p0", "Up"), -0.5 :("0p5", "Down"), -1.0 :("1p0", "Down"), -1.5 :("1p5", "Down"), -2.0 :("2p0", "Down")}
 
@@ -37,7 +38,7 @@ def _getEvents( systematic = "jesTotal", level = 0, n_split=1, maxN=None):
             n_split = n_split,
             splitting_strategy = "files",
             selection   = selection, #getSelection( systematic=systematic, level=level),
-            branches = feature_names + ["weight", "overflow_counter"],
+            branches = feature_names,
             redirector=redirector)
 
     return generator.scalar_branches( generator[-1], feature_names )[:maxN]
@@ -75,6 +76,8 @@ plot_points = [
     {'color':ROOT.kGreen+2,     'point':make_parameters(nu=-0.5),'tex':"#nu =-.5"},
     {'color':ROOT.kGreen-4,     'point':make_parameters(nu=0.5), 'tex':"#nu =+.5"},
 ]
+
+shape_user_range = {'log':(0.8, 1.2), 'lin':(0.8, 1.4)}
 
 from plot_options import plot_options
 

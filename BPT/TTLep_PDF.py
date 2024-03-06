@@ -48,7 +48,7 @@ def getEvents( N_events_requested, systematic = systematic):
 
 tex = {var:var for var in systematics}
 
-shape_user_range = {'log':(0.998, 1.002)}
+shape_user_range = {'log':(0.998, 1.002), 'lin':(0.998, 1.002)}
 
 from plot_options import plot_options
 

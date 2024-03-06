@@ -36,7 +36,7 @@ feature_names = [
         "l2_pt",
         "jet0_pt",
         "jet1_pt",
-        "jet2_pt",
+        #"jet2_pt",
         "nJetGood",
         "nBTag",
 ]

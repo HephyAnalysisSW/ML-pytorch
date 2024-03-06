@@ -88,11 +88,13 @@ class Node:
             sorted_weight_sums_left  = sorted_weight_sums_left[0:-1]
             sorted_weight_sums_right = total_weight_sum-sorted_weight_sums_left
 
-            sorted_weight_sums_nominal_left  = sorted_weight_sums_left[:, self.nominal_base_point_index]
+            sorted_weight_sums_nominal_left  = sorted_weight_sums_left[:,  self.nominal_base_point_index]
             sorted_weight_sums_nominal_right = sorted_weight_sums_right[:, self.nominal_base_point_index]
 
             # cumulative unweighted sum (for min size!)
-            sorted_count_sums_left = np.cumsum( np.eye(self.n_base_points)[self.enumeration[feature_sorted_indices]], axis=0)
+            sorted_count_sums_left  = np.cumsum( np.eye(self.n_base_points)[self.enumeration[feature_sorted_indices]], axis=0) #We might train with samples with weight=0
+            #sorted_count_sums_left = np.cumsum(
+            #    np.multiply( (self.weights[feature_sorted_indices][:,np.newaxis]!=0).astype('int'), np.eye(self.n_base_points)[self.enumeration[feature_sorted_indices]]), axis=0 )
             total_count_sum         = sorted_count_sums_left[-1]
             sorted_count_sums_left  = sorted_count_sums_left[0:-1]
             sorted_count_sums_right = total_count_sum-sorted_count_sums_left
@@ -112,7 +114,7 @@ class Node:
                 #print ("At first feature: sorted_weight_sums_left", sorted_weight_sums_left )
                 #print ("At first feature: sorted_count_sums_left", sorted_count_sums_left )
                 #print ("At first feature: weights", self.weights)
-                #print ("At first feature: self.enumeration", enumeration)
+                #print ("At first feature: self.enumeration", self.enumeration)
                 #print ("At first feature: feature_sorted_indices", feature_sorted_indices)
                 #print ("At first feature: total_weight_sum", total_weight_sum)
                 #print ("At first feature: nominal_base_point_index, self.n_base_points", nominal_base_point_index, self.n_base_points )
@@ -122,7 +124,7 @@ class Node:
             sorted_weight_sums_right = sorted_weight_sums_right[:, self.nu_mask]
 
             plateau_and_split_range_mask  = ((np.all(sorted_count_sums_left>=default_cfg['min_size'], axis=1)) & (np.all(sorted_count_sums_right>=default_cfg['min_size'], axis=1))).astype('bool')
-
+            
             if self.cfg['loss'] == 'CrossEntropy':
                 with np.errstate(divide='ignore', invalid='ignore'):
                     exponent_left  = np.dot( self.Mkkp, np.log(sorted_weight_sums_left/sorted_weight_sums_nominal_left[:,None]).transpose())
@@ -154,9 +156,10 @@ class Node:
 
             plateau_and_split_range_mask &= (np.diff(feature_values[feature_sorted_indices]) != 0)
             
-            plateau_and_split_range_mask = plateau_and_split_range_mask.astype(int)
+            #plateau_and_split_range_mask = plateau_and_split_range_mask.astype(int) #FIXME
 
-            loss_masked = np.nan_to_num(loss)*plateau_and_split_range_mask
+            loss_masked = loss #= np.nan_to_num(loss)#*plateau_and_split_range_mask
+            loss_masked[~plateau_and_split_range_mask] = float('nan') #FIXME
             argmin_split= np.nanargmin(loss_masked)
             loss_value  = loss_masked[argmin_split]
 
@@ -176,22 +179,37 @@ class Node:
                 self.split_i_feature = i_feature
                 self.split_value     = value
                 self.split_loss      = loss_value
-            #else:
-            #    print ("Do not take this split.")
+                ## for debug
 
-            if np.count_nonzero(self.features[:,self.split_i_feature]<=self.split_value) == 1: #self.split_value <= 3.26e-05:
+            if np.count_nonzero(self.features[:,self.split_i_feature]<=self.split_value) == 1: 
                 print ("Warning! Single-entry node!!")
 
         assert not np.isnan(self.split_value)
 
-        #print ("End of vectorized split. We have found", self.feature_names[self.split_i_feature], "<", self.split_value)
-        #print ("End of vectorized split. Prediction", self.Delta,"left/right", Delta_left, Delta_right)
-        #print ("End of vectorized split. Delta came from ", np.log(total_weight_sum[nu_mask]/total_weight_sum[nominal_base_point_index]), total_weight_sum[nu_mask], total_weight_sum[nominal_base_point_index] )
 
         self.split_left_group = self.features[:,self.split_i_feature]<=self.split_value if not  np.isnan(self.split_value) else np.ones(self.size, dtype='bool')
 
+        if np.count_nonzero(self.split_left_group)>0 and np.count_nonzero(self.split_left_group)<self.min_size:
+            print ("Mask:",plateau_and_split_range_mask[argmin_split])
+        
+            self.split_sorted_count_sums_left = sorted_count_sums_left[argmin_split]
+            self.split_sorted_count_sums_right = sorted_count_sums_right[argmin_split]
+
+            print ("End of vectorized split. We have found", self.feature_names[self.split_i_feature], "<", self.split_value, "loss", self.split_loss)
+            #print ("End of vectorized split. Prediction", self.Delta,"left/right", Delta_left, Delta_right)
+            #print ("End of vectorized split. Delta came from ", np.log(total_weight_sum[nu_mask]/total_weight_sum[nominal_base_point_index]), total_weight_sum[nu_mask], total_weight_sum[nominal_base_point_index] )
+            print ("split_sorted_count_sums_left", self.split_sorted_count_sums_left)
+            print ("split_sorted_count_sums_right", self.split_sorted_count_sums_right)
+
+            print (np.unique(self.enumeration[self.split_left_group],return_counts=True))
+            print (np.unique(self.enumeration[~self.split_left_group],return_counts=True))
+            raise RuntimeError
+
     # everything we want to store in the terminal nodes
     def __store( self, group ):
+        
+        if np.count_nonzero(group)>0 and np.count_nonzero(group)<self.min_size:
+            print ("Warning! Too small group.")
         return {
             'size': np.count_nonzero(group),
             }
@@ -439,12 +457,15 @@ if __name__=='__main__':
     loss = (l_left+l_right).sum(axis=0)
 
     # cumulative unweighted sum (for min size!)
-    sorted_count_sums_left = np.cumsum( np.eye(n_base_points)[enumeration[feature_sorted_indices]], axis=0)
+    #sorted_count_sums_left = np.cumsum( np.eye(n_base_points)[enumeration[feature_sorted_indices]], axis=0)
+    sorted_count_sums_left = np.cumsum(
+        np.multiply( (weights[feature_sorted_indices][:,np.newaxis]!=0).astype('int'), np.eye(n_base_points)[enumeration[feature_sorted_indices]]), axis=0 )
     total_count_sum         = sorted_count_sums_left[-1]
     sorted_count_sums_left  = sorted_count_sums_left[0:-1]
     sorted_count_sums_right = total_count_sum-sorted_count_sums_left
 
     plateau_and_split_range_mask  = ((np.all(sorted_count_sums_left>=default_cfg['min_size'], axis=1)) & (np.all(sorted_count_sums_right>=default_cfg['min_size'], axis=1))).astype('bool')
+
     plateau_and_split_range_mask &= (np.diff(feature_values[feature_sorted_indices]) != 0)
 
     argmin_split = np.nanargmin(loss*plateau_and_split_range_mask)

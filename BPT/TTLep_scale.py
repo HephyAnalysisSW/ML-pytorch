@@ -55,7 +55,7 @@ tex.update( {
     "scale_8":"Ren. Up, Fact. Up",  },
     )
 
-shape_user_range = {'log':(0.8, 1.2)}
+shape_user_range = {'log':(0.8, 1.2), 'lin':(0.2, 2)}
 
 from plot_options import plot_options
 

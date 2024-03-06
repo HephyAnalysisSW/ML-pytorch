@@ -80,6 +80,8 @@ def getEvents( N_events_requested, systematic = "DY"):
 
 tex = {"DY":"DY", "others":"others"}
 
+shape_user_range = {'log':(0.8, 1.2), 'lin':(0.2, 2)}
+
 from plot_options import plot_options
 
 bpt_cfg = {

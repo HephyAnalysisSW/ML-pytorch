@@ -59,7 +59,7 @@ def getEvents( N_events_requested, systematic = None):
 
 from plot_options import plot_options
 
-shape_user_range = {'log':(0.8, 1.2)}
+shape_user_range = {'log':(0.8, 1.2), 'lin':(0.8, 1.4)}
 
 bpt_cfg = {
     "n_trees" : 300,

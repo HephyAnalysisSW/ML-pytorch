@@ -58,7 +58,7 @@ class PDF:
 
 nominal_PDF = PDF(nominal_base_point)
 
-def getEvents( N_events_requested, weighted=True):
+def getEvents( N_events_requested, weighted=True, systematic=None):
 
     if weighted:
         x  = nominal_PDF.getFeatures( N_events_requested )
