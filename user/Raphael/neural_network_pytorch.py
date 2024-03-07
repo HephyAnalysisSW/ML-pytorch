@@ -1,10 +1,12 @@
+#!/usr/bin/env python
 #This script for training with a neural network (Regressor)
 
 #Settings
-epochs = 300
+epochs = 500
+learning_rate=0.005
 save=1 #Save model?
+filter=1 
 
-#!/usr/bin/env python
 import ROOT, os
 import sys
 import torch
@@ -69,34 +71,48 @@ class NeuralNetwork(nn.Module):
         x = self.batch_norm(x)
         x = self.act1(self.fc1(x))  #sigmoid transforms the input data to data between 0 and 1
         x = self.act2(self.fc2(x))
-        x = self.act_output(self.output_layer(x))   #returns value between 0 and 1, is equal to 1/(1+r_v)#NN
+        x = self.act_output(self.output_layer(x)) #NN
         return x     #Returns Delta Value! 
     
 #Define Loss Function
-def loss(Delta,nu):
+def loss(Delta,nu,quadratic):
     soft=torch.nn.Softplus()
-    loss = soft(nu*Delta)
+    if quadratic:
+        loss = soft(Delta[:,0]*nu+Delta[:,1]*nu**2)
+    else:
+        loss= soft(Delta[:,0]*nu)
     loss = torch.sum(loss)
     return loss
 
 def train():
     generator = data_model.DataGenerator()  # Adjust maxN as needed
     features, variations = generator[0]
+    
+    if filter:
+        H_t=features[:,1]<1000
+        jet0_pt=(features[:,2]<500) & (features[:,2] >= 0)
+        jet1_pt=(features[:,3]<400) & (features[:,3] >= 0)
+        jet2_pt=(features[:,4]<250) & (features[:,4] >= 0)
+        jet3_pt=(features[:,5]<250) & (features[:,5] >= 0)
+
+        total= H_t & jet0_pt & jet1_pt & jet2_pt & jet3_pt
+        features=features[total]
+        variations=variations[total]
+
+    #features = features[:, 0].reshape(-1, 1)
     nominal_features=features[variations[:, 0] == 0]
-    nominal_variations=variations[variations[:,0]==0]
     nominal_features_tensor=torch.tensor(nominal_features, dtype=torch.float32)
     nominal_features_tensor = torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor)   #Replace missing values with 0
-    nominal_variations_tensor=torch.tensor(nominal_variations,dtype=torch.float32)
 
     sigma_range = np.arange(-2, 2.5, 0.5)
     loss_array=[]
     best_loss=float('inf')
 
-    print("Training starts")
+    print('Training starts')
     np.random.seed(1)
     torch.manual_seed(1)
     model = NeuralNetwork(n_var_flat, args.quadratic)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     print(model)
 
     for epoch in range(epochs):
@@ -107,12 +123,12 @@ def train():
         for i,sigma in enumerate(sigma_range):
             if sigma !=0:
                 selected_features = features[(variations[:, 0] == sigma)] #filter the needed variations
-                selected_features_tensor   = torch.tensor(selected_features, dtype=torch.float32)
-                selected_features_tensor =   torch.where(torch.isnan(selected_features_tensor), torch.tensor(0.0), selected_features_tensor)   #Replace missing values with 0
+                selected_features_tensor = torch.tensor(selected_features, dtype=torch.float32)
+                selected_features_tensor = torch.where(torch.isnan(selected_features_tensor), torch.tensor(0.0), selected_features_tensor)   #Replace missing values with 0
                 predictions_nu = model(selected_features_tensor)
                 predictions_0=model(nominal_features_tensor)
                 # Compute the loss
-                loss_value = loss(predictions_0, sigma) + loss(predictions_nu, -sigma)
+                loss_value = loss(predictions_0, sigma,args.quadratic) + loss(predictions_nu, -sigma, args.quadratic)
                 total_loss+=loss_value
         Loss=total_loss.item()
         if Loss < best_loss:
@@ -133,8 +149,12 @@ def train():
 
     #Save the data
     if save:
-        np.savez('loss_data_regressor.npz', loss_array=loss_array)
-        output_file = 'best_regressor_model.pth'
+        if args.quadratic:
+            np.savez('loss_data_regressor_quadratic.npz', loss_array=loss_array)
+            output_file = 'best_regressor_model_quadratic.pth'
+        else:
+            np.savez('loss_data_regressor.npz', loss_array=loss_array)
+            output_file = 'best_regressor_model.pth'
         torch.save(best_model.state_dict(), output_file)
         print(f'Best regressor model saved. Best Loss: {best_loss} in Epoch: {best_epoch}')
 
