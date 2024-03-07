@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # This script is for plotting the results of the Training
 
 import matplotlib.pyplot as plt
@@ -9,20 +10,20 @@ import neural_network_pytorch as nnp
 import classifier as cf 
 import classifier_weighted as wcf
 
+
 #Settings 
 shuffle=0   #creates Plots with shuffle in name (check training if shuffle is on!) Shuffeling does not make a difference in result!
+quadratic=0 #Want the quadratic data?
+filter=1    #Want filtered data?
 
 Plot_loss_regressor = 1
 Plot_loss_classifier=0
 Plot_loss_weighted_classifier=0
 
-Plot_weighted_regressor=1   #Plots validation of training
+Plot_weighted_regressor=1  #Plots validation of training 
 
 Plot_classifier_distribution=0
 Plot_weighted_classifier_distribution=0
-
-Plot_y_pred_hist=0
-Plot_ratio_hist=0
 
 
 plot_options =  {
@@ -44,10 +45,16 @@ plot_options =  {
 feature_names = [ "nJetGood", "ht", "jet0_pt", "jet1_pt", "jet2_pt", "jet3_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta" ]
 
 #Load Regressor
-loaded_loss_regressor= np.load('loss_data_regressor.npz', allow_pickle=True)
+if quadratic:
+    loaded_loss_regressor= np.load('loss_data_regressor_quadratic.npz', allow_pickle=True)
+else:
+    loaded_loss_regressor= np.load('loss_data_regressor.npz', allow_pickle=True)
 loss_array_regressor=loaded_loss_regressor['loss_array']
 loaded_regressor = nnp.NeuralNetwork(nnp.n_var_flat, nnp.args.quadratic)
-loaded_regressor.load_state_dict(torch.load('best_regressor_model.pth'))
+if quadratic:
+    loaded_regressor.load_state_dict(torch.load('best_regressor_model_quadratic.pth'))
+else:
+    loaded_regressor.load_state_dict(torch.load('best_regressor_model.pth'))
 loaded_regressor.eval()
 
 #Load Classifier for \nu =1 and \nu =0
@@ -67,31 +74,25 @@ loaded_weighted_classifier.eval()
 
 generator = nnp.data_model.DataGenerator()  # Adjust maxN as needed
 features, variations = generator[0]
+print(features.shape)
 
+if filter:
+    H_t=features[:,1]<1000
+    jet0_pt=(features[:,2]<500) & (features[:,2] >= 0)
+    jet1_pt=(features[:,3]<400) & (features[:,3] >= 0)
+    jet2_pt=(features[:,4]<250) & (features[:,4] >= 0)
+    jet3_pt=(features[:,5]<250) & (features[:,5] >= 0)
+
+    total= H_t & jet0_pt & jet1_pt & jet2_pt & jet3_pt
+    features=features[total]
+    variations=variations[total]
+
+#features_ht=features[:,0].reshape(-1, 1)
+
+print(features.shape)
 ############################################################## Plotting ######################################################
 output_folder = 'Plots'
 os.makedirs(output_folder, exist_ok=True)
-
-#Create Histogramm for y_pred values
-if Plot_y_pred_hist:
-    plt.hist(y_pred.detach().numpy(), bins=10)
-    plt.title('Y Pred Values')
-    plt.xlabel('Values')
-    plt.ylabel('Number')
-    output_path = os.path.join(output_folder, 'Histo_Pred.png')
-    plt.savefig(output_path)
-    plt.clf()
-
-#Create Histogramm for Ratio values
-if Plot_ratio_hist:
-    plt.hist(ratio.detach().numpy(), bins=10)
-    plt.title('Ratio Values')
-    plt.xlabel('Values')
-    plt.ylabel('Number')
-    output_path = os.path.join(output_folder, 'Histo_Ratio.png')
-    plt.savefig(output_path)
-    plt.clf()
-
 
 #Create loss plot for Regressor
 if Plot_loss_regressor:
@@ -99,7 +100,10 @@ if Plot_loss_regressor:
     plt.ylabel('Loss Value')
     plt.title('Loss Function Regressor')
     plt.plot(loss_array_regressor)
-    output_path= os.path.join(output_folder, 'Loss_regressor.png')
+    if quadratic:
+        output_path= os.path.join(output_folder, 'Loss_regressor_quadratic.png')
+    else:
+        output_path= os.path.join(output_folder, 'Loss_regressor.png')
     plt.savefig(output_path)
     plt.clf()
 
@@ -137,23 +141,21 @@ if Plot_classifier_distribution:
     features_tensor_0 =  torch.where(torch.isnan(features_tensor_0), torch.tensor(0.0), features_tensor_0)  
     features_tensor_1 =  torch.tensor(features_1, dtype=torch.float32)
     features_tensor_1 =  torch.where(torch.isnan(features_tensor_1), torch.tensor(0.0), features_tensor_1)  
-    delta_0=loaded_classifier(features_tensor_0,1)
-    delta_1=loaded_classifier(features_tensor_1,1)
-    probability_0=1/(1+torch.exp(delta_0))
+    probability_0=loaded_classifier(features_tensor_0)
+    probability_1=loaded_classifier(features_tensor_1)
     probability_0=probability_0.detach().numpy()
-    probability_1=1/(1+torch.exp(delta_1))
     probability_1=probability_1.detach().numpy()
 
     plt.xlabel('Probability')
     plt.ylabel('Number of Events')
-    plt.title('Probability Distribution for Classifier')
-    bins = np.linspace(0.4, 0.6, 100 + 1)
+    plt.title('Probability distribution for classifier')
+    bins = np.linspace(0.45, 0.6, 100 + 1)
     n_0,_ = np.histogram(probability_0, bins=bins)
     n_1,_= np.histogram(probability_1, bins=bins)
     n_0_safe= np.where(n_0 == 0, 1, n_0)
     probabilty_ratio=n_1/n_0_safe
-    plt.plot(bins[1:],n_0, drawstyle='steps',color='blue', label = 'D_0')
-    plt.plot(bins[1:],n_1, drawstyle='steps',color='red', label = 'D_1')
+    plt.plot(bins[:-1],n_0, drawstyle='steps-post',color='blue', label = 'D_0')
+    plt.plot(bins[:-1],n_1, drawstyle='steps-post',color='red', label = 'D_1')
     if shuffle:
         output_path = os.path.join(output_folder, 'classifier_distribution_shuffeld.png')
     else:
@@ -164,8 +166,8 @@ if Plot_classifier_distribution:
 
     plt.xlabel('Probability')
     plt.ylabel('Ratio D1/D0')
-    plt.title('Ratio for Classifier')
-    plt.plot(bins[1:],probabilty_ratio,drawstyle='steps', color='black', label='D_1/D_0')
+    plt.title('Ratio for classifier')
+    plt.plot(bins[:-1],probabilty_ratio,drawstyle='steps-post', color='black', label='D_1/D_0')
     if shuffle:
         output_path = os.path.join(output_folder, 'classifier_distribution_ratio_shuffeld.png')
     else:
@@ -182,30 +184,22 @@ if Plot_weighted_classifier_distribution:
     features_tensor_0 =  torch.where(torch.isnan(features_tensor_0), torch.tensor(0.0), features_tensor_0)  
     features_tensor_1 =  torch.tensor(features_1, dtype=torch.float32)
     features_tensor_1 =  torch.where(torch.isnan(features_tensor_1), torch.tensor(0.0), features_tensor_1)  
-    delta=loaded_regressor(features_tensor_0,1)
-    weights=torch.exp(delta)
-    weights=weights.detach().numpy()
-    features_weighted_1= features_0 * weights
-    features_tensor_weighted_1 =  torch.tensor(features_weighted_1, dtype=torch.float32)
-    features_tensor_weighted_1 =  torch.where(torch.isnan(features_tensor_weighted_1), torch.tensor(0.0), features_tensor_weighted_1)  
 
-    delta_0=loaded_weighted_classifier(features_tensor_weighted_1,1)
-    delta_1=loaded_weighted_classifier(features_tensor_1,1)
-    probability_0=1/(1+torch.exp(delta_0))
-    probability_0=probability_0.detach().numpy()
-    probability_1=1/(1+torch.exp(delta_1))
-    probability_1=probability_1.detach().numpy()
+    delta_0=loaded_weighted_classifier(features_tensor_0)
+    delta_1=loaded_weighted_classifier(features_tensor_1)
+    probability_0=delta_0.detach().numpy()
+    probability_1=delta_1.detach().numpy()
 
     plt.xlabel('Probability')
     plt.ylabel('Number of Events')
     plt.title('Probability Distribution for weighted Classifier')
-    bins = np.linspace(0.4, 0.6, 100 + 1)
+    bins = np.linspace(0, 1, 100 + 1)
     n_0,_ = np.histogram(probability_0, bins=bins)
     n_1,_= np.histogram(probability_1, bins=bins)
     n_0_safe= np.where(n_0 == 0, 1, n_0)
     probabilty_ratio=n_1/n_0_safe
-    plt.plot(bins[1:],n_0,drawstyle='steps', color='blue', label = 'D_0') 
-    plt.plot(bins[1:],n_1,drawstyle='steps', color='red', label = 'D_1')
+    plt.plot(bins[:-1],n_0,drawstyle='steps-post', color='blue', label = 'D_0') 
+    plt.plot(bins[:-1],n_1,drawstyle='steps-post', color='red', label = 'D_1')
     if shuffle:
         output_path = os.path.join(output_folder, 'weighted_classifier_distribution_shuffeld.png')
     else:
@@ -217,7 +211,7 @@ if Plot_weighted_classifier_distribution:
     plt.xlabel('Probability')
     plt.ylabel('Ratio D1/D0')
     plt.title('Ratio for weighted Classifier')
-    plt.plot(bins[1:],probabilty_ratio,drawstyle='steps', color='black', label='D_1/D_0')
+    plt.plot(bins[:-1],probabilty_ratio,drawstyle='steps-post', color='black', label='D_1/D_0')
     if shuffle:
         output_path = os.path.join(output_folder, 'weighted_classifier_distribution_ratio_shuffeld.png')
     else:
@@ -233,14 +227,18 @@ if Plot_weighted_regressor:
     unique_variations=np.unique(variations)
     nominal_features= features[(variations[:, 0] == 0)] #filter the nominal data
     nominal_features_tensor=   torch.tensor(nominal_features, dtype=torch.float32)
-    nominal_features_tensor =  torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor)  
+    nominal_features_tensor =  torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor) 
+    delta=loaded_regressor(nominal_features_tensor)
     for i_variation_value, variation_value in enumerate(unique_variations):
         if variation_value ==0:
             ratio_array.append(0)
         if variation_value != 0:
-            delta=loaded_regressor(nominal_features_tensor)
-            ratio=torch.exp(variation_value*delta)
-            ratio_array.append(ratio)
+            if quadratic:
+                ratio=torch.exp(variation_value*delta[:,0]+variation_value**2*delta[:,1])
+                ratio_array.append(ratio)
+            else:
+                ratio=torch.exp(variation_value*delta[:,0])
+                ratio_array.append(ratio)
     column_arrays=np.split(features,features.shape[1],axis=1)
     for i_feature, feature in enumerate(feature_names):
         binning_info = plot_options[feature]['binning']
@@ -250,20 +248,18 @@ if Plot_weighted_regressor:
         n_nominal_safe = np.where(n_nominal == 0, 1, n_nominal)     #avoid division by 0
         for i_variation_value, variation_value in enumerate(unique_variations):
             selected_data = column_arrays[i_feature][variations == variation_value]
-            n, _ = np.histogram(selected_data, bins=bins) 
+            n, _ = np.histogram(selected_data, bins=bins)
             normalized_histogram= n /n_nominal_safe  #Truth  
             if i_variation_value != 4: #dont include 0
                 weights=ratio_array[i_variation_value]
                 weights=weights.detach().numpy()
-                weights=np.squeeze(weights, axis=1)
                 n_w, _ = np.histogram(nominal_data,bins=bins, weights=weights)  #weighted Histogramm
-                n_w_safe = np.where(n_w == 0, 1, n_w)
                 normalized_histogram_w = n_w / n_nominal_safe   #Prediction
-            label = f'$\sigma = {variation_value}$ (Pred)'
+            label = f'$\\nu = {variation_value}$ (Pred)'
             color = plt.cm.viridis(i_variation_value/len(unique_variations))
             if i_variation_value != 4:
-                plt.plot(bins[1:],normalized_histogram_w, drawstyle='steps', color = color, linestyle='dashed', label=label) #Prediction
-            plt.plot(bins[1:],normalized_histogram, drawstyle='steps', color = color)  #Truth
+                plt.plot(bins[:-1],normalized_histogram_w, drawstyle='steps-post', color = color, linestyle='dashed', label=label) #Prediction
+            plt.plot(bins[:-1],normalized_histogram, drawstyle='steps-post', color = color)  #Truth
 
         plt.xlabel(plot_options[feature]['tex'])
         plt.ylabel('Normalized events weighted')
@@ -272,8 +268,10 @@ if Plot_weighted_regressor:
             plt.yscale('log')
         else:
             plt.yscale('linear')
-        output_path = os.path.join(output_folder, 'weightedvariation_'+ feature + '.png')
+        if quadratic:
+            output_path = os.path.join(output_folder, 'weightedvariation_quadratic_'+ feature + '.png')
+        else:
+            output_path = os.path.join(output_folder, 'weightedvariation_'+ feature + '.png')
         plt.legend(loc='best')
         plt.savefig(output_path)
         plt.clf()
-
