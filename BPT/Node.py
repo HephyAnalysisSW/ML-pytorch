@@ -160,10 +160,17 @@ class Node:
 
             loss_masked = loss #= np.nan_to_num(loss)#*plateau_and_split_range_mask
             loss_masked[~plateau_and_split_range_mask] = float('nan') #FIXME
-            argmin_split= np.nanargmin(loss_masked)
-            loss_value  = loss_masked[argmin_split]
+            try:
+                argmin_split = np.nanargmin(loss_masked)
+            except ValueError:
+                argmin_split = None
 
-            value = feature_values[feature_sorted_indices[argmin_split]]
+            if argmin_split:
+                loss_value  = loss_masked[argmin_split]
+                value       = feature_values[feature_sorted_indices[argmin_split]]
+            else:
+                loss_value =  float('inf')    
+                value      = -float('inf')
 
             #Delta_left  = np.dot( self.MkA, np.log( sorted_weight_sums_left[argmin_split]/sorted_weight_sums_nominal_left[argmin_split] ))
             #Delta_right = np.dot( self.MkA, np.log( sorted_weight_sums_right[argmin_split]/sorted_weight_sums_nominal_right[argmin_split] ))
@@ -172,7 +179,6 @@ class Node:
             #       "right (nominal/var)", sorted_weight_sums_nominal_right[argmin_split], sorted_weight_sums_right[argmin_split])
             #print ("Delta_left",Delta_left,"Delta_right",Delta_right)
 
-            debug_self_split_loss = self.split_loss
             #print ("Old loss value", self.split_loss, "new one", loss_value, "feature", self.feature_names[i_feature],"<",value)
             if loss_value < self.split_loss: 
                 #print ("Found better split!")
