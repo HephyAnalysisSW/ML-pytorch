@@ -2,7 +2,7 @@
 #This script for training with a neural network (Regressor)
 
 #Settings
-epochs = 500
+epochs = 1000
 learning_rate=0.005
 save=1 #Save model?
 filter=1 
@@ -52,7 +52,8 @@ output_directory = os.path.join( args.output_directory, args.data_model, args.pr
 if not os.path.exists(output_directory):
     os.makedirs(output_directory)
 
-n_var_flat = len(data_model.feature_names)
+#n_var_flat = len(data_model.feature_names)
+n_var_flat=1
 
 # Define neural network model
 class NeuralNetwork(nn.Module):
@@ -65,13 +66,13 @@ class NeuralNetwork(nn.Module):
         self.fc2 = nn.Linear(n_var_flat*2, n_var_flat+5)    #Trafo: y=xA^T +b, A and b are adjusted during training, Initial numbers of A and b random (adjustable)
         self.act2=nn.Sigmoid()
         self.output_layer = nn.Linear(n_var_flat+5, 2 if quadratic else 1)
-        self.act_output=nn.Sigmoid()
+        #self.act_output=nn.Sigmoid()
 
     def forward(self, x):   #is executed every time model(...) is called
         x = self.batch_norm(x)
         x = self.act1(self.fc1(x))  #sigmoid transforms the input data to data between 0 and 1
         x = self.act2(self.fc2(x))
-        x = self.act_output(self.output_layer(x)) #NN
+        x = self.output_layer(x) #NN
         return x     #Returns Delta Value! 
     
 #Define Loss Function
@@ -99,7 +100,8 @@ def train():
         features=features[total]
         variations=variations[total]
 
-    #features = features[:, 0].reshape(-1, 1)
+    features = features[:, 2].reshape(-1, 1)
+
     nominal_features=features[variations[:, 0] == 0]
     nominal_features_tensor=torch.tensor(nominal_features, dtype=torch.float32)
     nominal_features_tensor = torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor)   #Replace missing values with 0
@@ -127,6 +129,7 @@ def train():
                 selected_features_tensor = torch.where(torch.isnan(selected_features_tensor), torch.tensor(0.0), selected_features_tensor)   #Replace missing values with 0
                 predictions_nu = model(selected_features_tensor)
                 predictions_0=model(nominal_features_tensor)
+                #print(predictions_0)
                 # Compute the loss
                 loss_value = loss(predictions_0, sigma,args.quadratic) + loss(predictions_nu, -sigma, args.quadratic)
                 total_loss+=loss_value
@@ -146,7 +149,7 @@ def train():
         loss_array.append(Loss)
         print(f'Epoch {epoch+1}/{epochs}, Loss: {Loss}')
     print("Training finished")
-
+    print(predictions_0)
     #Save the data
     if save:
         if args.quadratic:
