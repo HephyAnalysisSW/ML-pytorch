@@ -87,7 +87,7 @@ if filter:
     features=features[total]
     variations=variations[total]
 
-#features_ht=features[:,0].reshape(-1, 1)
+features_ht=features[:,2].reshape(-1, 1)
 
 print(features.shape)
 ############################################################## Plotting ######################################################
@@ -225,7 +225,7 @@ if Plot_weighted_classifier_distribution:
 if Plot_weighted_regressor:
     ratio_array=[]
     unique_variations=np.unique(variations)
-    nominal_features= features[(variations[:, 0] == 0)] #filter the nominal data
+    nominal_features= features_ht[(variations[:, 0] == 0)] #filter the nominal data
     nominal_features_tensor=   torch.tensor(nominal_features, dtype=torch.float32)
     nominal_features_tensor =  torch.where(torch.isnan(nominal_features_tensor), torch.tensor(0.0), nominal_features_tensor) 
     delta=loaded_regressor(nominal_features_tensor)
@@ -243,17 +243,17 @@ if Plot_weighted_regressor:
     for i_feature, feature in enumerate(feature_names):
         binning_info = plot_options[feature]['binning']
         bins = np.linspace(binning_info[1], binning_info[2], binning_info[0] + 1)
-        nominal_data = column_arrays[i_feature][variations == 0]
-        n_nominal, _ = np.histogram(nominal_data, bins=bins)
+        nominal_data = column_arrays[i_feature][variations[:,0] == 0]
+        n_nominal, _ = np.histogram(nominal_data[:,0], bins=bins)
         n_nominal_safe = np.where(n_nominal == 0, 1, n_nominal)     #avoid division by 0
         for i_variation_value, variation_value in enumerate(unique_variations):
-            selected_data = column_arrays[i_feature][variations == variation_value]
-            n, _ = np.histogram(selected_data, bins=bins)
+            selected_data = column_arrays[i_feature][variations[:,0] == variation_value]
+            n, _ = np.histogram(selected_data[:,0], bins=bins)
             normalized_histogram= n /n_nominal_safe  #Truth  
             if i_variation_value != 4: #dont include 0
                 weights=ratio_array[i_variation_value]
                 weights=weights.detach().numpy()
-                n_w, _ = np.histogram(nominal_data,bins=bins, weights=weights)  #weighted Histogramm
+                n_w, _ = np.histogram(nominal_data[:,0],bins=bins, weights=weights)  #weighted Histogramm
                 normalized_histogram_w = n_w / n_nominal_safe   #Prediction
             label = f'$\\nu = {variation_value}$ (Pred)'
             color = plt.cm.viridis(i_variation_value/len(unique_variations))
@@ -275,3 +275,5 @@ if Plot_weighted_regressor:
         plt.legend(loc='best')
         plt.savefig(output_path)
         plt.clf()
+    print(nominal_features_tensor)
+    print(delta)
