@@ -11,8 +11,11 @@ import itertools
 import numpy as np
 import operator
 import functools
-
 import Node
+
+#import tracemalloc
+#tracemalloc.start()
+#import mprof
 
 default_cfg = {
     "n_trees" : 100,
@@ -165,7 +168,6 @@ class BoostedParametricTree:
     def save(self, filename):
         with open(filename,'wb') as file_:
             pickle.dump( self, file_ )
-
     def boost( self ):
 
         toolbar_width = min(20, self.n_trees)
@@ -180,6 +182,8 @@ class BoostedParametricTree:
 
         # reweight only the non-base point events
         reweight_mask = self.enumeration!=self.nominal_base_point_index
+        
+        #snapshot1 = tracemalloc.take_snapshot()
 
         for n_tree in range(self.n_trees):
 
@@ -231,6 +235,13 @@ class BoostedParametricTree:
             if self.n_trees>=toolbar_width:
                 if n_tree % (self.n_trees/toolbar_width)==0:   sys.stdout.write("-")
             sys.stdout.flush()
+
+            #snapshot2 = tracemalloc.take_snapshot()
+            #top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+            #print ()
+            #for stat in top_stats[:10]:
+            #    print(stat) 
+            #snapshot1 = snapshot2
 
         sys.stdout.write("]\n") # this ends the progress bar
         print ("weak learner time: %.2f" % weak_learner_time)
