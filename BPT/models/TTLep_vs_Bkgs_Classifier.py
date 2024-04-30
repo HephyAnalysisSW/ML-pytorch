@@ -3,6 +3,7 @@ import random
 import ROOT
 from math import pi
 import numpy as np
+import os
 if __name__=="__main__":
     import sys
     sys.path.append('..')
@@ -12,33 +13,33 @@ from tools.WeightInfo    import WeightInfo
 
 from defaults import selection, feature_names
 
+from defaults import selection, feature_names, data_locations
+
 data_generator_TTLep  =  DataGenerator(
-    input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TTLep/TTLep.root"
-    ],
+    input_files = [os.path.join( data_locations["RunII"], training_file) for training_file in ["TTLep/TTLep.root"] ],
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["weight", "overflow_counter"] ) 
+        branches  = feature_names + ["overflow_counter_v1", "weight"] )
 
 data_generator_DY  =  DataGenerator(
-    input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/DY/*.root"
-    ],
+    input_files = [os.path.join( data_locations["RunII"], training_file) for training_file in ["DY/DY.root"] ],
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["weight", "overflow_counter"]) 
+        branches  = feature_names + ["overflow_counter_v1", "weight"] )
 
 data_generator_others  =  DataGenerator(
-    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TTH/*.root",
-                   "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TTW/*.root",
-                   "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TTZ/*.root",
-                   "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/ST/*.root",
-                   "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/DiBoson/*.root",
-    ],
+    input_files = [os.path.join( data_locations["RunII"], training_file) for training_file in ["TTH/*.root", "TTW/*.root", "TTZ/*.root", "ST/*.root", "DiBoson/*.root"] ],
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["weight", "overflow_counter"]) 
+        branches  = feature_names + ["overflow_counter_v1", "weight"] )
+
+def set_era(era):
+    data_generator_TTLep.read_files([os.path.join( data_locations[era], training_file) for training_file in ["TTLep/TTLep.root"] ] )
+    data_generator_DY.read_files(  [os.path.join( data_locations[era], training_file) for training_file in ["DY/DY.root"] ] )
+    data_generator_others.read_files( [os.path.join( data_locations[era], training_file) for training_file in ["TTH/*.root", "TTW/*.root", "TTZ/*.root", "ST/*.root", "DiBoson/*.root"] ] )
 
 systematics = ["DY", "others"]
 
@@ -80,7 +81,7 @@ def getEvents( N_events_requested, systematic = "DY"):
 
 tex = {"DY":"DY", "others":"others"}
 
-shape_user_range = {'log':(0.8, 1.2), 'lin':(0.2, 2)}
+shape_user_range = {'lin':(0., 0.2)}
 
 from plot_options import plot_options
 
@@ -89,5 +90,5 @@ bpt_cfg = {
     "learning_rate" : 0.2,
     "loss" : "CrossEntropy",
     "learn_global_param": False,
-    "min_size": 50,
+    "min_size": 1000,
 }

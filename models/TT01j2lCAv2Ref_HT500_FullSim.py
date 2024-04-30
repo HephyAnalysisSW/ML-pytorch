@@ -9,7 +9,7 @@ if __name__=="__main__":
 from tools.DataGenerator import DataGenerator
 from tools.WeightInfo    import WeightInfo
 
-selection = lambda ar: (ar.overflow_counter==0) 
+selection = lambda ar: (ar.overflow_counter_v1==0) 
 
 feature_names = [   
         "tr_cosThetaPlus_n",
@@ -47,7 +47,7 @@ feature_names = [
         "l2_pt",
         "jet0_pt",
         "jet1_pt",
-        "jet2_pt",
+        #"jet2_pt",
         "nJetGood",
         "nBTag",
     ]
@@ -56,11 +56,11 @@ feature_names = [
 observers = []
 
 data_generator =  DataGenerator(
-    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TT01j2lCAv2Ref_HT500/*.root"],
+    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-v4/MVA-training/EFT_tr-minDLmass20-dilepM-offZ1-njet3p-btagM2p-ht500/TT01j2lCAv2Ref_HT500/*.root"],
         n_split = 100,
         splitting_strategy = "events",
         selection   = selection,
-        branches = ["p_C", "overflow_counter"] +feature_names   ) 
+        branches = ["p_C", "overflow_counter_v1"] +feature_names   ) 
 
 
 reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/CA/TT01j2lCARef_HT500_reweight_card.pkl'
@@ -188,22 +188,22 @@ plot_options =  {
     "tr_cos_phi_lab"        :{'binning':[30,-1,1], 'tex':'cos(#phi lab)'},
     "tr_abs_delta_phi_ll_lab":{'binning':[30,0,pi], 'tex':'|#Delta(#phi(l,l))|'},
 
-    "l1_pt"         :{'binning':[30,0,1500], 'tex':'p_{T}(l_{1})'},
-    "l2_pt"         :{'binning':[30,0,1500], 'tex':'p_{T}(l_{2})'},
-    "jet0_pt"         :{'binning':[30,0,1500], 'tex':'p_{T}(j_{0})'},
-    "jet1_pt"         :{'binning':[30,0,1500], 'tex':'p_{T}(j_{1})'},
-    "jet2_pt"         :{'binning':[30,0,1500], 'tex':'p_{T}(j_{2})'},
-    "tr_ttbar_mass"   :{'binning':[40,0,4000], 'tex':'M(tt)'},
-    "ht"              :{'binning':[50,0,2500], 'tex':'H_{T}'},
-    "nBTag"           :{'binning':[4,0,4], 'tex':'N_{b}'},
-    "nJetGood"        :{'binning':[10,0,10], 'tex':'N_{jet}'},
+    "l1_pt"         :{'binning':[36,40,400], 'tex':'p_{T}(l_{1})'},
+    "l2_pt"         :{'binning':[18,20,200], 'tex':'p_{T}(l_{2})'},
+    "jet0_pt"         :{'binning':[28,60,900], 'tex':'p_{T}(j_{0})'},
+    "jet1_pt"         :{'binning':[14,30,450], 'tex':'p_{T}(j_{1})'},
+    "jet2_pt"         :{'binning':[9,30,300], 'tex':'p_{T}(j_{2})'},
+    "tr_ttbar_mass"   :{'binning':[(4000-350)//73,350,4000], 'tex':'M(tt)'},
+    "ht"              :{'binning':[26,500,1800], 'tex':'H_{T}'},
+    "nBTag"           :{'binning':[2,2,4], 'tex':'N_{b}'},
+    "nJetGood"        :{'binning':[7,3,10], 'tex':'N_{jet}'},
 
     "tr_ttbar_dAbsEta"     :{'binning':[30,-2.5,2.5], 'tex':'#Delta|#eta|(tt)'},
     "tr_ttbar_dEta"       :{'binning':[30,-2.5,2.5], 'tex':'#Delta#eta(tt)'},
-    "overflow_counter":{'binning':[7,1,8], 'tex':"Overflow"}
+    "overflow_counter_v1":{'binning':[7,1,8], 'tex':"Overflow"}
 }
 
 multi_bit_cfg = {'n_trees': 300,
                  'max_depth': 4,
                  'learning_rate': 0.20,
-                 'min_size': 25 }
+                 'min_size': 100 }

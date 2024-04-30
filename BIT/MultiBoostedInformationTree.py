@@ -89,7 +89,6 @@ class MultiBoostedInformationTree:
 
         # setup toolbar
         sys.stdout.write("[%s]" % (" " * toolbar_width))
-        sys.stdout.flush()
         sys.stdout.write("\b" * (toolbar_width+1)) # return to start of line, after '['
 
         weak_learner_time = 0.0
@@ -137,10 +136,17 @@ class MultiBoostedInformationTree:
 
             # update the bar
             if self.n_trees>=toolbar_width:
-                if n_tree % (self.n_trees/toolbar_width)==0:   sys.stdout.write("-")
-            sys.stdout.flush()
+                try:
+                    if n_tree % (self.n_trees/toolbar_width)==0:   sys.stdout.write("-")
+                    sys.stdout.flush()
+                except OSError:
+                    pass
 
-        sys.stdout.write("]\n") # this ends the progress bar
+        try:
+            sys.stdout.write("]\n") # this ends the progress bar
+        except OSError:
+            pass
+
         print ("weak learner time: %.2f" % weak_learner_time)
         print ("update time: %.2f" % update_time)
        

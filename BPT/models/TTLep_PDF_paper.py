@@ -1,8 +1,10 @@
 import pickle
 import random
+import os
 import ROOT
 from math import pi
 import numpy as np
+
 if __name__=="__main__":
     import sys
     sys.path.append('..')
@@ -10,19 +12,30 @@ if __name__=="__main__":
 from tools.DataGenerator import DataGenerator
 from tools.WeightInfo    import WeightInfo
 
-from defaults import selection, feature_names
-
 systematics = ["PDF%03i"%i for i in range(1,101)]
 wilson_coefficients = systematics
 
 observers = []
 
+training_files = {
+    'RunII':            ['TTLep_RunII/TTLep_RunII.root'],
+    'Summer16_preVFP':  ['TTLep_UL2016_preVFP/TTLep_UL2016_preVFP.root'],
+    'Summer16':         ['TTLep_UL2016/TTLep_UL2016.root'],
+    'Fall17':           ['TTLep_UL2017/TTLep_UL2017.root'],
+    'Autumn18':         ['TTLep_UL2018/TTLep_UL2018.root'],
+}
+
+from defaults_paper import selection, feature_names, data_location
+
 data_generator  =  DataGenerator(
-    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TTLep/TTLep.root"],
+    input_files = [os.path.join( data_location, training_file) for training_file in training_files["RunII"] ],
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["PDF_Weight", "overflow_counter", "weight"] ) 
+        branches  = feature_names + ["PDF_Weight", "overflow_counter_v1", "weight"] )
+
+def set_era(era):
+    data_generator.read_files( [os.path.join(data_location, training_file) for training_file in training_files[era] ] )
 
 systematic         = "PDF001"
 base_points        = [ [0.], [1.] ]
@@ -57,6 +70,6 @@ bpt_cfg = {
     "learning_rate" : 0.2,
     "loss" : "CrossEntropy",
     "learn_global_param": False,
-    "min_size": 50,
+    "min_size": 300,
 }
 

@@ -155,6 +155,7 @@ class BoostedParametricTree:
                     base_points         = old_instance.base_points,
                     learn_global_param  = old_instance.learn_global_param if hasattr( old_instance, "learn_global_param") else False,
                     feature_names       = old_instance.feature_names if hasattr( old_instance, "feature_names") else None,
+
                     )
             new_instance.trees = old_instance.trees
 
@@ -234,7 +235,11 @@ class BoostedParametricTree:
             # update the bar
             if self.n_trees>=toolbar_width:
                 if n_tree % (self.n_trees/toolbar_width)==0:   sys.stdout.write("-")
-            sys.stdout.flush()
+
+            try:
+                sys.stdout.flush()
+            except OSError:
+                pass
 
             #snapshot2 = tracemalloc.take_snapshot()
             #top_stats = snapshot2.compare_to(snapshot1, 'lineno')

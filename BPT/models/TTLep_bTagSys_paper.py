@@ -3,6 +3,7 @@ import random
 import ROOT
 from math import pi
 import numpy as np
+import os
 if __name__=="__main__":
     import sys
     sys.path.append('..')
@@ -10,20 +11,30 @@ if __name__=="__main__":
 from tools.DataGenerator import DataGenerator
 from tools.WeightInfo    import WeightInfo
 
-from defaults import selection, feature_names
-
 systematics = ["hf", "lf",  "cferr1", "cferr2", "lfstats1", "lfstats2", "hfstats1", "hfstats2"]
-wilson_coefficients = systematics
 weight_branches = ["reweightBTagSF_central"] + ["reweightBTagSF_%s_%s"%(ud, sys) for ud in ["up","down"] for sys in systematics ]
 
 observers = []
 
+training_files = {
+    'RunII':            ['TTLep_RunII/TTLep_RunII.root'],
+    'Summer16_preVFP':  ['TTLep_UL2016_preVFP/TTLep_UL2016_preVFP.root'],
+    'Summer16':         ['TTLep_UL2016/TTLep_UL2016.root'],
+    'Fall17':           ['TTLep_UL2017/TTLep_UL2017.root'],
+    'Autumn18':         ['TTLep_UL2018/TTLep_UL2018.root'],
+}
+
+from defaults_paper import selection, feature_names, data_location
+
 data_generator  =  DataGenerator(
-    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/tt-jec/training-ntuples-3/MVA-training/tt_jec_trg-dilepVL-minDLmass20-offZ1/TTLep_nominal/TTLep_nominal.root"],
+    input_files = [os.path.join( data_location, training_file) for training_file in training_files["RunII"] ],
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + weight_branches + ["weight", "overflow_counter"]  ) 
+        branches  = feature_names + ["weight"] + weight_branches )
+
+def set_era(era):
+    data_generator.read_files( [os.path.join(data_location, training_file) for training_file in training_files[era] ] )
 
 systematic         = "hf"
 base_points        = [  [-1.],  [0.], [1.], ]
@@ -50,7 +61,7 @@ def getEvents( N_events_requested, systematic = systematic):
 
 tex = {"hf":"HF", "lf":"LF", "cferr1":"cferr1", "cferr2":"cferr2", "lfstats1":"lfstats1", "lfstats2":"lfstats2", "hfstats1":"hfstats1", "hfstats2":"hfstats2"}
 
-shape_user_range = {'log':(0.8, 1.2), 'lin':(0.8, 1.4)}
+shape_user_range = {'log':(0.9, 1.2), 'lin':(0.9, 1.2)}
 
 from plot_options import plot_options
 
@@ -59,6 +70,6 @@ bpt_cfg = {
     "learning_rate" : 0.2,
     "loss" : "CrossEntropy",
     "learn_global_param": False,
-    "min_size": 50,
+    "min_size": 500,
 }
 

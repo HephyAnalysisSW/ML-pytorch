@@ -7,6 +7,7 @@ import random
 import cProfile
 import time
 import os, sys
+sys.path.insert(0, '../BIT')
 sys.path.insert(0, '..')
 from math import log, exp, sin, cos, sqrt, pi
 import copy
@@ -41,8 +42,8 @@ argParser.add_argument('--bias',               action='store',      default=None
 argParser.add_argument('--debug',              action='store_true', help="Make debug plots?")
 argParser.add_argument('--feature_plots',      action='store_true', help="Feature plots?")
 #argParser.add_argument('--auto_clip',          action='store',      default=None, type=float, help="Remove quantiles of the training variable?")
-argParser.add_argument('--nJobs',       action='store',         nargs='?',  type=int, default=0,                                    help="EFT interpolation order" )
-argParser.add_argument('--job',         action='store',                     type=int, default=0,                                    help="Run only jobs i" )
+argParser.add_argument('--nJobs',       action='store',         nargs='?',  type=int, default=0,                                    help="Bootstrapping total number" )
+argParser.add_argument('--job',         action='store',                     type=int, default=0,                                    help="Bootstrepping iteration" )
  
 args, extra = argParser.parse_known_args(sys.argv[1:])
 
@@ -83,7 +84,7 @@ model.multi_bit_cfg.update( extra_args )
 feature_names = model.feature_names
 
 # directory for plots
-plot_directory = os.path.join( user.plot_directory, args.plot_directory, args.model )
+plot_directory = os.path.join( user.plot_directory,  args.model, args.prefix)
 
 if not os.path.isdir(plot_directory):
     try:

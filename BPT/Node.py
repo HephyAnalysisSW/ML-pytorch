@@ -79,10 +79,12 @@ class Node:
             # sorting all the data
             feature_values         = self.features[:,i_feature]
             feature_sorted_indices = np.argsort(feature_values)
-
+            sorted_features        = feature_values[feature_sorted_indices]
+            sorted_weights         = self.weights[feature_sorted_indices]
+            sorted_enumeration     = self.enumeration[feature_sorted_indices]
             # cumulative weighted sum
             sorted_weight_sums_left = np.cumsum(
-                np.multiply( self.weights[feature_sorted_indices][:,np.newaxis], np.eye(self.n_base_points)[self.enumeration[feature_sorted_indices]]), axis=0 )
+                np.multiply( sorted_weights[:,np.newaxis], np.eye(self.n_base_points)[sorted_enumeration]), axis=0 )
 
             total_weight_sum         = sorted_weight_sums_left[-1]
             sorted_weight_sums_left  = sorted_weight_sums_left[0:-1]
@@ -92,19 +94,19 @@ class Node:
             sorted_weight_sums_nominal_right = sorted_weight_sums_right[:, self.nominal_base_point_index]
 
             # cumulative unweighted sum (for min size!)
-            sorted_count_sums_left  = np.cumsum( np.eye(self.n_base_points)[self.enumeration[feature_sorted_indices]], axis=0) #We might train with samples with weight=0
+            sorted_count_sums_left  = np.cumsum( np.eye(self.n_base_points)[sorted_enumeration], axis=0) #We might train with samples with weight=0
             #sorted_count_sums_left = np.cumsum(
-            #    np.multiply( (self.weights[feature_sorted_indices][:,np.newaxis]!=0).astype('int'), np.eye(self.n_base_points)[self.enumeration[feature_sorted_indices]]), axis=0 )
+            #    np.multiply( (sorted_weights[:,np.newaxis]!=0).astype('int'), np.eye(self.n_base_points)[sorted_enumeration]), axis=0 )
             total_count_sum         = sorted_count_sums_left[-1]
             sorted_count_sums_left  = sorted_count_sums_left[0:-1]
             sorted_count_sums_right = total_count_sum-sorted_count_sums_left
 
             #print ("Test",self.weights[self.enumeration==0].sum())
-            #print ("Test",self.weights[feature_sorted_indices][self.enumeration[feature_sorted_indices]==0].sum())
+            #print ("Test",sorted_weights[sorted_enumeration==0].sum())
             #print ("Test",self.weights[self.enumeration==1].sum())
-            #print ("Test",self.weights[feature_sorted_indices][self.enumeration[feature_sorted_indices]==1].sum())
+            #print ("Test",sorted_weights[sorted_enumeration==1].sum())
             #print ("Test",self.weights[self.enumeration==2].sum())
-            #print ("Test",self.weights[feature_sorted_indices][self.enumeration[feature_sorted_indices]==2].sum())
+            #print ("Test",sorted_weights[sorted_enumeration==2].sum())
 
             if i_feature==0:
                 self.Delta = np.dot(self.MkA, np.log(total_weight_sum[self.nu_mask]/total_weight_sum[self.nominal_base_point_index]))
@@ -154,7 +156,7 @@ class Node:
             #    plateau_and_split_range_mask[0:self.min_size-1] = False
             #    plateau_and_split_range_mask[-self.min_size+1:] = False
 
-            plateau_and_split_range_mask &= (np.diff(feature_values[feature_sorted_indices]) != 0)
+            plateau_and_split_range_mask &= (np.diff(sorted_features) != 0)
             
             #plateau_and_split_range_mask = plateau_and_split_range_mask.astype(int) #FIXME
 

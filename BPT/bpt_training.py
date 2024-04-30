@@ -31,9 +31,10 @@ argParser = argparse.ArgumentParser(description = "Argument parser")
 argParser.add_argument("--plot_directory",     action="store",      default="BPT",                 help="plot sub-directory")
 argParser.add_argument("--version",            action="store",      default="",                 help="Which version?")
 argParser.add_argument("--model",              action="store",      default="analytic",                 help="Which model?")
-#argParser.add_argument("--modelFile",          action="store",      default="toy_models",                 help="Which model directory?")
+argParser.add_argument("--modelDir",          action="store",      default="models",                 help="Which model directory?")
 argParser.add_argument("--variation",          action="store",      default=None, type=str,  help="variation")
-argParser.add_argument("--nTraining",          action="store",      default=20000,       type=int,  help="number of training events")
+argParser.add_argument("--era",                action="store",      default="RunII", choices = ["RunII", "Summer16_preVFP", "Summer16", "Fall17", "Autumn18"], type=str,  help="variation")
+argParser.add_argument("--nTraining",          action="store",      default=50000,       type=int,  help="number of training events")
 argParser.add_argument("--plot_iterations",    action="store",      default=None,          nargs="*", type=int, help="Certain iterations to plot? If first iteration is -1, plot only list provided.")
 argParser.add_argument('--overwrite',          action='store',      default=None, choices = [None, "training", "data", "all"],  help="Overwrite output?")
 argParser.add_argument('--debug',              action='store_true', help="Make debug plots?")
@@ -72,7 +73,10 @@ for key, val in extra_args.items():
         extra_args[key]=val[0]
 
 # import the model
-exec('import %s as model'%args.model) 
+exec('import %s.%s as model'%( args.modelDir, args.model)) 
+
+print("Set model era to:", args.era)
+model.set_era( args.era )
 
 cfg = model.bpt_cfg
 cfg.update( extra_args )
@@ -81,7 +85,7 @@ feature_names = model.feature_names
 
 # directory for plots
 plot_directory = os.path.join( user.plot_directory, args.plot_directory,
-    args.version, 
+    args.version, args.era, 
     args.model
         + ("_"+args.variation if args.variation is not None else "")
     )
@@ -92,7 +96,7 @@ if not os.path.isdir(plot_directory):
     except IOError:
         pass
 
-training_data_filename = os.path.join(user.data_directory, args.version, args.model+("_"+args.variation if args.variation is not None else ""), "training_%i"%args.nTraining)+'.pkl'
+training_data_filename = os.path.join(user.data_directory, args.version, args.era, args.model+("_"+args.variation if args.variation is not None else ""), "training_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(training_data_filename):
     training_data = model.getEvents(args.nTraining, systematic=args.variation)
     total_size    =  sum([len(s['features']) for s in training_data.values() if 'features' in s ])
@@ -128,7 +132,7 @@ def drawObjects( offset=0 ):
 ###############
 nominal_base_point_index = np.where(np.all(np.array(model.base_points)==np.array(model.nominal_base_point),axis=1))[0][0] 
 
-colors = [ ROOT.kRed + 2, ROOT.kRed -4,ROOT.kCyan +2, ROOT.kCyan -4, ROOT.kMagenta+2,  ROOT.kMagenta-4,  ROOT.kBlue+2,     ROOT.kBlue-4,     ROOT.kGreen+2,    ROOT.kGreen-4, ] 
+colors = [ ROOT.kRed + 2, ROOT.kRed -4,ROOT.kCyan +2, ROOT.kCyan -4, ROOT.kMagenta+2,  ROOT.kMagenta-4,  ROOT.kBlue+2,     ROOT.kBlue-4,     ROOT.kGreen+2,    ROOT.kGreen-4, ROOT.kOrange+6, ROOT.kOrange+3] 
 stuff = []
 if args.feature_plots:
     h    = {}
@@ -252,7 +256,7 @@ if args.feature_plots:
 print ("Done with plots")
 syncer.sync()
 
-postfix = ("_"+args.version if args.version != "" else "")
+postfix = ("_"+args.version if args.version != "" else "") + ("_"+args.era if args.era != "RunII" else "")
 if args.variation == None:
     bpt_name = "BPT_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, args.nTraining, cfg["n_trees"])
 else:
@@ -265,6 +269,8 @@ try:
 except (IOError, EOFError, ValueError):
     bpt = None
 
+import cProfile
+
 if bpt is None or args.overwrite in ["all", "training"]:
     time1 = time.time()
     bpt = BoostedParametricTree(
@@ -275,7 +281,9 @@ if bpt is None or args.overwrite in ["all", "training"]:
             feature_names      = model.feature_names,
             **cfg,
                 )
+    #cProfile.run("bpt.boost()")
     bpt.boost()
+
     bpt.save(filename)
     print ("Written %s"%( filename ))
 
@@ -302,6 +310,8 @@ if args.debug:
 
     for max_n_tree in plot_iterations:
         if max_n_tree==0: max_n_tree=1
+
+        if max_n_tree>bpt.n_trees: continue #protection; we could be fitting just one tree 
 
         predicted_reweights = np.exp( np.dot( bpt.vectorized_predict(training_data[model.nominal_base_point]['features'],  max_n_tree = max_n_tree), bpt.VkA.transpose() ) )
 
@@ -436,6 +446,11 @@ if args.debug:
                 max_ = 10**(1.5)*max_ if logY else 1+1.3*(max_-1)
                 min_ = min( map( lambda h:h.GetMinimum(), [h_truth_shape[tuple(point)][feature] for point in model.base_points] ))
                 min_ = 0.1 if logY else 1-1.3*(1-min_)
+
+                try:
+                    min_, max_ = model.shape_user_range["log" if logY else "lin"]
+                except:
+                    pass
 
                 first = True
                 for h in [h_pred_shape[tuple(point)][feature] for point in model.base_points] +  [h_truth_shape[tuple(point)][feature] for point in model.base_points]:

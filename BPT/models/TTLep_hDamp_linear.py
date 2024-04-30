@@ -3,6 +3,7 @@ import random
 import ROOT
 from math import pi
 import numpy as np
+import os
 if __name__=="__main__":
     import sys
     sys.path.append('..')
@@ -18,7 +19,7 @@ data_generator_central  =  DataGenerator(
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["weight", "overflow_counter"] ) 
+        branches  = feature_names + ["weight", "overflow_counter_v1"] ) 
 
 data_generator_hUp  =  DataGenerator(
     input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/tt-jec/training-ntuples-3/MVA-training/tt_hdamp_trg-dilepVL-minDLmass20-offZ1/TTLep_hUp/*.root"
@@ -26,7 +27,7 @@ data_generator_hUp  =  DataGenerator(
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["weight", "overflow_counter"]) 
+        branches  = feature_names + ["weight", "overflow_counter_v1"]) 
 
 data_generator_hDown  =  DataGenerator(
     input_files = ["/eos/vbc/group/cms/robert.schoefbeck/tt-jec/training-ntuples-3/MVA-training/tt_hdamp_trg-dilepVL-minDLmass20-offZ1/TTLep_hDown/*.root"
@@ -34,11 +35,11 @@ data_generator_hDown  =  DataGenerator(
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["weight", "overflow_counter"]) 
+        branches  = feature_names + ["weight", "overflow_counter_v1"]) 
 
 base_points        = [  [-1.],  [0.], [1.], ]
 parameters         = ['hdamp']
-combinations       = [('hdamp',), ('hdamp', 'hdamp'),] #('hdamp', 'hdamp', 'hdamp'), ('hdamp', 'hdamp', 'hdamp', 'hdamp')]
+combinations       = [('hdamp',), ]#('hdamp', 'hdamp'),] #('hdamp', 'hdamp', 'hdamp'), ('hdamp', 'hdamp', 'hdamp', 'hdamp')]
 tex                = {"hdamp":"h_{damp}"}
 nominal_base_point = (0.,)
 

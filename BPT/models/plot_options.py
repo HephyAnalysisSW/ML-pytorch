@@ -56,18 +56,28 @@ plot_options =  {
     "tr_cos_phi_lab"        :{'binning':[30,-1,1], 'tex':'cos(#phi lab)'},
     "tr_abs_delta_phi_ll_lab":{'binning':[30,0,pi], 'tex':'|#Delta(#phi(l,l))|'},
 
-    "l1_pt"         :{'binning':[30,0,400], 'tex':'p_{T}(l_{1})'},
-    "l2_pt"         :{'binning':[30,0,200], 'tex':'p_{T}(l_{2})'},
-    "jet0_pt"         :{'binning':[30,0,900], 'tex':'p_{T}(j_{0})'},
-    "jet1_pt"         :{'binning':[30,0,450], 'tex':'p_{T}(j_{1})'},
-    "jet2_pt"         :{'binning':[30,0,300], 'tex':'p_{T}(j_{2})'},
+    "l1_pt"         :{'binning':[36,40,400], 'tex':'p_{T}(l_{1})'},
+    "l2_pt"         :{'binning':[18,20,200], 'tex':'p_{T}(l_{2})'},
+    "recoLep01_pt"         :{'binning':[36,40,400], 'tex':'p_{T}(l_{1}+l_{2})'},
+    "recoLep01_mass"         :{'binning':[36,40,400], 'tex':'M(l_{1}+l_{2})'},
+    "recoLep0_pt"         :{'binning':[36,40,400], 'tex':'p_{T}(l_{1})'},
+    "recoLep1_pt"         :{'binning':[18,20,200], 'tex':'p_{T}(l_{2})'},
+    "recoLepPos_pt"         :{'binning':[36,40,400], 'tex':'p_{T}(l_{1})'},
+    "recoLepNeg_pt"         :{'binning':[18,20,200], 'tex':'p_{T}(l_{2})'},
+    "jet0_pt"         :{'binning':[28,60,900], 'tex':'p_{T}(j_{0})'},
+    "jet1_pt"         :{'binning':[14,30,450], 'tex':'p_{T}(j_{1})'},
+    "jet2_pt"         :{'binning':[9,30,300], 'tex':'p_{T}(j_{2})'},
     "tr_ttbar_mass"   :{'binning':[(4000-350)//73,350,4000], 'tex':'M(tt)'},
-    "ht"              :{'binning':[30,500,2000], 'tex':'H_{T}'},
+    "ht"              :{'binning':[26,500,1800], 'tex':'H_{T}'},
     "nBTag"           :{'binning':[2,2,4], 'tex':'N_{b}'},
     "nJetGood"        :{'binning':[7,3,10], 'tex':'N_{jet}'},
+    "nrecoJet"        :{'binning':[7,3,10], 'tex':'N_{jet}'},
+    "recoLep_dAbsEta"    :{'binning':[30,-2.5,2.5], 'tex':'#Delta|#eta|(tt)'},
+    "recoLep_dEta"       :{'binning':[30,-2.5,2.5], 'tex':'#Delta#eta(tt)'},
 
-    "tr_ttbar_dAbsEta"     :{'binning':[30,-2.5,2.5], 'tex':'#Delta|#eta|(tt)'},
+    "tr_ttbar_dAbsEta"    :{'binning':[30,-2.5,2.5], 'tex':'#Delta|#eta|(tt)'},
     "tr_ttbar_dEta"       :{'binning':[30,-2.5,2.5], 'tex':'#Delta#eta(tt)'},
-    "overflow_counter":{'binning':[7,1,8], 'tex':"Overflow"}
+    "tr_ttbar_pt"         :{'binning':[50,0,1000], 'tex':'p_{T}(tt)'},
+    "overflow_counter_v1":{'binning':[7,1,8], 'tex':"Overflow"}
 
 }

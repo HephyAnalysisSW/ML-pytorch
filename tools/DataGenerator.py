@@ -30,6 +30,44 @@ def get_chunk( tot, n_split, index):
 from tensorflow.keras.utils import Sequence
 class DataGenerator(Sequence):
 
+    def read_files( self, input_files):
+        # input_files
+        self.input_files = []
+        for filename in input_files:
+            if filename.endswith('.root'):
+                self.input_files.extend(glob.glob(filename))
+            # step into directory
+            elif os.path.isdir( filename ):
+                for filename_ in os.listdir( filename ):
+                    if filename_.endswith('.root'):
+                        self.input_files.append(os.path.join( filename, filename_ ))
+            else:
+                raise RuntimeError( "Don't know what to do with %r" % filename )
+
+        self.input_files = self.input_files[:self.max_files]
+
+        # prepending redirector
+        if self.redirector is not None:
+            self.input_files = [self.redirector+file_ if file_.startswith('/eos/') else file_ for file_ in self.input_files]
+
+        if self.splitting_strategy.lower() not in ['files', 'events']:
+            raise RuntimeError("'splitting_strategy' must be 'files' or 'events'")
+
+        # split per file
+        if self.splitting_strategy == "files" and self.n_split<0:
+            self.n_split = len(self.input_files)
+
+        # Into how many chunks we split
+        if not self.n_split>0 or not type(self.n_split)==int:
+            raise RuntimeError( "Need to split in positive integer. Got %r"%self.n_split )
+
+        # Delete the array if it exists
+        if hasattr( self, "array" ):
+            delattr( self, "array")
+
+        # recall the index we loaded
+        self.index          = None
+
     def __init__( self, 
             input_files,
             branches            = None, 
@@ -49,48 +87,20 @@ class DataGenerator(Sequence):
         input_files:    Input files or directories.
         '''
 
-        # input_files
-        self.input_files = []
-        for filename in input_files:
-            if filename.endswith('.root'):
-                self.input_files.extend(glob.glob(filename))
-            # step into directory
-            elif os.path.isdir( filename ):
-                for filename_ in os.listdir( filename ):
-                    if filename_.endswith('.root'):
-                        self.input_files.append(os.path.join( filename, filename_ ))
-            else:
-                raise RuntimeError( "Don't know what to do with %r" % filename )
-
-        self.input_files = self.input_files[:max_files]
-
-        # prepending redirector
-        if redirector is not None:
-            self.input_files = [redirector+file_ if file_.startswith('/eos/') else file_ for file_ in self.input_files]
-
+        self.max_files          = max_files
+        self.redirector         = redirector
         self.splitting_strategy = splitting_strategy
-        if splitting_strategy.lower() not in ['files', 'events']:
-            raise RuntimeError("'splitting_strategy' must be 'files' or 'events'")
+        self.n_split            = n_split
+        # read files
+        self.read_files( input_files )
 
         self.verbose = verbose
-
-        # split per file
-        if splitting_strategy == "files" and n_split<0:
-            n_split = len(self.input_files)
 
         # apply selection string
         self.selection = selection        
 
-        # Into how many chunks we split
-        self.n_split        = n_split
-        if not n_split>0 or not type(n_split)==int:
-            raise RuntimeError( "Need to split in positive integer. Got %r"%n_split )
-            
         # variables to return 
         self.branches = branches 
-
-        # recall the index we loaded
-        self.index          = None
 
         # name of the tree to be read
         self.tree_name = tree_name
@@ -136,6 +146,7 @@ class DataGenerator(Sequence):
         if small is not None and small>0:
             entry_stop = min( entry_stop, entry_start+small )
 
+        # recall the index we loaded
         self.index = index
         self.data  = self.array[entry_start:entry_stop]
 

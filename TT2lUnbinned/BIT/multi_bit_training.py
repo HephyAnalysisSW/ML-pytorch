@@ -47,6 +47,9 @@ argParser.add_argument('--lepton_kinematics',  action='store_true')
 argParser.add_argument('--asymmetry',          action='store_true')
 argParser.add_argument('--spin_correlation',   action='store_true')
 
+argParser.add_argument('--nJobs',       action='store',         nargs='?',  type=int, default=0,                                    help="Bootstrapping total number" )
+argParser.add_argument('--job',         action='store',                     type=int, default=0,                                    help="Bootstrepping iteration" )
+
 args, extra = argParser.parse_known_args(sys.argv[1:])
 
 def parse_value( s ):
@@ -111,6 +114,14 @@ if args.auto_clip is not None:
     len_before = len(training_features)
     training_features, training_weights = helpers.clip_quantile(training_features, args.auto_clip, training_weights )
     print ("Auto clip efficiency (training) %4.3f is %4.3f"%( args.auto_clip, len(training_features)/len_before ) )
+
+# Resample for bootstrapping
+if args.nJobs>0:
+    from sklearn.utils import resample
+    rs_mask = resample(range(training_features.shape[0]))
+    training_features = training_features[rs_mask]
+    training_weights = {key:val[rs_mask] for key, val in training_weights.items()}
+    print("Bootstrapping training data for job %i/%i"%( args.job, args.nJobs) )
 
 # Text on the plots
 def drawObjects( offset=0 ):
@@ -266,13 +277,17 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
 print ("Done with plots")
 syncer.sync()
 
+postfix = ""
+if args.nJobs>0:
+    postfix  = "_resample%05i"%args.job
+
 base_points = []
 for comb in list(itertools.combinations_with_replacement(args.coefficients,1))+list(itertools.combinations_with_replacement(args.coefficients,2)):
     base_points.append( {c:comb.count(c) for c in args.coefficients} )
 if args.prefix == None:
-    bit_name = "multiBit_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, data_model.name, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 else:
-    bit_name = "multiBit_%s_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+    bit_name = "multiBit_%s_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, data_model.name, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 
 # delete coefficients we don't need (the BIT coefficients are determined from the training weight keys)
 if args.coefficients is not None:
@@ -349,38 +364,38 @@ if args.coefficients is not None:
 
 if args.debug:
 
-    # Loss plot
-    training_losses = helpers.make_TH1F((bit.losses(training_features, training_weights),None), ignore_binning = True)
-    test_losses     = helpers.make_TH1F((bit.losses(test_features, test_weights),None),         ignore_binning = True)
-
-    c1 = ROOT.TCanvas("c1");
-
-    l = ROOT.TLegend(0.2,0.8,0.9,0.85)
-    l.SetNColumns(2)
-    l.SetFillStyle(0)
-    l.SetShadowColor(ROOT.kWhite)
-    l.SetBorderSize(0)
-
-    training_losses.GetXaxis().SetTitle("N_{B}")
-    training_losses.GetYaxis().SetTitle("Loss")
-    l.AddEntry(training_losses, "train")
-    l.AddEntry(test_losses, "test")
-
-    test_losses.SetLineWidth(2)
-    test_losses.SetLineColor(ROOT.kRed+2)
-    test_losses.SetMarkerColor(ROOT.kRed+2)
-    test_losses.SetMarkerStyle(0)
-    training_losses.SetLineWidth(2)
-    training_losses.SetLineColor(ROOT.kRed+2)
-    training_losses.SetMarkerColor(ROOT.kRed+2)
-    training_losses.SetMarkerStyle(0)
-
-    training_losses.Draw("hist") 
-    test_losses.Draw("histsame")
-
-    for logY in [True, False]:
-        plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logY else "lin" )
-        c1.Print(os.path.join(plot_directory_, "loss.png"))
+#    # Loss plot
+#    training_losses = helpers.make_TH1F((bit.losses(training_features, training_weights),None), ignore_binning = True)
+#    test_losses     = helpers.make_TH1F((bit.losses(test_features, test_weights),None),         ignore_binning = True)
+#
+#    c1 = ROOT.TCanvas("c1");
+#
+#    l = ROOT.TLegend(0.2,0.8,0.9,0.85)
+#    l.SetNColumns(2)
+#    l.SetFillStyle(0)
+#    l.SetShadowColor(ROOT.kWhite)
+#    l.SetBorderSize(0)
+#
+#    training_losses.GetXaxis().SetTitle("N_{B}")
+#    training_losses.GetYaxis().SetTitle("Loss")
+#    l.AddEntry(training_losses, "train")
+#    l.AddEntry(test_losses, "test")
+#
+#    test_losses.SetLineWidth(2)
+#    test_losses.SetLineColor(ROOT.kRed+2)
+#    test_losses.SetMarkerColor(ROOT.kRed+2)
+#    test_losses.SetMarkerStyle(0)
+#    training_losses.SetLineWidth(2)
+#    training_losses.SetLineColor(ROOT.kRed+2)
+#    training_losses.SetMarkerColor(ROOT.kRed+2)
+#    training_losses.SetMarkerStyle(0)
+#
+#    training_losses.Draw("hist") 
+#    test_losses.Draw("histsame")
+#
+#    for logY in [True, False]:
+#        plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logY else "lin" )
+#        c1.Print(os.path.join(plot_directory_, "loss.png"))
 
     # GIF animation
     tex = ROOT.TLatex()
@@ -418,7 +433,6 @@ if args.debug:
         w0 = test_weights[()]
 
         # 2D plots for convergence + animation
-        th2d = {}
         th1d_pred = {}
         th1d_truth= {}
         for i_der, der in enumerate( bit.derivatives ):
@@ -428,12 +442,9 @@ if args.debug:
                 binning = np.linspace( min([0, quantiles[0]]), quantiles[1], 21 )
             else:
                 binning = np.linspace( quantiles[0], quantiles[1], 21 )
-            th2d[der]      = helpers.make_TH2F( np.histogram2d( truth_ratio, test_predictions[:,i_der], bins = [binning, binning], weights=w0) )
             th1d_truth[der]= helpers.make_TH1F( np.histogram( truth_ratio, bins = binning, weights=w0) )
             th1d_pred[der] = helpers.make_TH1F( np.histogram( test_predictions[:,i_der], bins = binning, weights=w0) )
             tex_name = "%s"%(",".join( der ))
-            th2d[der].GetXaxis().SetTitle( tex_name + " truth" )
-            th2d[der].GetYaxis().SetTitle( tex_name + " prediction" )
             th1d_pred[der].GetXaxis().SetTitle( tex_name + " prediction" )
             th1d_pred[der].GetYaxis().SetTitle( "Number of Events" )
             th1d_truth[der].GetXaxis().SetTitle( tex_name + " truth" )
@@ -448,48 +459,6 @@ if args.debug:
             th1d_pred[der].SetMarkerColor(color[der])
             th1d_pred[der].SetMarkerStyle(0)
             th1d_pred[der].SetLineWidth(2)
-
-        n_col  = len(bit.derivatives)
-        n_rows = 2
-        for logZ in [False, True]:
-            c1 = ROOT.TCanvas("c1","multipads",500*n_col,500*n_rows);
-            c1.Divide(n_col,n_rows)
-
-            for i_der, der in enumerate(bit.derivatives):
-
-                c1.cd(i_der+1)
-                ROOT.gStyle.SetOptStat(0)
-                th2d[der].Draw("COLZ")
-                ROOT.gPad.SetLogz(logZ)
-
-            lines = [ (0.29, 0.9, 'N_{B} =%5i'%( max_n_tree )) ]
-            drawObjects = [ tex.DrawLatex(*line) for line in lines ]
-            for o in drawObjects:
-                o.Draw()
-
-            for i_der, der in enumerate(bit.derivatives):
-                c1.cd(i_der+1+len(bit.derivatives))
-                l = ROOT.TLegend(0.6,0.75,0.9,0.9)
-                stuff.append(l)
-                l.SetNColumns(1)
-                l.SetFillStyle(0)
-                l.SetShadowColor(ROOT.kWhite)
-                l.SetBorderSize(0)
-                tex_name = "%s"%(",".join( der ))
-                l.AddEntry( th1d_truth[der], "R("+tex_name+")")
-                l.AddEntry( th1d_pred[der],  "#hat{R}("+tex_name+")")
-                ROOT.gStyle.SetOptStat(0)
-                th1d_pred[der].Draw("hist")
-                th1d_truth[der].Draw("histsame")
-                ROOT.gPad.SetLogy(logZ)
-                l.Draw()
-
-            plot_directory_ = os.path.join( plot_directory, "training_plots", bit_name, "log" if logZ else "lin" )
-            os.makedirs( plot_directory_, exist_ok=True)
-            helpers.copyIndexPHP( plot_directory_ )
-            c1.Print( os.path.join( plot_directory_, "training_2D_epoch_%05i.png"%(max_n_tree) ) )
-            syncer.makeRemoteGif(plot_directory_, pattern="training_2D_epoch_*.png", name="training_2D_epoch" )
-
 
         for observables, features, postfix in [
             #( model.observers if hasattr(model, "observers") else [], test_observers, "_observers"),

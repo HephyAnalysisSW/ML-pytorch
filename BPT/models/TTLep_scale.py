@@ -3,6 +3,7 @@ import random
 import ROOT
 from math import pi
 import numpy as np
+import os
 if __name__=="__main__":
     import sys
     sys.path.append('..')
@@ -17,12 +18,19 @@ wilson_coefficients = systematics
 
 observers = []
 
+training_files =  ["TTLep/TTLep.root"]
+
+from defaults import selection, feature_names, data_locations
+
 data_generator  =  DataGenerator(
-    input_files = ["/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples/MVA-training/EFT_tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500/TTLep/TTLep.root"],
+    input_files = [os.path.join( data_locations["RunII"], training_file) for training_file in training_files ],
         n_split = 1,
         splitting_strategy = "files",
         selection = selection,
-        branches  = feature_names + ["scale_Weight", "overflow_counter", "weight"] ) 
+        branches  = feature_names + ["scale_Weight", "overflow_counter_v1", "weight"] )
+
+def set_era(era):
+    data_generator.read_files( [os.path.join(data_locations[era], training_file) for training_file in training_files ] )
 
 systematic         = "scale001"
 base_points        = [ [0.], [1.] ]
@@ -64,6 +72,6 @@ bpt_cfg = {
     "learning_rate" : 0.2,
     "loss" : "CrossEntropy",
     "learn_global_param": False,
-    "min_size": 50,
+    "min_size": 1000,
 }
 
