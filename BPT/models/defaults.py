@@ -15,8 +15,7 @@ data_locations = {
 
 selection = lambda ar: (ar.overflow_counter_v1==0)
 
-feature_names_tr = 
-    [
+feature_names_tr = [
         "tr_cosThetaPlus_n",
         "tr_cosThetaMinus_n",
         "tr_cosThetaPlus_r",

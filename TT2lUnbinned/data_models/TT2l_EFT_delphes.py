@@ -47,17 +47,18 @@ spin_correlation_features = [
 ]
 
 feature_names = top_kinematics_features + lepton_kinematics_features + asymmetry_features + spin_correlation_features + [   
-            "nBTag",
+            "nBTag", "nrecoJet", "nrecoLep",
         ]
 
 observers = []
 
 data_generator =  DataGenerator(
-    input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v1/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_ext/TT01j2lCAOldRef_Mtt500_ext.root"],
+    #input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v1/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_ext/TT01j2lCAOldRef_Mtt500_ext.root"],
+    input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v1/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_small/TT01j2lCAOldRef_Mtt500_small.root"],
         n_split = 1,
         splitting_strategy = "events",
         selection   = selection,
-        branches = ["p_C", "nrecoLep"] + feature_names   ) 
+        branches = ["p_C"] + feature_names   ) 
 
 reweight_pkl = '/eos/vbc/group/cms/robert.schoefbeck/gridpacks/CA_v4/TT01j2lCAOldRef_reweight_card.pkl'
 weightInfo = WeightInfo(reweight_pkl)
@@ -115,7 +116,7 @@ class DataModel:
     def name(self):
         return "TK_%r_LK_%r_CA_%r_SC_%r"%( self.top_kinematics, self.lepton_kinematics, self.asymmetry, self.spin_correlation) 
 
-    def getEvents( self, nTraining, return_observers = False,  wilson_coefficients = None, feature_names=None):
+    def getEvents( self, nTraining, return_observers = False,  wilson_coefficients = None, feature_names=None, feature_dicts=False):
 
         index = -1
         if wilson_coefficients is None:
@@ -126,12 +127,14 @@ class DataModel:
         vectors      = None #{key:model.data_generator.vector_branch(data, key ) for key in vector_branches}
         combinations = make_combinations( [ w for w in weightInfo.variables if w in wilson_coefficients] )
 
+        if feature_dicts:
+            features = {f:features[:,i_f] for i_f,f in enumerate(feature_names)}
+
         if return_observers:
             observers_ = data_generator.scalar_branches( data_generator[index], observers )[:nTraining]
             return features, {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}, observers_
         else: 
             return features, {comb:coeffs[:,weightInfo.combinations.index(comb)] for comb in combinations}
-    
 
 eft_plot_points = [
     {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
