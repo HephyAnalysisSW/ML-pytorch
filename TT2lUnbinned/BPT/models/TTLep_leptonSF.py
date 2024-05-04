@@ -38,9 +38,9 @@ def set_era(era):
 
 systematic         = "leptonSF"
 base_points        = [  [-1.],  [0.], [1.], ]
-parameters         = ['nu']
-combinations       = [('nu',), ('nu', 'nu'),] #('nu', 'nu', 'nu'), ('nu', 'nu', 'nu', 'nu')]
-tex                = {"nu":"#nu"}
+parameters         = ['lSF']
+combinations       = [('lSF',), ('lSF', 'lSF'),] #('nu', 'nu', 'nu'), ('nu', 'nu', 'nu', 'nu')]
+tex                = {"lSF":"l(SF)"}
 nominal_base_point = (0.,)
 
 default_parameters = {  }

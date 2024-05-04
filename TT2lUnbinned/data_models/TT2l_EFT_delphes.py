@@ -47,14 +47,17 @@ spin_correlation_features = [
 ]
 
 feature_names = top_kinematics_features + lepton_kinematics_features + asymmetry_features + spin_correlation_features + [   
-            "nBTag", "nrecoJet", "nrecoLep",
+            "nBTag", "nrecoJet", "nrecoLep", "jet0_pt", "jet1_pt", "ht", "recoLep0_pt", "recoLep1_pt", 
         ]
 
 observers = []
 
 data_generator =  DataGenerator(
+    #input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v1/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_small/TT01j2lCAOldRef_Mtt500_small.root"],
+    #input_files = [ "/users/robert.schoefbeck/ML-pytorch/TT2lUnbinned/asimov/TT01j2lCAOldRef_Mtt500_small.root"],
+    #input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v1/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_20percent/TT01j2lCAOldRef_Mtt500_20percent.root"],
+    input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v2/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_50percent/TT01j2lCAOldRef_Mtt500_50percent.root"],
     #input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v1/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_ext/TT01j2lCAOldRef_Mtt500_ext.root"],
-    input_files = [ "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-delphes-v1/MVA-training/EFT_delphes_dilep-offZ-njet3p-btag2p-mtt750/TT01j2lCAOldRef_Mtt500_small/TT01j2lCAOldRef_Mtt500_small.root"],
         n_split = 1,
         splitting_strategy = "events",
         selection   = selection,

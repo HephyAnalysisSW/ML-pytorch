@@ -8,6 +8,10 @@ sys.path.insert(0, '../..')
 import logging
 logger = logging.getLogger('ML')
 
+import scipy
+def median_expected_pValue(df, nc):
+    return 1-scipy.stats.chi2.cdf( scipy.stats.ncx2.median(df=df,nc=nc), df=df )
+
 def make_combinations( coefficients ):
     import itertools
     return list(itertools.combinations_with_replacement(coefficients,1))+list(itertools.combinations_with_replacement(coefficients,2))
@@ -64,13 +68,27 @@ class MultiplicativeUncertainty:
 from BPT.BoostedParametricTree import BoostedParametricTree
 class BPTUncertainty:
 
-    def __init__( self, name, bpt_file):
+    def __init__( self, name, bpt_file, renameParams=None):
     
         self.name = name
         self.bpt  = BoostedParametricTree.load( bpt_file )
-        self.parameters = self.bpt.parameters 
         self.initialized = False
 
+        # translate parameter names
+        self.translate_param_names = {}
+        self.parameters  = []
+        for i_p, p in enumerate(self.bpt.parameters):
+            if renameParams is not None:
+                if len(self.bpt.parameters)==1:
+                    new_name = renameParams
+                else:
+                    new_name = renameParams+"_"+str(i_p)
+            else:
+                new_name = p
+            self.translate_param_names[p] = new_name 
+            self.translate_param_names[new_name] = p
+            self.parameters.append( new_name )
+ 
     def makePenalizedNuisances( self ):
         return list(map( ModelParameter.makePenalizedNuisance, self.parameters ))
 
@@ -78,9 +96,9 @@ class BPTUncertainty:
     def feature_names( self ):
         return self.bpt.feature_names
 
-    def initialize( self, dataset ):
+    def initialize( self, dataset, translation = None):
         logger.info( "Initializing BPT predictions for %s and %i events", self.name, len( dataset ) )
-        self.bpt_predictions = dataset.BPTPrediction( self.bpt )
+        self.bpt_predictions = dataset.BPTPrediction( self.bpt, translation=translation)
         self.initialized     = True
 
     def __call__( self, hypothesis):
@@ -91,8 +109,7 @@ class BPTUncertainty:
         if not self.initialized:
             raise RuntimeError( "Must initialize BPTUncertainty %s with a dataset" % self.name )
 
-        return np.exp(np.sum( [ np.prod([hypothesis[var].val for var in comb])*self.bpt_predictions[:,i_comb] for i_comb, comb in enumerate(self.bpt.combinations)], axis=0))
-
+        return np.exp(np.sum( [ np.prod([hypothesis[self.translate_param_names[var]].val for var in comb])*self.bpt_predictions[:,i_comb] for i_comb, comb in enumerate(self.bpt.combinations)], axis=0))
 
 class Hypothesis:
     def __init__(self, parameters, name=None):
@@ -100,6 +117,15 @@ class Hypothesis:
         self.parameters = parameters
         self.name = name 
 
+        self.check()
+
+    def append(self, parameters):
+        if type(parameters)==type([]): 
+            self.parameters.extend(parameters)
+        else:
+            self.parameters.append(parameters)
+
+    def check( self ):
         # Sanity
         for p in self.parameters:
             if p.isPenalized and p.isPOI:
@@ -164,11 +190,18 @@ class Hypothesis:
 
     def cloneSM( self ):
         res = copy.deepcopy( self )
-        for param in self.parameters:
+        for param in res.parameters:
             if param.val!=0.:
                 if param.isFrozen:
                     logger.warning("Set a frozen parameter %s=%3.2f to zero!", param.name, param.val)
                 param.val = 0.
+        return res
+
+    def cloneFreeze( self, **kwargs):
+        res = copy.deepcopy(self)
+        for key, val in kwargs.items():
+            res[key].val = val
+            res[key].isFrozen = True
         return res
 
 class NormalizedSMEFTData:
@@ -186,7 +219,7 @@ class NormalizedSMEFTData:
         if inclusiveExpectation is not None:
             scaling = inclusiveExpectation/weights[()].sum()
             self.weights = {k:v*scaling for k,v in self.weights.items()}
-            logger.info( "Scaled %i input events to an expectation of %3.2f", len(features), inclusiveExpectation)
+            logger.info( "Scaled %i input events to an expectation of %3.2f", len(self.weights[()]), inclusiveExpectation)
 
     def __len__( self ):
         return self.features.shape[0] 
@@ -217,10 +250,14 @@ class NormalizedSMEFTData:
     
         return bit_predicted_weights  
 
-    def BPTPrediction( self, bpt ):
-
+    def BPTPrediction( self, bpt, translation=None):
+        if translation == None:
+            feature_names = bpt.feature_names
+        else:
+            feature_names = [translation[feature] if feature in translation else feature for feature in bpt.feature_names]
+            logger.info("Using translation: %s", " ".join( ["%s -> %s"%(key, val) for key, val in translation.items()]) )
         logger.info("Computing BPT predictions for %i events from these %i features: %s"%( len(self), len(bpt.feature_names), ", ".join(bpt.feature_names)) )
-        return bpt.vectorized_predict( self.get_features_by_name( bpt.feature_names ) )
+        return bpt.vectorized_predict( self.get_features_by_name( feature_names ) )
 
 def SMEFTweight( weights, hypothesis, relative=False):
     import numpy as np
@@ -231,13 +268,20 @@ def SMEFTweight( weights, hypothesis, relative=False):
 
 class AsimovNonCentrality:
 
-    def __init__( self, model_weight_func, null, alt=None):
+    def __init__( self, model_weight_func, null, alt=None, debug=False):
 
         self.model_weight_func = model_weight_func
         self.null = null
         self.null.name  = "Null (BSM)"
         self.alt        = null.cloneSM() if alt is None else alt
         self.alt.name   = "Alternate (SM)"
+
+        self.debug = debug
+        if self.debug:
+            print ("End of constructor Null:")
+            self.null.print()
+            print ("End of constructor Alt:")
+            self.alt.print()
 
     def __call__( self, null=None):
         _null = null if null is not None else self.null
@@ -249,7 +293,7 @@ class AsimovNonCentrality:
         #if return_neg_frac: return neg_frac
 
         if neg_frac>0.01: 
-            print ( "Discarded fraction of events because prediction is negative: %4.3f" % neg_frac ) 
+            logger.warning ( "Discarded fraction of events because prediction is negative: %4.3f" % neg_frac ) 
         penalties = np.sum( [par.val**2 for par in _null.penalized  ] ) 
         return -2*( 
                       -w_null.sum() + w_alt.sum() +
@@ -260,10 +304,6 @@ class AsimovNonCentrality:
     def variables(self):
         return [v for v in self.null.parameters if not (v.isFrozen or v.isIgnored)]
 
-    def cloneFromHypo( self, hypo):
-        return AsimovNonCentrality( self.model_weight_func, hypo)
-
-
 from iminuit import Minuit
 from iminuit.util import describe
 from typing import Annotated
@@ -273,8 +313,9 @@ class MinuitInterface:
     # https://iminuit.readthedocs.io/en/stable/reference.html#iminuit.Minuit.errordef
     errordef = Minuit.LEAST_SQUARES  # for Minuit to compute errors correctly
 
-    def __init__( self, asimov_object):
+    def __init__( self, asimov_object, debug=False):
         self.asimov_object = asimov_object
+        self.debug         = debug
 
     def __call__(self, *par):
         hypo = self.asimov_object.null.clone()
@@ -283,17 +324,29 @@ class MinuitInterface:
         #hypo.update( {k:v for k, v in zip(self.asimov_object.variables, par)} )
 
         logger.debug ("Calling Asimov Object")
-        hypo.print()
+        if self.debug:
+            hypo.print()
 
         res = self.asimov_object(null=hypo)
         return res
 
     def fit( self ):
-        m = Minuit(self, *[par.val for par in self.asimov_object.variables])
+
+        res = {'preFit_hypothesis':self.asimov_object.null.clone(), 'preFit_nonCentrality':self.asimov_object(self.asimov_object.null),}
+        if len( self.asimov_object.variables) == 0:
+            logger.warning( "No parameters to fit!")
+            res['minuit'] = None
+            return res
+
+        m = Minuit(self, *[par.val for par in self.asimov_object.variables], name=[par.name for par in self.asimov_object.variables])
 
         m.migrad()
 
         logger.info (m)
 
-        #return m.values.to_dict()
-        return self.asimov_object.null.cloneModify( **{ par.name:val for par, val in zip(self.asimov_object.variables, list(m.values))} ) 
+        res.update( {
+            'minuit':m, 
+            'hypothesis':self.asimov_object.null.cloneModify( **{ par.name:val for par, val in zip(self.asimov_object.variables, list(m.values))} ),
+            'nonCentrality':m.fval,
+        })
+        return res
