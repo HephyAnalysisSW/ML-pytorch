@@ -25,14 +25,50 @@ parser.add_argument('--exp',            action='store_true',  help="Experimental
 parser.add_argument("--wc1",   action="store",      default = "ctGRe", help="Which wilson coefficient?")
 parser.add_argument("--low1",  action="store",      default = -0.5, type=float, help="Lower range")
 parser.add_argument("--high1", action="store",      default = 0.5, type=float, help="Upper range")
-parser.add_argument("--nBins1", action="store",      default = 11, type=int, help="Upper range")
+parser.add_argument("--nBins1", action="store",      default = 21, type=int, help="Upper range")
 
+parser.add_argument("--wc2",   action="store",      default = None, help="Which second wilson coefficient?")
+parser.add_argument("--low2",  action="store",      default = None, type=float, help="Lower range")
+parser.add_argument("--high2", action="store",      default = None, type=float, help="Upper range")
+parser.add_argument("--nBins2", action="store",     default = None, type=int, help="Upper range")
+
+parser.add_argument("--wc2_val",  action="store",      default = None, type=float, help="Value of the 2nd Wilson coefficient")
 
 args = parser.parse_args()
 
 # Logger
 import tools.logger as logger_
 logger = logger_.get_logger(args.logLevel, logFile = None )
+
+# Idea: If an array for the 2nd WC is provided, append to a jobs file instead!
+if args.high2 is not None:
+
+    with open('jobs.sh', 'a+') as job_file:
+        for wc2_val in np.linspace(args.low2, args.high2, args.nBins2):
+
+            arguments = ["--version %s"%args.version]
+            if args.overwrite:
+                arguments.append("--overwrite")
+            if args.marginalized:
+                arguments.append("--marginalized")
+            if args.th:
+                arguments.append("--th")
+            if args.mod:
+                arguments.append("--mod")
+            if args.exp:
+                arguments.append("--exp")
+           
+            arguments.append("--wc1 %s"%args.wc1) 
+            arguments.append("--low1 %.5f"%args.low1 ) 
+            arguments.append("--high1 %.5f"%args.high1 ) 
+            arguments.append("--nBins1 %i"%args.nBins1 ) 
+
+            arguments.append("--wc2 %s"%args.wc2) 
+            arguments.append("--wc2_val %.5f"%wc2_val ) 
+
+            job_file.write('python TT2lUnbinned_asimov.py '+' '.join(arguments)+'\n')
+    logger.info( "Appended to jobs.sh" )
+    sys.exit(0)
 
 sub_directory = []
 
@@ -100,11 +136,16 @@ combinations = Modeling.make_combinations(WCs)
 hypothesis = Modeling.Hypothesis( list(map( lambda p: Modeling.ModelParameter(p, isWC=True), WCs )) ) 
 
 hypothesis[args.wc1].isPOI = True
+if args.wc2 is not None:
+    hypothesis[args.wc2].isPOI = True
 
 for wc in WCs:
-    if wc!=args.wc1:
-        if not args.marginalized:
-            hypothesis[wc].isFrozen = True
+    if wc==args.wc1:
+        continue
+    if args.wc2 is not None and wc==args.wc2:
+        continue
+    if not args.marginalized:
+        hypothesis[wc].isFrozen = True
  
 # SYSTEMATICS
 if lumi:
@@ -148,6 +189,9 @@ if lSF:
     hypothesis.append( leptonSF.makePenalizedNuisances() )
 
 if JEC:
+
+    all_features.append( "nrecoJet" )
+
     jesAbsoluteMPFBias  = Modeling.BPTUncertainty("jesAbsoluteMPFBias", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_TTLep_JERC_linear_paper_v4.1_jesAbsoluteMPFBias_nTraining_-1_nTrees_300.pkl", renameParams = "jesAbsBias")
     jesFlavorQCD        = Modeling.BPTUncertainty("jesFlavorQCD", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_TTLep_JERC_linear_paper_v4.1_jesFlavorQCD_nTraining_-1_nTrees_300.pkl", renameParams = "jesFlavQCD")
     jesPileUpDataMC     = Modeling.BPTUncertainty("jesPileUpDataMC", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_TTLep_JERC_linear_paper_v4.1_jesPileUpDataMC_nTraining_-1_nTrees_300.pkl", renameParams = "jesPU")
@@ -161,7 +205,7 @@ if JEC:
     hypothesis.append( jesSinglePionECAL  .makePenalizedNuisances())
 
 if BTag:
-    all_features.append('ht')
+    all_features.extend(['ht', 'jet0_pt', 'jet1_pt'])
     bTagSys_hf       = Modeling.BPTUncertainty("bTagSys_hf", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_TTLep_bTagSys_v4_Autumn18_hf_nTraining_-1_nTrees_300.pkl", renameParams="hf")
     bTagSys_cferr1   = Modeling.BPTUncertainty("bTagSys_cferr1", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_TTLep_bTagSys_v4_Autumn18_cferr1_nTraining_-1_nTrees_300.pkl", renameParams="cferr1")
     bTagSys_cferr2   = Modeling.BPTUncertainty("bTagSys_cferr2", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_TTLep_bTagSys_v4_Autumn18_cferr2_nTraining_-1_nTrees_300.pkl", renameParams="cferr2")
@@ -244,25 +288,26 @@ def model_weights( hypo ):
     if xsec:
         res *= xsecUnc(hypo)
     if scale:
-        res*=scaleUnc_2D(hypo)
+        res *= scaleUnc_2D(hypo)
     if MG:
-        res*=MGvsPow(hypo)
+        res *= MGvsPow(hypo)
     if PS:
-        res*=PS_FSR(hypo)*PS_ISR(hypo)
+        res *= PS_FSR(hypo)*PS_ISR(hypo)
     if DYnorm:
         res += scale_DYNorm_fraction*(alpha_DYUnc_norm**hypo['gDY'].val)*DYUnc_norm_weight*TTBAR_SM_weight
     if BTag:
-        btag= bTagSys_hf(hypo)*bTagSys_cferr1(hypo)*bTagSys_cferr2(hypo)*bTagSys_hfstats1(hypo)*bTagSys_hfstats2(hypo)*bTagSys_lf(hypo)*bTagSys_lfstats1(hypo)*bTagSys_lfstats2(hypo)
-        res*=btag
+        btag = bTagSys_hf(hypo)*bTagSys_cferr1(hypo)*bTagSys_cferr2(hypo)*bTagSys_hfstats1(hypo)*bTagSys_hfstats2(hypo)*bTagSys_lf(hypo)*bTagSys_lfstats1(hypo)*bTagSys_lfstats2(hypo)
+        res *= btag
     if JEC: 
-        jec = jesAbsoluteMPFBias(hypo)*jesFlavorQCD(hypo)*jesPileUpDataMC(hypo)*jesRelativeBal(hypo)*jesSinglePionECAL(hypo)
-        res*=jec
+        jec =  jesAbsoluteMPFBias(hypo)*jesFlavorQCD(hypo)*jesPileUpDataMC(hypo)*jesRelativeBal(hypo)*jesSinglePionECAL(hypo)
+        res *= jec
     if lSF:
-        res*=leptonSF(hypo)
+        res *= leptonSF(hypo)
     if lumi:
-        res*=lumiUnc(hypo)
+        res *= lumiUnc(hypo)
 
     return res
+
     #return lumiUnc(hypo)*leptonSF(hypo)*jec*btag*( xsecUnc(hypo)*TTBAR_SMEFT_weight*scaleUnc_2D(hypo)*PS_FSR(hypo)*PS_ISR(hypo)*MGvsPow(hypo) + scale_DYNorm_fraction*(alpha_DYUnc_norm**hypo['gDY'].val)*DYUnc_norm_weight*TTBAR_SM_weight )
 
 #hypothesis = hypothesis.cloneFreeze(ctGIm=0, xsec=0, ren=0, fac=0,gDY=0,fsr=0,isr=0,gPowheg=0,lSF=0,jesAbsBias=0,jesFlavQCD=0,jesPU=0,jesRelBal=0,jesECAL=0)
@@ -275,17 +320,26 @@ out_dir = os.path.join( output_directory, sub_dir)
 if not os.path.exists( out_dir ):
     os.makedirs( out_dir, exist_ok=True )
 
+if args.wc2 is not None:
+    fname_postfix = "_"+args.wc2 +"_" + ("%.5f"%args.wc2_val).replace('.','p').replace('-','m')
+else:
+    fname_postfix = ""
+
 results = {}
 for wc1_val in np.linspace(args.low1, args.high1, args.nBins1):
 
-    filename = os.path.join( out_dir, args.wc1 +"_" + ("%.5f"%wc1_val).replace('.','p').replace('-','m') +".pkl" )
+    filename = os.path.join( out_dir, args.wc1 +"_" + ("%.5f"%wc1_val).replace('.','p').replace('-','m') + fname_postfix + ".pkl" )
     if os.path.exists(filename) and not args.overwrite:
-        logger.info("File %s exists. Do nothing.")
+        logger.info("File %s exists. Do nothing.", filename)
         continue
+
+    model_point_dict = {args.wc1:wc1_val}
+    if args.wc2 is not None:
+        model_point_dict[args.wc2] = args.wc2_val
 
     logger.info("Fitting %s=%3.2f", args.wc1, wc1_val)
     asimov = Modeling.AsimovNonCentrality( model_weights, 
-        null=hypothesis.cloneFreeze(**{args.wc1:wc1_val}), 
+        null=hypothesis.cloneFreeze(**model_point_dict), 
         alt =hypothesis)#, alt=hypothesis.cloneModify(ctGRe=1, ctGIm=1))
 
     minuit = Modeling.MinuitInterface( asimov )
