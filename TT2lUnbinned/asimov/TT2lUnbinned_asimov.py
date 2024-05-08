@@ -175,6 +175,7 @@ if PS:
     # PS weights
     PS_FSR     = Modeling.BPTUncertainty( "PS_FSR", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_delphes_TTLep_PS_FSR_scale_v4.1_nTraining_-1_nTrees_300.pkl" )
     PS_ISR     = Modeling.BPTUncertainty( "PS_ISR", "/groups/hephy/cms/robert.schoefbeck/NN/models/BPT/BPT_delphes_TTLep_PS_ISR_scale_v4.1_nTraining_-1_nTrees_300.pkl" )
+    all_features += PS_FSR.feature_names
 
     hypothesis.append(PS_FSR.makePenalizedNuisances())
     hypothesis.append(PS_ISR.makePenalizedNuisances())
@@ -337,7 +338,7 @@ for wc1_val in np.linspace(args.low1, args.high1, args.nBins1):
     if args.wc2 is not None:
         model_point_dict[args.wc2] = args.wc2_val
 
-    logger.info("Fitting %s=%3.2f", args.wc1, wc1_val)
+    logger.info("Fitting %s", " ".join( ["%s=%3.2f"%(w,v) for w, v in model_point_dict.items()]) )
     asimov = Modeling.AsimovNonCentrality( model_weights, 
         null=hypothesis.cloneFreeze(**model_point_dict), 
         alt =hypothesis)#, alt=hypothesis.cloneModify(ctGRe=1, ctGIm=1))

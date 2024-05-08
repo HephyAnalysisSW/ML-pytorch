@@ -549,6 +549,10 @@ if args.debug:
                     min_ = min( map( lambda h:h.GetMinimum(), th1d_ratio_truth.values() ))
                     min_ = 0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_)
 
+                    #FIXME
+                    if min_<-0.1:
+                        min_= -0.1
+
                     th1d_yield_min = th1d_yield.GetMinimum()
                     th1d_yield_max = th1d_yield.GetMaximum()
                     for bin_ in range(1, th1d_yield.GetNbinsX()+1 ):
