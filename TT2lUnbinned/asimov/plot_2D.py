@@ -92,60 +92,66 @@ def getContours(h, contlist=def_contlist):
     return contours_
 
 ranges = { 
-    'ctGRe':(-0.8, 0.8),
-    'ctGIm':(-0.8, 0.8),
+    'ctGRe':(-0.6, 0.6),
+    'ctGIm':(-0.6, 0.6),
     'cQj18':(-2.0, 1.2),
     'cQj38':(-2.0, 2.0),
     'ctj8':(-1.2, 0.8),
     }
 
 coefficients = ['ctGRe', 'ctGIm', 'cQj18', 'cQj38', 'ctj8']
+tex  = {'ctGRe':'C_{tG}^{Re}', 'ctGIm':'C_{tG}^{Im}', 'cQj18':'C_{Qj}^{18}', 'cQj38':'C_{Qj}^{38}', 'ctj8':'C_{tj}^{8}'}
 
 style = {0.68:ROOT.kDashed, 0.95:1}
 color = {"marginalized": ROOT.kBlue, "marginalized_th_mod_exp":ROOT.kBlack }
 
 stuff = []
+#for wc1, wc2 in [('ctGIm', 'cQj18')]:#list( itertools.combinations( coefficients, 2)):
 for wc1, wc2 in list( itertools.combinations( coefficients, 2)):
 
-    c1 = ROOT.TCanvas()
-
-    first = True
+    contours = {}
+    histo    = {}
     for subdir in [ "marginalized", "marginalized_th_mod_exp"]:
-
         result = getTGraphData( subdir,  wc1, wc2 )
 
         tgr = ROOT.TGraph2D( len(result), array.array('d', [r[0] for r in result]), array.array('d', [r[1] for r in result]), array.array('d', [r[2] for r in result]) )
-        contours = {cl:cont for cl, cont in zip( confidence_levels, getContours( tgr.GetHistogram()) ) }
-        stuff.append( tgr )
-        #tgr.Draw("COLZ")
-        h = tgr.GetHistogram()
-        stuff.append( h )
+        histo[subdir] = tgr.GetHistogram().Clone()
+        contours[subdir] = {cl:cont for cl, cont in zip( confidence_levels, getContours( tgr.GetHistogram()) ) }
+        histo[subdir].GetXaxis().SetRangeUser(*ranges[wc1])
+        histo[subdir].GetYaxis().SetRangeUser(*ranges[wc2])
+        stuff.append( histo[subdir] )
+
+
+    c1 = ROOT.TCanvas()
+    c1.cd()
+    first = True
+    for subdir in [ "marginalized_th_mod_exp", "marginalized" ]:
+
+        h =  histo[subdir]
+
         for i_x in range(1, h.GetNbinsX()+1):
             for i_y in range(1, h.GetNbinsY()+1):
                 h.SetBinContent( i_x, i_y, 0)
                 h.SetBinError(   i_x, i_y, 0)
 
-        h.GetXaxis().SetTitle(wc1)
-        h.GetYaxis().SetTitle(wc2)
-
-        h.GetXaxis().SetRangeUser(*ranges[wc1])
-        h.GetYaxis().SetRangeUser(*ranges[wc2])
+        h.GetXaxis().SetTitle(tex[wc1])
+        h.GetYaxis().SetTitle(tex[wc2])
 
         h.GetZaxis().SetTitle("-2#Delta L");
         if first:
-            h.Draw("AXIS")
+            h.Draw("COLZ")
             first=False
-        #else:
-        #    h.Draw("same")
-
     
-        for level, conts in contours.items():
+        for level, conts in contours[subdir].items():
             for c in conts:
                 c.SetLineColor( color[subdir] )
                 c.SetLineStyle( style[level] )
                 c.Draw("same")
                 stuff.append( c )
-    c1.Update()
+
+    #c1.Update()
+    #c1.RedrawAxis()
+
     out_dir = os.path.join( plot_directory, "limits_2D_2")
     os.makedirs( out_dir, exist_ok=True)
     c1.Print(os.path.join( out_dir, wc1+'_'+wc2+"_"+subdir+".png"))

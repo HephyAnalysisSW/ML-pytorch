@@ -57,19 +57,19 @@ def my_savefig( *args, **kwargs):
 
 plt.savefig = my_savefig
 
-# Wrap pickle dump
-import pickle
-# that's the old dump method
-pickle._dump = pickle.dump
-def syncer_pickle_dump( *args ):
-    # second argument is file handle!
-    if len(args)>1:
-        file_sync_storage.append( args[1].name )
-    else:
-        logger.warning( "Pickle dump called with less than two arguments... shouldn't happen." )
-    pickle._dump(*args)
-# that's the new dump method
-pickle.dump = syncer_pickle_dump
+## Wrap pickle dump
+#import pickle
+## that's the old dump method
+#pickle._dump = pickle.dump
+#def syncer_pickle_dump( *args ):
+#    # second argument is file handle!
+#    if len(args)>1:
+#        file_sync_storage.append( args[1].name )
+#    else:
+#        logger.warning( "Pickle dump called with less than two arguments... shouldn't happen." )
+#    pickle._dump(*args)
+## that's the new dump method
+#pickle.dump = syncer_pickle_dump
 
 # What happens on exit 
 def write_sync_files_txt(output_filename = 'file_sync_storage.txt'):

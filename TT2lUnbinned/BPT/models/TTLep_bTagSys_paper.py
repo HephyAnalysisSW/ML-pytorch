@@ -59,9 +59,9 @@ def getEvents( N_events_requested, systematic = systematic):
 
     return res 
 
-tex = {"hf":"HF", "lf":"LF", "cferr1":"cferr1", "cferr2":"cferr2", "lfstats1":"lfstats1", "lfstats2":"lfstats2", "hfstats1":"hfstats1", "hfstats2":"hfstats2"}
+tex.update( {"hf":"HF", "lf":"LF", "cferr1":"cferr1", "cferr2":"cferr2", "lfstats1":"lfstats1", "lfstats2":"lfstats2", "hfstats1":"hfstats1", "hfstats2":"hfstats2"} )
 
-shape_user_range = {'log':(0.9, 1.2), 'lin':(0.9, 1.2)}
+shape_user_range = {'log':(0.9, 1.1), 'lin':(0.9, 1.1)}
 
 from plot_options import plot_options
 
