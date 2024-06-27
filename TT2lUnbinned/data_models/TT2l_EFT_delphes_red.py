@@ -34,12 +34,12 @@ lepton_kinematics_features = [
 asymmetry_features = [
             "tr_ttbar_dEta",
             "tr_ttbar_dAbsEta",
-            "recoLep_dEta", 
-            "recoLep_dAbsEta",
+#            "recoLep_dEta", 
+#            "recoLep_dAbsEta",
 ]
 
 spin_correlation_features = [
-            "tr_cosThetaPlus_n", "tr_cosThetaMinus_n", "tr_cosThetaPlus_r", "tr_cosThetaMinus_r", "tr_cosThetaPlus_k", "tr_cosThetaMinus_k", "tr_cosThetaPlus_r_star", "tr_cosThetaMinus_r_star", "tr_cosThetaPlus_k_star", "tr_cosThetaMinus_k_star", 
+            #"tr_cosThetaPlus_n", "tr_cosThetaMinus_n", "tr_cosThetaPlus_r", "tr_cosThetaMinus_r", "tr_cosThetaPlus_k", "tr_cosThetaMinus_k", "tr_cosThetaPlus_r_star", "tr_cosThetaMinus_r_star", "tr_cosThetaPlus_k_star", "tr_cosThetaMinus_k_star", 
             
             "tr_xi_nn", "tr_xi_rr", "tr_xi_kk", "tr_xi_nr_plus", "tr_xi_nr_minus", "tr_xi_rk_plus", "tr_xi_rk_minus", "tr_xi_nk_plus", "tr_xi_nk_minus", 
             "tr_xi_r_star_k", "tr_xi_k_r_star", "tr_xi_kk_star",
@@ -142,29 +142,22 @@ class DataModel:
 eft_plot_points = [
     {'color':ROOT.kBlack,       'eft':sm, 'tex':"SM"},
 
-#    {'color':ROOT.kViolet,        'eft':make_eft(ctGRe=1), 'tex':"C_{tG}^{Re}=1"},
-#    {'color':ROOT.kPink,        'eft':make_eft(ctGIm=1), 'tex':"C_{tG}^{Im}=1"},
-#    {'color':ROOT.kCyan-4,         'eft':make_eft(cQj18=1), 'tex':"c_{Qj}^{18}=1"},
-#    {'color':ROOT.kRed+2,         'eft':make_eft(cQj38=1), 'tex':"c_{Qj}^{38}=1"},
-#     {'color':ROOT.kCyan+2,       'eft':make_eft(ctj8=1), 'tex':"c_{tj}^{8}=1"  },
-
-    {'color':210,        'eft':make_eft(ctGRe=-2), 'tex':"C_{tG}^{Re}=-2"},
-    {'color':62,        'eft':make_eft(ctGIm=3), 'tex':"C_{tG}^{Im}=3"},
-    {'color':218,         'eft':make_eft(cQj18=5), 'tex':"C_{Qj}^{(1,8)}=5"},
-    {'color':226,         'eft':make_eft(cQj38=5), 'tex':"C_{Qj}^{(3,8)}=5"},
-     {'color':51,       'eft':make_eft(ctj8=5), 'tex':"C_{tj}^{(8)}=5"  },
-
-#    {'color':ROOT.kGreen+2,     'eft':make_eft(cQj11=1), 'tex':"c_{Qj}^{11}=1"},
-#    {'color':ROOT.kBlue-4,      'eft':make_eft(cQj31=1), 'tex':"c_{Qj}^{31}=1"},
-#    {'color':ROOT.kBlue+2,      'eft':make_eft(ctu8=1), 'tex':"c_{tu}^{8}=1"  },
-#    {'color':ROOT.kRed-4,       'eft':make_eft(ctd8=1), 'tex':"c_{td}^{8}=1"  },
-#    {'color':ROOT.kOrange-4,    'eft':make_eft(cQu8=1), 'tex':"c_{Qu}^{8}=1"  },
-#    {'color':ROOT.kOrange+2,    'eft':make_eft(cQd8=1), 'tex':"c_{Qd}^{8}=1"  },
-#    #{'color':ROOT.kCyan-4,      'eft':make_eft(ctu1=1), 'tex':"c_{tu}^{1}=1"  },
-##    {'color':ROOT.kCyan+2,      'eft':make_eft(ctd1=1), 'tex':"c_{td}^{1}=1"  },
-##    {'color':ROOT.kCyan-4,    'eft':make_eft(ctj1=1), 'tex':"c_{tj}^{1}=1"  },
-#    {'color':ROOT.kYellow+2,    'eft':make_eft(cQu1=1), 'tex':"c_{Qu}^{1}=1"  },
-#    {'color':ROOT.kPink,        'eft':make_eft(cQd1=1), 'tex':"c_{Qd}^{1}=1"  },
+    {'color':ROOT.kMagenta-4,   'eft':make_eft(ctGRe=0.2), 'tex':"C_{tG}^{Re}=1"},
+    {'color':ROOT.kMagenta-6,   'eft':make_eft(ctGIm=1), 'tex':"C_{tG}^{Im}=1"},
+    {'color':ROOT.kMagenta+2,   'eft':make_eft(cQj18=10), 'tex':"c_{Qj}^{18}=10"},
+    {'color':ROOT.kGreen-4,     'eft':make_eft(cQj38=10), 'tex':"c_{Qj}^{38}=10"},
+    {'color':ROOT.kGreen+2,     'eft':make_eft(cQj11=10), 'tex':"c_{Qj}^{11}=10"},
+    {'color':ROOT.kBlue-4,      'eft':make_eft(cQj31=10), 'tex':"c_{jj}^{31}=10"},
+    {'color':ROOT.kBlue+2,      'eft':make_eft(ctu8=10), 'tex':"c_{tu}^{8}=10"  },
+    {'color':ROOT.kRed-4,       'eft':make_eft(ctd8=10), 'tex':"c_{td}^{8}=10"  },
+    {'color':ROOT.kRed+2,       'eft':make_eft(ctj8=10), 'tex':"c_{tj}^{8}=10"  },
+    {'color':ROOT.kOrange-4,    'eft':make_eft(cQu8=10), 'tex':"c_{Qu}^{8}=10"  },
+    {'color':ROOT.kOrange+2,    'eft':make_eft(cQd8=10), 'tex':"c_{Qd}^{8}=10"  },
+    {'color':ROOT.kCyan-4,      'eft':make_eft(ctu1=10), 'tex':"c_{tu}^{1}=10"  },
+    {'color':ROOT.kCyan+2,      'eft':make_eft(ctd1=10), 'tex':"c_{td}^{1}=10"  },
+#    {'color':ROOT.kYellow-4,    'eft':make_eft(ctj1=10), 'tex':"c_{tj}^{1}=10"  },
+#    {'color':ROOT.kYellow+2,    'eft':make_eft(cQu1=10), 'tex':"c_{Qu}^{1}=10"  },
+    {'color':ROOT.kPink,        'eft':make_eft(cQd1=10), 'tex':"c_{Qd}^{1}=10"  },
 ]
 
 multi_bit_cfg = {'n_trees': 300,

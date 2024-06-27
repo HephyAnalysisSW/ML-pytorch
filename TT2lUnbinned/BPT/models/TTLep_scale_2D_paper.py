@@ -23,7 +23,7 @@ training_files = {
 
 from defaults_paper import selection, data_location
 
-feature_names = ["nrecoJet", "recoLep01_pt", "recoLep0_pt", "recoLep1_pt", "recoLepPos_pt", "recoLep_dAbsEta", "recoLep_dEta", "tr_abs_delta_phi_ll_lab", "tr_ttbar_dEta", "tr_ttbar_mass", "tr_ttbar_pt"]
+feature_names = ["nrecoJet", "recoLep01_pt", "recoLep0_pt", "recoLep1_pt", "recoLepPos_pt", "recoLep_dAbsEta", "recoLep_dEta", "tr_abs_delta_phi_ll_lab", "tr_ttbar_dEta", "tr_ttbar_mass", "tr_ttbar_pt", "tr_ttbar_dAbsEta"]
 
 data_generator  =  DataGenerator(
     input_files = [os.path.join( data_location, training_file) for training_file in training_files["RunII"] ],

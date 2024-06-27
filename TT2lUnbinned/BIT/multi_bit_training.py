@@ -145,7 +145,7 @@ def drawObjects( offset=0 ):
 stuff = []
 if args.feature_plots and hasattr( model, "eft_plot_points"):
     h    = {}
-    h_lin= {}
+    #h_lin= {}
     for i_eft, eft_plot_point in enumerate(model.eft_plot_points):
         eft = eft_plot_point['eft']
 
@@ -159,13 +159,13 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
         if i_eft==0: name='SM'
 
         h[name]     = {}
-        h_lin[name] = {}
+        #h_lin[name] = {}
 
         eft['name'] = name
         
         for i_feature, feature in enumerate(data_model.feature_names):
             h[name][feature]        = ROOT.TH1F(name+'_'+feature+'_nom',    name+'_'+feature, *plot_options[feature]['binning'] )
-            h_lin[name][feature]    = ROOT.TH1F(name+'_'+feature+'_nom_lin',name+'_'+feature+'_lin', *plot_options[feature]['binning'] )
+            #h_lin[name][feature]    = ROOT.TH1F(name+'_'+feature+'_nom_lin',name+'_'+feature+'_lin', *plot_options[feature]['binning'] )
 
         # make reweights for x-check
         reweight     = copy.deepcopy(training_weights[()])
@@ -186,28 +186,28 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
             binning = plot_options[feature]['binning']
 
             h[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight) )
-            h_lin[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight_lin) )
+            #h_lin[name][feature] = helpers.make_TH1F( np.histogram(training_features[:,i_feature], np.linspace(binning[1], binning[2], binning[0]+1), weights=reweight_lin) )
 
             h[name][feature].SetLineWidth(2)
             h[name][feature].SetLineColor( eft_plot_point['color'] )
             h[name][feature].SetMarkerStyle(0)
             h[name][feature].SetMarkerColor(eft_plot_point['color'])
             h[name][feature].legendText = tex_name
-            h_lin[name][feature].SetLineWidth(2)
-            h_lin[name][feature].SetLineColor( eft_plot_point['color'] )
-            h_lin[name][feature].SetMarkerStyle(0)
-            h_lin[name][feature].SetMarkerColor(eft_plot_point['color'])
-            h_lin[name][feature].legendText = tex_name+(" (lin)" if name!="SM" else "")
+            #h_lin[name][feature].SetLineWidth(2)
+            #h_lin[name][feature].SetLineColor( eft_plot_point['color'] )
+            #h_lin[name][feature].SetMarkerStyle(0)
+            #h_lin[name][feature].SetMarkerColor(eft_plot_point['color'])
+            #h_lin[name][feature].legendText = tex_name+(" (lin)" if name!="SM" else "")
 
     for i_feature, feature in enumerate(data_model.feature_names):
 
-        for _h in [h, h_lin]:
+        for _h in [h]:#, h_lin]:
             norm = _h[model.eft_plot_points[0]['eft']['name']][feature].Integral()
             if norm>0:
                 for eft_plot_point in model.eft_plot_points:
                     _h[eft_plot_point['eft']['name']][feature].Scale(1./norm) 
 
-        for postfix, _h in [ ("", h), ("_linEFT", h_lin)]:
+        for postfix, _h in [ ("", h)]:#, ("_linEFT", h_lin)]:
             histos = [_h[eft_plot_point['eft']['name']][feature] for eft_plot_point in model.eft_plot_points]
             max_   = max( map( lambda h__:h__.GetMaximum(), histos ))
 
@@ -235,6 +235,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
                 plot_directory_ = os.path.join( plot_directory, "feature_plots", "nTraining_%i"%args.nTraining, "log" if logY else "lin" )
                 helpers.copyIndexPHP( plot_directory_ )
                 c1.Print( os.path.join( plot_directory_, feature+postfix+'.png' ))
+                c1.Print( os.path.join( plot_directory_, feature+postfix+'.pdf' ))
 
             # Norm all shapes to 1
             for i_histo, histo in enumerate(histos):
@@ -250,7 +251,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
             # Now plot shape differences
             for logY in [True, False]:
                 c1 = ROOT.TCanvas("c1");
-                l = ROOT.TLegend(0.2,0.68,0.9,0.91)
+                l = ROOT.TLegend(0.2,0.78,0.9,0.91)
                 l.SetNColumns(2)
                 l.SetFillStyle(0)
                 l.SetShadowColor(ROOT.kWhite)
@@ -262,7 +263,7 @@ if args.feature_plots and hasattr( model, "eft_plot_points"):
                     histo.GetYaxis().SetTitle("shape wrt. SM")
                     if i_histo == 0:
                         histo.Draw('hist')
-                        histo.GetYaxis().SetRangeUser( (0.01 if logY else 0), (10 if logY else 2))
+                        histo.GetYaxis().SetRangeUser( (0.01 if logY else 0.9), (10 if logY else 1.2))
                         histo.Draw('hist')
                     else:
                         histo.Draw('histsame')
@@ -306,7 +307,7 @@ except (IOError, EOFError, ValueError):
 if args.bias is not None:
     if len(args.bias)!=2: raise RuntimeError ("Bias is defined by <var> <function>, i.e. 'x' '10**(({}-200)/200). Got instead %r"%args.bias)
     function     = eval( 'lambda x:'+args.bias[1].replace('{}','x') ) 
-    bias_weights = np.array(map( function, training_features[:, data_model.feature_names.index(args.bias[0])] ))
+    bias_weights = np.array(list(map( function, training_features[:, data_model.feature_names.index(args.bias[0])] )))
     bias_weights /= np.mean(bias_weights)
     training_weights = {k:v*bias_weights for k,v in training_weights.items()} 
 
@@ -351,10 +352,10 @@ if args.auto_clip is not None:
         test_observers = test_observers[selected] 
     print ("Auto clip efficiency (test) %4.3f is %4.3f"%( args.auto_clip, len(test_features)/len_before ) )
 
-if args.bias is not None:
-    bias_weights = np.array(map( function, test_features[:, data_model.feature_names.index(args.bias[0])] ))
-    bias_weights /= np.mean(bias_weights)
-    test_weights = {k:v*bias_weights for k,v in test_weights.items()} 
+#if args.bias is not None:
+#    bias_weights = np.array(list(map( function, test_features[:, data_model.feature_names.index(args.bias[0])] )))
+#    bias_weights /= np.mean(bias_weights)
+#    test_weights = {k:v*bias_weights for k,v in test_weights.items()} 
 
 # delete coefficients we don't need
 if args.coefficients is not None:

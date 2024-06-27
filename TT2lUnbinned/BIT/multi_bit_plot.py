@@ -10,13 +10,14 @@ import cProfile
 import time
 import os, sys
 sys.path.insert(0, '..')
+sys.path.insert(0, '../..')
 from math import log, exp, sin, cos, sqrt, pi
 import copy
 import pickle
 import itertools
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../tools/scripts/tdrstyle.C"))
+ROOT.gROOT.LoadMacro(os.path.join( dir_path, "../../tools/scripts/tdrstyle.C"))
 ROOT.setTDRStyle()
 
 from   tools import helpers
@@ -31,12 +32,12 @@ import tools.user as user
 # Parser
 import argparse
 argParser = argparse.ArgumentParser(description = "Argument parser")
-argParser.add_argument("--plot_directory",     action="store",      default="TT01j2lCAv2Ref_HT500_FullSim",                 help="plot sub-directory")
-argParser.add_argument("--model",              action="store",      default="TT01j2lCAv2Ref_HT500_FullSim",                 help="Which model?")
-argParser.add_argument("--modelFile",          action="store",      default="models",                 help="Which model directory?")
-argParser.add_argument("--prefix",             action="store",      default="v4", type=str,  help="prefix")
+argParser.add_argument("--plot_directory",     action="store",      default="",                 help="plot sub-directory")
+argParser.add_argument("--model",              action="store",      default="TT2l_EFT_delphes",                 help="Which model?")
+argParser.add_argument("--modelFile",          action="store",      default="data_models",                 help="Which model directory?")
+argParser.add_argument("--prefix",             action="store",      default="v1.1", type=str,  help="prefix")
 argParser.add_argument("--nTraining",          action="store",      default=-1,        type=int,  help="number of training events")
-argParser.add_argument("--coefficients",       action="store",      default=['ctGRe', 'cQj18', 'cQj38', 'ctj8', 'ctj1'],       nargs="*", help="Which coefficients?")
+argParser.add_argument("--coefficients",       action="store",      default=['ctGRe', 'ctGIm', 'cQj18', 'cQj38', 'ctj8'],       nargs="*", help="Which coefficients?")
  
 args, extra = argParser.parse_known_args(sys.argv[1:])
 
@@ -85,7 +86,16 @@ if not os.path.isdir(plot_directory):
     except IOError:
         pass
 
-training_features, training_weights, observer_features = model.getEvents(args.nTraining, return_observers=True)
+from data_models.plot_options import plot_options
+
+data_model = model.DataModel(
+        top_kinematics      =  False, 
+        lepton_kinematics   =  False, 
+        asymmetry           =  False, 
+        spin_correlation    =  False, 
+    )
+
+training_features, training_weights = data_model.getEvents(args.nTraining)
 print ("Created data set of size %i" % len(training_features) )
 
 # Text on the plots
@@ -106,11 +116,11 @@ def drawObjects( offset=0 ):
 base_points = []
 for comb in list(itertools.combinations_with_replacement(args.coefficients,1))+list(itertools.combinations_with_replacement(args.coefficients,2)):
     base_points.append( {c:comb.count(c) for c in args.coefficients} )
-if args.prefix == None:
-    bit_name = "multiBit_%s_%s_nTraining_%i_nTrees_%i"%(args.model, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
-else:
-    bit_name = "multiBit_%s_%s_%s_nTraining_%i_nTrees_%i"%(args.model, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 
+if args.prefix == None:
+    bit_name = "multiBit_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
+else:
+    bit_name = "multiBit_%s_%s_%s_coeffs_%s_nTraining_%i_nTrees_%i"%(args.model, data_model.name, args.prefix, "_".join(args.coefficients), args.nTraining, model.multi_bit_cfg["n_trees"])
 
 # delete coefficients we don't need (the BIT coefficients are determined from the training weight keys)
 if args.coefficients is not None:
@@ -128,14 +138,14 @@ except (IOError, EOFError, ValueError):
 import glob
 bit_pattern = bit_name.replace(args.model,args.model+"_*resample*")
 bit_bootstrap={}
-for _filename in glob.glob(os.path.join(user.model_directory, bit_pattern)+'.pkl'):
+for _filename in []:#glob.glob(os.path.join(user.model_directory, bit_pattern)+'.pkl'):
     int_ = int( _filename.split("resample")[1].split("_")[0].replace("resample",""))
     bit_bootstrap[int_] = MultiBoostedInformationTree.load( _filename )
     print ("Loaded bootstrap prediction", _filename)
 
 print ("Loaded %i bootstraps"%len(bit_bootstrap) )
 
-test_features, test_weights, test_observers = model.getEvents(args.nTraining, return_observers=True)
+test_features, test_weights, test_observers = data_model.getEvents(args.nTraining, return_observers=True)
 print ("Created data set of size %i" % len(test_features) )
 
 # delete coefficients we don't need
@@ -186,6 +196,12 @@ w0 = test_weights[()]
 
 stuff = []
 
+# FIXME
+test_weights[('ctGRe',)]/=5.
+test_predictions[:,bit.derivatives.index(('ctGRe',))]/=5
+bit.derivatives = list( filter( lambda d:len(d)<=1, bit.derivatives))
+
+
 for observables, features, postfix in [
     ( model.observers if hasattr(model, "observers") else [], test_observers, "_observers"),
     ( model.feature_names, test_features, ""),
@@ -197,7 +213,7 @@ for observables, features, postfix in [
     h_w0, h_ratio_prediction, h_ratio_bootstrap_prediction, h_ratio_truth, lin_binning = {}, {}, {}, {}, {}
     for i_feature, feature in enumerate(observables):
         # root style binning
-        binning     = model.plot_options[feature]['binning']
+        binning     = plot_options[feature]['binning']
         # linspace binning
         lin_binning[feature] = np.linspace(binning[1], binning[2], binning[0]+1)
         #digitize feature
@@ -216,8 +232,8 @@ for observables, features, postfix in [
             h_ratio_bootstrap_prediction[feature][key] = h_bootstrap_predictions[key]/h_w0[feature].reshape(-1,1)
         h_ratio_truth[feature]      = h_derivative_truth/h_w0[feature].reshape(-1,1)
 
-        if feature=='nJetGood':
-            assert False, ""
+        #if feature=='nJetGood':
+        #    assert False, ""
 
     n_pads = len(observables)+1
     n_col  = int(sqrt(n_pads))
@@ -243,12 +259,11 @@ for observables, features, postfix in [
             th1d_ratio_pred  = { der: helpers.make_TH1F( (h_ratio_prediction[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
             th1d_ratio_truth = { der: helpers.make_TH1F( (h_ratio_truth[feature][:,i_der], lin_binning[feature])) for i_der, der in enumerate( bit.derivatives ) }
 
-            for der in th1d_ratio_pred.keys():
-                for i_bin in range(1, th1d_ratio_pred[der].GetNbinsX()+1):
-                    sigma = np.sqrt(np.var( [ th1d_ratio_pred_bootstrap[key][der].GetBinContent(i_bin) for key in th1d_ratio_pred_bootstrap.keys()] ))
-                    assert False, ""
-                    th1d_ratio_pred[der].SetBinError( i_bin, sigma )
-                    #print (i_feature, feature, der, th1d_ratio_pred[der].GetBinContent(i_bin), sigma)
+            #for der in th1d_ratio_pred.keys():
+            #    for i_bin in range(1, th1d_ratio_pred[der].GetNbinsX()+1):
+            #        sigma = np.sqrt(np.var( [ th1d_ratio_pred_bootstrap[key][der].GetBinContent(i_bin) for key in th1d_ratio_pred_bootstrap.keys()] ))
+            #        th1d_ratio_pred[der].SetBinError( i_bin, sigma )
+            #        #print (i_feature, feature, der, th1d_ratio_pred[der].GetBinContent(i_bin), sigma)
 
             stuff.append(th1d_yield)
             stuff.append(th1d_ratio_truth)
@@ -258,7 +273,7 @@ for observables, features, postfix in [
             th1d_yield.SetLineColor(ROOT.kGray+2)
             th1d_yield.SetMarkerColor(ROOT.kGray+2)
             th1d_yield.SetMarkerStyle(0)
-            th1d_yield.GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+            th1d_yield.GetXaxis().SetTitle(plot_options[feature]['tex'])
             th1d_yield.SetTitle("")
 
             th1d_yield.Draw("hist")
@@ -270,14 +285,14 @@ for observables, features, postfix in [
                 th1d_ratio_truth[der].SetMarkerStyle(0)
                 th1d_ratio_truth[der].SetLineWidth(2)
                 th1d_ratio_truth[der].SetLineStyle(ROOT.kDashed)
-                th1d_ratio_truth[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                th1d_ratio_truth[der].GetXaxis().SetTitle(plot_options[feature]['tex'])
 
                 th1d_ratio_pred[der].SetTitle("")
                 th1d_ratio_pred[der].SetLineColor(color[der])
                 th1d_ratio_pred[der].SetMarkerColor(color[der])
                 th1d_ratio_pred[der].SetMarkerStyle(0)
                 th1d_ratio_pred[der].SetLineWidth(2)
-                th1d_ratio_pred[der].GetXaxis().SetTitle(model.plot_options[feature]['tex'])
+                th1d_ratio_pred[der].GetXaxis().SetTitle(plot_options[feature]['tex'])
 
                 tex_name = "%s"%(",".join( der ))
 

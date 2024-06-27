@@ -59,7 +59,7 @@ def getEvents( N_events_requested, systematic = None):
 
     return res 
 
-tex = {"leptonSF":"SF(l)"}
+tex.update( {"leptonSF":"SF(l)"} )
 
 shape_user_range = {'log':(0.97, 1.03), 'lin':(0.97, 1.03)}
 

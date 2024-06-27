@@ -9,7 +9,7 @@ from tools.DataGenerator import DataGenerator as _DataGenerator
 
 #feature_names = [ "nrecoJet", "tr_ttbar_mass", "jet0_pt"]#, "jet1_pt", "jet2_pt", "jet3_pt", "jet0_eta", "jet1_eta", "jet2_eta", "jet3_eta" ]
 feature_names = [
-            "tr_ttbar_pt",
+#            "tr_ttbar_pt",
 #
 #            "recoLep0_pt",
 #            "recoLep1_pt",
@@ -20,7 +20,7 @@ feature_names = [
 #            "tr_cosThetaPlus_k",
 #
 #            "nBTag",
-#            "nrecoJet", #change name when ntuple is updated
+            "nrecoJet", #change name when ntuple is updated
 #            "ht"
 ]
 
@@ -34,7 +34,7 @@ encoding      = { 0.5 :("0p5", "Up"), 1.0 :("1p0", "Up"), 1.5 :("1p5", "Up"), 2.
 def set_era(era):
     print ("Set era:",era,"-> do nothing!")
 
-input_dir = "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-v7-jec/MVA-training/JEC_for_paper_minDLmass20-dilepM-offZ1/"
+input_dir = "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-v4-jec/MVA-training/JEC_for_paper_minDLmass20-dilepM-offZ1/"
 redirector = "root://eos.grid.vbc.ac.at/"
 
 def _getEvents( systematic = "jesTotal", level = 0, n_split=1, maxN=None):
@@ -68,38 +68,6 @@ parameters         = ['nu']
 combinations       = [('nu',), ]#('nu', 'nu'),] #('nu', 'nu', 'nu'), ('nu', 'nu', 'nu', 'nu')]
 tex                = {"nu":"#nu"}
 nominal_base_point = (0.,)
-
-tex.update( {
-    #"jesTotal":           "Total",
-    #"jesAbsoluteMPFBias": "AbsoluteMPFBias",
-    #"jesAbsoluteScale":   "AbsoluteScale",
-    #"jesAbsoluteStat":    "AbsoluteStat",
-    #"jesRelativeBal":     "RelativeBal",
-    #"jesRelativeFSR":     "RelativeFSR",
-    #"jesRelativePtBB":    "RelativePtBB",
-    #"jesRelativeStatFSR": "RelativeStatFSR",
-    #"jesPileUpDataMC":    "PileUpDataMC",
-    #"jesPileUpPtBB":      "PileUpPtBB",
-    #"jesPileUpPtRef":     "PileUpPtRef",
-    #"jesFlavorQCD":       "FlavorQCD",
-    #"jesFragmentation":   "Fragmentation",
-    #"jesSinglePionECAL":  "SinglePionECAL",
-    #"jesSinglePionHCAL":  "SinglePionHCAL",
-    #"jesTimePtEta":       "TimePtEta",
-
-    "jesTotal":                 "jesTotal",
-    "jesSubTotalPileUp":        "jesSubTotalPileUp",
-    "jesSubTotalRelative":      "jesSubTotalRelative",
-    "jesSubTotalAbsolute":      "jesSubTotalAbsolute",
-    "jesSubTotalPt":            "jesSubTotalPt",
-    "jesSubTotalScale":         "jesSubTotalScale",
-    "jesSubTotalMC":            "jesSubTotalMC",
-    "jesTotalNoFlavor":         "jesTotalNoFlavor",
-    "jesTotalNoTime":           "jesTotalNoTime",
-    "jesTotalNoFlavorNoTime":   "jesTotalNoFlavorNoTime",
-    "jesTimePtEta":             "jesTimePtEta",
-})
-
 
 default_parameters = {  }
 default_parameters.update( {var:0. for var in parameters} )

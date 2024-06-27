@@ -59,7 +59,8 @@ def getEvents( N_events_requested, systematic = systematic):
 
     return res 
 
-tex = {var:var for var in systematics}
+tex.update( {var:var for var in systematics} )
+tex['nu'] = '#nu'
 
 shape_user_range = {'log':(0.998, 1.002), 'lin':(0.998, 1.002)}
 

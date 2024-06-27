@@ -1,4 +1,3 @@
-#systematics   = ["jesTotal", "jesAbsoluteMPFBias", "jesAbsoluteScale", "jesAbsoluteStat", "jesRelativeBal", "jesRelativeFSR", "jesRelativeJEREC1", "jesRelativeJEREC2", "jesRelativeJERHF", "jesRelativePtBB", "jesRelativePtEC1", "jesRelativePtEC2", "jesRelativePtHF", "jesRelativeStatEC", "jesRelativeStatFSR", "jesRelativeStatHF", "jesPileDataMC", "jesPilePtBB", "jesPilePtEC1", "jesPilePtEC2", "jesPilePtHF", "jesPilePtRef", "jesFlavorQCD", "jesFragmentation", "jesSinglePionECAL", "jesSinglePionHCAL", "jesTimePtEta"]
 #python bpt_training.py --model TTLep_JERC --feature_plots --nTraining -1 --debug
 
 #python bpt_training.py --model TTLep_JERC --feature_plots --nTraining -1 --debug --variation jesTotal

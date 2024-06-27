@@ -3,7 +3,7 @@ import os
 input_selection = "tr-minDLmass20-dilepM-offZ1-njet3p-btagM2p-mtt750"
 #input_selection = "tr-minDLmass20-dilepL-offZ1-njet3p-btag2p-ht500"
 
-location = "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-v4/MVA-training/"
+location = "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-v6/MVA-training/"
 
 data_location =  os.path.join( location, "EFT_for_paper_%s/"%input_selection)
 

@@ -89,7 +89,7 @@ if args.marginalized:
 if args.th:
     sub_directory.append("th")
     scale  = True
-    DYnorm = True
+    DYnorm = False
     xsec   = True
 
 if args.mod:

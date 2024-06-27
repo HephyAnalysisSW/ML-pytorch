@@ -11,11 +11,23 @@ import csv
 import os
 import array
 
-parameters         = ['nu1']
-combinations       = [('nu1',), ('nu1', 'nu1'),] #('nu1', 'nu1', 'nu1'), ('nu1', 'nu1', 'nu1', 'nu1')]
-tex                = {"nu1":"#nu_{1}"}
-base_points        = [ [0.], [.5] , [1.], [1.5] ]
-nominal_base_point = (0.,)
+base_point_index = {
+    0 : (0., 0.),
+    1 : (.5, 0.),
+    2 : (0., .5),
+    3 : (1., 0.),
+    4 : (0., 1.),
+    5 : (.5, .5),
+    #6 : (.45, .45),
+    #7 : (.55, .55),
+}
+base_point_index.update ({val:key for key, val in base_point_index.items()})
+
+base_points        = [ base_point_index[i] for i in [0,1,2,3,4,5,]] #6,7] ]
+parameters         = ['nu1', 'nu2']
+combinations       = [('nu1',),  ('nu1', 'nu1'), ('nu2',), ('nu2', 'nu2'), ('nu1', 'nu2')] #('nu1', 'nu1', 'nu1'), ('nu1', 'nu1', 'nu1', 'nu1')]
+tex                = {"nu1":"#nu_{1}", "nu2":"#nu_{2}"}
+nominal_base_point = base_point_index[0]
 
 default_parameters = {  }
 default_parameters.update( {var:0. for var in parameters} )
@@ -34,6 +46,9 @@ sm         = make_parameters()
 
 feature_names =  ['x']
 
+def set_era( era ):
+    print ("Do nothing to set the era to %s" % era)
+
 from scipy.stats.sampling import NumericalInversePolynomial
 
 class PDF:
@@ -44,14 +59,14 @@ class PDF:
     # for external use
     @staticmethod
     def generic_pdf( x, parameters):
-        return np.exp(parameters[0]*np.sin(x)) 
+        return np.exp( .25*(parameters[0]*np.sin(x)+ parameters[1]*np.cos(.5*x))**2 ) 
 
     def pdf(self, x: float) -> float:
         # note that the normalization constant isn't required
         return self.generic_pdf( x, self.parameters )
 
-    def dpdf(self, x: float) -> float:
-        return self.parameters[0]*np.cos(x)*np.exp( self.parameters[0]*np.sin(x) )
+    #def dpdf(self, x: float) -> float:
+    #    return 2*(parameters[0]*np.sin(x)+parameters[1]*np.cos(x))*(parameters[0]*np.cos(x)-parameters[1]*np.sin(x))*np.exp( (parameters[0]*np.sin(x)+parameters[1]*np.cos(x))**2 )
 
     def getFeatures( self, N_events_requested ):
         return np.array( self.rng.rvs(N_events_requested) ).reshape( -1, 1)
@@ -63,9 +78,10 @@ def getEvents( N_events_requested, weighted=True, systematic=None):
     if weighted:
         x  = nominal_PDF.getFeatures( N_events_requested )
         res = {tuple(bp):{'weights':nominal_PDF.generic_pdf( x[:,0], bp)} for bp in base_points}
-        #res = {tuple(bp):{'weights':np.exp(1.+bp[0]*x)*np.ones((len(x),))} for bp in base_points}
-        #res = {tuple(bp):{'weights':np.exp( (.2*bp[0]-0.3*bp[0]**2+0.0*bp[0]**3))*np.ones((len(x),) )} for bp in base_points}
         res[nominal_base_point]['features'] = x
+        for key, val in res.items():
+            val['weights']/=(val['weights'].sum())
+            val['weights']*=100
     else:
         res = {tuple(bp):{'features': PDF(bp).getFeatures( N_events_requested )} for bp in base_points}
 
@@ -74,16 +90,6 @@ def getEvents( N_events_requested, weighted=True, systematic=None):
 plot_options = {
     'x': {'binning':[20,-pi,pi],      'tex':"x",},
     }
-
-plot_points = [
-    {'color':ROOT.kBlack,       'point':sm, 'tex':"SM"},
-    {'color':ROOT.kMagenta+2,   'point':make_parameters(nu1=-2),'tex':"#nu_{1} = -2"},
-    {'color':ROOT.kMagenta-4,   'point':make_parameters(nu1=+2), 'tex':"#nu_{1} = +2"},
-    {'color':ROOT.kBlue+2,      'point':make_parameters(nu1=-1),  'tex':"#nu_{1} = -1"},
-    {'color':ROOT.kBlue-4,      'point':make_parameters(nu1=+1),  'tex':"#nu_{1} = +1"},
-    {'color':ROOT.kGreen+2,     'point':make_parameters(nu1=-0.5),'tex':"#nu_{1} =-.5"},
-    {'color':ROOT.kGreen-4,     'point':make_parameters(nu1=0.5), 'tex':"#nu_{1} =+.5"},
-]
 
 bpt_cfg = {
     "n_trees" : 100,

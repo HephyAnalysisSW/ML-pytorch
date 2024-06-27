@@ -34,7 +34,7 @@ encoding      = { 0.5 :("0p5", "Up"), 1.0 :("1p0", "Up"), 1.5 :("1p5", "Up"), 2.
 def set_era(era):
     print ("Set era:",era,"-> do nothing!")
 
-input_dir = "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-v4-jec/MVA-training/JEC_for_paper_minDLmass20-dilepM-offZ1/"
+input_dir = "/eos/vbc/group/cms/robert.schoefbeck/TT2lUnbinned/training-ntuples-v7-jec/MVA-training/JEC_for_paper_minDLmass20-dilepM-offZ1/"
 redirector = "root://eos.grid.vbc.ac.at/"
 
 def _getEvents( systematic = "jesTotal", level = 0, n_split=1, maxN=None):

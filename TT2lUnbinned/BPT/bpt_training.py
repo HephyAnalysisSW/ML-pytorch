@@ -42,6 +42,7 @@ argParser.add_argument('--overwrite',          action='store',      default=None
 argParser.add_argument('--debug',              action='store_true', help="Make debug plots?")
 argParser.add_argument('--feature_plots',      action='store_true', help="Feature plots?")
 #argParser.add_argument('--auto_clip',          action='store',      default=None, type=float, help="Remove quantiles of the training variable?")
+argParser.add_argument('--bias',               action='store',      default=None, nargs = "*",  help="Bias training? Example:  --bias 'pT' '10**(({}-200)/200) ")
 
 args, extra = argParser.parse_known_args(sys.argv[1:])
 
@@ -258,6 +259,17 @@ if args.feature_plots:
 print ("Done with plots")
 syncer.sync()
 
+# reweight training data according to bias
+if args.bias is not None:
+    if len(args.bias)!=2: raise RuntimeError ("Bias is defined by <var> <function>, i.e. 'x' '10**(({}-200)/200). Got instead %r"%args.bias)
+    function     = eval( 'lambda x:'+args.bias[1].replace('{}','x') )
+    for k, v in training_data.items():
+        feat = v["features"] if "features" in v else training_data[model.nominal_base_point]["features"]
+        
+        bias_weights = np.array(list(map( function, feat[:, model.feature_names.index(args.bias[0])] )))
+        bias_weights /= np.mean(bias_weights)
+        v["weights"] *=bias_weights 
+
 postfix = ("_"+args.version if args.version != "" else "") + ("_"+args.era if args.era != "RunII" else "")
 if args.variation == None:
     bpt_name = "BPT_%s_nTraining_%i_nTrees_%i"%(args.model+postfix, args.nTraining, cfg["n_trees"])
@@ -321,11 +333,11 @@ if args.debug:
         h_pred  = {}
         h_truth_shape = {}
         h_pred_shape  = {}
-        for i_point, point in enumerate(model.base_points):
+        for i_point, point in enumerate(bpt.base_points):
 
             name     = '_'.join( [ (model.parameters[i_param]+'_%3.2f'%param).replace('.','p').replace('-','m') for i_param, param in enumerate(point)])
             tex_name = '_'.join( [ (model.parameters[i_param]+' = %3.2f'%param) for i_param, param in enumerate(point)])
-            is_nominal = tuple(point) == tuple(model.nominal_base_point)
+            is_nominal = tuple(point) == tuple(bpt.nominal_base_point)
             if is_nominal:
                 nominal_index = i_point
                 nominal_name  = name
@@ -384,7 +396,7 @@ if args.debug:
 
         # make shape plots
         for feature in feature_names:
-            for i_point, point in enumerate(model.base_points):
+            for i_point, point in enumerate(bpt.base_points):
                 h_truth_shape[tuple(point)][feature].Divide(h_truth[model.nominal_base_point][feature])
                 h_pred_shape[tuple(point)][feature].Divide(h_truth[model.nominal_base_point][feature])
 
@@ -411,20 +423,20 @@ if args.debug:
                 c1.cd(i_feature+1)
                 ROOT.gStyle.SetOptStat(0)
 
-                for i_point, point in enumerate(model.base_points):
+                for i_point, point in enumerate(bpt.base_points):
                     h_truth[tuple(point)][feature].Draw("same") 
                     h_pred[tuple(point)][feature].Draw("same") 
                     if i_feature==0:
                         l.AddEntry(  h_truth[tuple(point)][feature],  h_truth[tuple(point)]["tex"])
                         l.AddEntry(  h_pred[tuple(point)][feature],   h_pred[tuple(point)]["tex"])
 
-                max_ = max( map( lambda h:h.GetMaximum(), [h_truth[tuple(point)][feature] for point in model.base_points] ))
+                max_ = max( map( lambda h:h.GetMaximum(), [h_truth[tuple(point)][feature] for point in bpt.base_points] ))
                 max_ = 10**(1.5)*max_ if logY else 1.5*max_
-                min_ = min( map( lambda h:h.GetMinimum(), [h_truth[tuple(point)][feature] for point in model.base_points] ))
+                min_ = min( map( lambda h:h.GetMinimum(), [h_truth[tuple(point)][feature] for point in bpt.base_points] ))
                 min_ = 0.1 if logY else (1.5*min_ if min_<0 else 0.75*min_)
 
                 first = True
-                for h in [h_pred[tuple(point)][feature] for point in model.base_points] +  [h_truth[tuple(point)][feature] for point in model.base_points]:
+                for h in [h_pred[tuple(point)][feature] for point in bpt.base_points] +  [h_truth[tuple(point)][feature] for point in bpt.base_points]:
                     if first:
                         h.Draw("h")
                         ROOT.gPad.SetLogy(logY)
@@ -440,13 +452,13 @@ if args.debug:
                 c2.cd(i_feature+1)
                 ROOT.gStyle.SetOptStat(0)
 
-                for i_point, point in enumerate(model.base_points):
+                for i_point, point in enumerate(bpt.base_points):
                     h_truth_shape[tuple(point)][feature].Draw("same") 
                     h_pred_shape[tuple(point)][feature].Draw("same") 
 
-                max_ = max( map( lambda h:h.GetMaximum(), [h_truth_shape[tuple(point)][feature] for point in model.base_points] ))
+                max_ = max( map( lambda h:h.GetMaximum(), [h_truth_shape[tuple(point)][feature] for point in bpt.base_points] ))
                 max_ = 10**(1.5)*max_ if logY else 1+1.3*(max_-1)
-                min_ = min( map( lambda h:h.GetMinimum(), [h_truth_shape[tuple(point)][feature] for point in model.base_points] ))
+                min_ = min( map( lambda h:h.GetMinimum(), [h_truth_shape[tuple(point)][feature] for point in bpt.base_points] ))
                 min_ = 0.1 if logY else 1-1.3*(1-min_)
 
                 try:
@@ -455,7 +467,7 @@ if args.debug:
                     pass
 
                 first = True
-                for h in [h_pred_shape[tuple(point)][feature] for point in model.base_points] +  [h_truth_shape[tuple(point)][feature] for point in model.base_points]:
+                for h in [h_pred_shape[tuple(point)][feature] for point in bpt.base_points] +  [h_truth_shape[tuple(point)][feature] for point in bpt.base_points]:
                     if first:
                         h.Draw("h")
                         ROOT.gPad.SetLogy(logY)
