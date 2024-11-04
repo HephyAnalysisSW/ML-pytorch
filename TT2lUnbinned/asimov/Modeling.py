@@ -304,6 +304,50 @@ class AsimovNonCentrality:
     def variables(self):
         return [v for v in self.null.parameters if not (v.isFrozen or v.isIgnored)]
 
+class Toy:
+
+    def __init__( self, expectation, choice, model_weight_func, null, alt=None, debug=False):
+
+        self.model_weight_func = model_weight_func
+        self.null = null
+        self.null.name  = "Null (BSM)"
+        self.alt        = null.cloneSM() if alt is None else alt
+        self.alt.name   = "Alternate (SM)"
+
+        self.expectation= expectation
+        self.choice     = choice 
+
+        self.debug = debug
+        if self.debug:
+            print ("End of constructor Null:")
+            self.null.print()
+            print ("End of constructor Alt:")
+            self.alt.print()
+
+    def __call__( self, null=None):
+        _null = null if null is not None else self.null
+
+        w_null = self.model_weight_func(_null) 
+        w_alt  = self.model_weight_func(self.alt) 
+
+        sim_scale  = self.expectation/w_alt.sum()
+
+        neg_frac = (w_null<0).sum()/len(w_null)
+        #if return_neg_frac: return neg_frac
+
+        if neg_frac>0.01: 
+            logger.warning ( "Discarded fraction of events because prediction is negative: %4.3f" % neg_frac ) 
+        penalties = np.sum( [par.val**2 for par in _null.penalized  ] ) 
+        return -2*( 
+                      sim_scale*(-w_null.sum() + w_alt.sum()) +
+                    + (np.log(np.where( (w_alt[self.choice]>0) & (w_null[self.choice]>0), w_null[self.choice]/w_alt[self.choice], 1))).sum() 
+                ) + penalties
+
+    @property
+    def variables(self):
+        return [v for v in self.null.parameters if not (v.isFrozen or v.isIgnored)]
+
+
 from iminuit import Minuit
 from iminuit.util import describe
 from typing import Annotated

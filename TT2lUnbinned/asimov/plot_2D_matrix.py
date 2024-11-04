@@ -107,7 +107,7 @@ for wc1, wc2 in list( itertools.combinations( coefficients, 2)):
 
 c1 = ROOT.TCanvas("","", 500*(len(coefficients)-1), 500*(len(coefficients)-1))
 c1.Divide(len(coefficients)-1, len(coefficients)-1, 0.002, 0.002)
-for wc1, wc2 in [('cQj38', 'ctj8')]: #list( itertools.combinations( coefficients, 2)):
+for wc1, wc2 in list( itertools.combinations( coefficients, 2)):
     c1.cd(coefficients.index(wc2) + (len(coefficients)-1)*coefficients.index(wc1))
     first = True
     for subdir in subdirs:

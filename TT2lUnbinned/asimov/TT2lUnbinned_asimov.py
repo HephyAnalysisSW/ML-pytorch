@@ -21,6 +21,10 @@ parser.add_argument('--marginalized',   action='store_true',   help="Marginalize
 parser.add_argument('--th',             action='store_true',  help="Theoretical systematics?")
 parser.add_argument('--mod',            action='store_true',  help="Modeling systematics?")
 parser.add_argument('--exp',            action='store_true',  help="Experimental systematics?")
+parser.add_argument('--top_kinematics',       action='store_true')
+parser.add_argument('--lepton_kinematics',    action='store_true')
+parser.add_argument('--asymmetry',            action='store_true')
+parser.add_argument('--spin_correlation',     action='store_true')
 
 parser.add_argument("--wc1",   action="store",      default = "ctGRe", help="Which wilson coefficient?")
 parser.add_argument("--low1",  action="store",      default = -0.5, type=float, help="Lower range")
@@ -57,6 +61,14 @@ if args.high2 is not None:
                 arguments.append("--mod")
             if args.exp:
                 arguments.append("--exp")
+            if args.top_kinematics:
+                arguments.append("--top_kinematics")
+            if args.lepton_kinematics:
+                arguments.append("--lepton_kinematics")
+            if args.asymmetry:
+                arguments.append("--asymmetry")
+            if args.spin_correlation:
+                arguments.append("--spin_correlation")
            
             arguments.append("--wc1 %s"%args.wc1) 
             arguments.append("--low1 %.5f"%args.low1 ) 
@@ -104,7 +116,6 @@ if args.exp:
     BTag   = True
     lumi   = True
 
-output_directory = os.path.join( results_directory, "TT2lUnbinned/limits", args.version )
 
 logger.info ("LOADING DATA MODEL: TT2l_EFT_delphes") 
 import data_models.TT2l_EFT_delphes as data_model
@@ -113,7 +124,15 @@ logger.info("All Wilson coefficients: "+",".join( data_model.wilson_coefficients
 logger.info ("LOADING BIT") 
 from BIT.MultiBoostedInformationTree import MultiBoostedInformationTree
 
-bit_name = "/groups/hephy/cms/robert.schoefbeck/NN/models/multiBit_TT2l_EFT_delphes_TK_False_LK_False_CA_False_SC_False_v1.1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300.pkl"
+bit_id = "TK_%r_LK_%r_CA_%r_SC_%r"%( args.top_kinematics, args.lepton_kinematics, args.asymmetry, args.spin_correlation)
+
+if "True" in bit_id:
+    args.version+= "_"+bit_id
+
+output_directory = os.path.join( results_directory, "TT2lUnbinned/limits", args.version )
+
+#bit_name = "/groups/hephy/cms/robert.schoefbeck/NN/models/multiBit_TT2l_EFT_delphes_TK_False_LK_False_CA_False_SC_False_v1.1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300.pkl"
+bit_name = "/groups/hephy/cms/robert.schoefbeck/NN/models/multiBit_TT2l_EFT_delphes_%s_v1.1_coeffs_ctGRe_ctGIm_cQj18_cQj38_ctj8_nTraining_-1_nTrees_300.pkl"%bit_id
 logger.info ("Using BIT training: %s", bit_name)
 bit = MultiBoostedInformationTree.load(bit_name)
 logger.info ("We have predictions for these BIT derivatives: %s", bit.derivatives)
