@@ -149,5 +149,10 @@ plot_options =  {
     "jet1_pt":{'binning':[30,0,800], 'tex':'p_{T}(jet1)'},
     "ht":{'binning':[30,0,1500], 'tex':'H_T'},
 
+    "Generator_x1":{'binning':[30,0,1], 'tex':'x_{1,Bjorken}'},
+    "Generator_x2":{'binning':[30,0,1], 'tex':'x_{2,Bjorken}'},
+    "Generator_id1":{'binning':[26,-5,21], 'tex':'PDGID(1)'},
+    "Generator_id2":{'binning':[26,-5,21], 'tex':'PDGID(2)'},
+
 }
 

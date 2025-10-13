@@ -9,7 +9,7 @@ if __name__=="__main__":
 from tools.DataGenerator import DataGenerator
 from tools.PDFParametrization import PDFParametrization
 
-selection = lambda ar: (ar.nrecoLep==2) & (ar.recoLepNeg_pt>0) & (ar.recoLepPos_pt>0) #& (ar.recoBj01_pt > 0) & (ar.recoBj01_mass>0) 
+selection = None #lambda ar: (ar.nrecoLep==2) & (ar.recoLepNeg_pt>0) & (ar.recoLepPos_pt>0) #& (ar.recoBj01_pt > 0) & (ar.recoBj01_mass>0) 
 
 top_kinematics_features = [
             "tr_ttbar_pt", 
@@ -47,19 +47,19 @@ spin_correlation_features = [
 ]
 
 feature_names = top_kinematics_features + lepton_kinematics_features + asymmetry_features + spin_correlation_features + [   
-            "nBTag", "nrecoJet", "nrecoLep", "jet0_pt", "jet1_pt", "ht", "recoLep0_pt", "recoLep1_pt", 
+            "nBTag", "nrecoJet", "jet0_pt", "jet1_pt", "ht", "recoLep0_pt", "recoLep1_pt", 
         ]
 
-observers = []
+observers = ["Generator_x1", "Generator_x2", "Generator_id1", "Generator_id2"]
 
-pdf = PDFParametrization(n = 3)
+pdf = PDFParametrization(n = 5)
 
 default_pdf_parameters = {p:0 for p in pdf.variables}
 def make_pdf(**kwargs):
     result = { key:val for key, val in default_pdf_parameters.items() }
     for key, val in kwargs.items():
         if not key in pdf.variables:
-            raise RuntimeError ("Wilson coefficient not known.")
+            raise RuntimeError ("Coefficient not known.")
         else:
             result[key] = float(val)
     return result
@@ -67,7 +67,7 @@ def make_pdf(**kwargs):
 sm         = make_pdf()
 
 data_generator =  DataGenerator(
-    input_files = [ "/scratch-cbe/users/robert.schoefbeck/TT2lUnbinned/training-ntuples-v7/MVA-training/PDF_tr-minDLmass20-dilepM-offZ1-njet3p-btagM2p/TTLep/TTLep.root"],
+    input_files = [ "/scratch-cbe/users/robert.schoefbeck/TT2lUnbinned/training-ntuples-v7/MVA-training/PDF_tr-minDLmass20-dilepM-offZ1-njet3p-btagM2p/TTLep_Summer16_preVFP/TTLep_Summer16_preVFP.root"],
         n_split = 1,
         splitting_strategy = "events",
         selection   = selection,
@@ -99,7 +99,7 @@ class DataModel:
     def name(self):
         return "TK_%r_LK_%r_CA_%r_SC_%r"%( self.top_kinematics, self.lepton_kinematics, self.asymmetry, self.spin_correlation) 
 
-    def getEvents( self, nTraining, return_observers = False,  wilson_coefficients = None, feature_names=None, feature_dicts=False):
+    def getEvents( self, nTraining, return_observers = False, feature_names=None, feature_dicts=False):
 
         index = -1
 
@@ -114,24 +114,37 @@ class DataModel:
 
         if return_observers:
             observers_ = data_generator.scalar_branches( data_generator[index], observers )[:nTraining]
-            return features, {comb:derivatives[:,pdf.combinations.index(comb)] for comb in combinations}, observers_
+            return features, {comb:derivatives[:,pdf.combinations.index(comb)] for comb in pdf.combinations}, observers_
         else: 
-            return features, {comb:derivatives[:,pdf.combinations.index(comb)] for comb in combinations}
+            return features, {comb:derivatives[:,pdf.combinations.index(comb)] for comb in pdf.combinations}
 
 
 pdf_plot_points = [
     {'color':ROOT.kBlack,       'pdf':sm, 'tex':"SM"},
 
     {'color':ROOT.kGreen+2,     'pdf':make_pdf(c1=.1), 'tex':"c_{1}=.1"},
-    {'color':ROOT.kGreen-2,     'pdf':make_pdf(c1=-.1), 'tex':"c_{1}=-.1"},
-    {'color':ROOT.kBlue-4,      'pdf':make_pdf(c2=.1), 'tex':"c_{2}=.1"},
-    {'color':ROOT.kBlue+2,      'pdf':make_pdf(c2=-.1), 'tex':"c_{2}=-.1"},
-    {'color':ROOT.kRed-4,       'pdf':make_pdf(c3=.1), 'tex':"c_{3}=.1"},
-    {'color':ROOT.kRed+4,       'pdf':make_pdf(c3=-.1), 'tex':"c_{3}=-.1"},
-
+    {'color':ROOT.kGreen-4,     'pdf':make_pdf(c1=-.1), 'tex':"c_{1}=-.1"},
+    {'color':ROOT.kBlue-7,      'pdf':make_pdf(c2=.1), 'tex':"c_{2}=.1"},
+    {'color':ROOT.kBlue+1,      'pdf':make_pdf(c2=-.1), 'tex':"c_{2}=-.1"},
+    {'color':ROOT.kRed+1,       'pdf':make_pdf(c3=.1), 'tex':"c_{3}=.1"},
+    {'color':ROOT.kRed-7,       'pdf':make_pdf(c3=-.1), 'tex':"c_{3}=-.1"},
+    {'color':ROOT.kCyan+2,      'pdf':make_pdf(c4=.1), 'tex':"c_{4}=.1"},
+    {'color':ROOT.kCyan-7,      'pdf':make_pdf(c4=-.1), 'tex':"c_{4}=-.1"},
+    {'color':ROOT.kOrange,      'pdf':make_pdf(c5=.1), 'tex':"c_{5}=.1"},
+    {'color':ROOT.kOrange+1,    'pdf':make_pdf(c5=-.1), 'tex':"c_{5}=-.1"},
 ]
 
 multi_bit_cfg = {'n_trees': 300,
                  'max_depth': 4,
                  'learning_rate': 0.20,
-                 'min_size': 50 }
+                 'min_size': 50,
+                 'learn_global_score': True,
+                    }
+jax_bit_cfg = {'n_trees': 300,
+                 'max_depth': 4,
+                 'learning_rate': 0.20,
+                 'min_size': 50,
+                 'learn_global_score': True,
+                 'max_n_split':64,
+                 'loss':"CrossEntropy",
+                    }

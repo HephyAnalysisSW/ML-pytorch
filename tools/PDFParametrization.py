@@ -166,3 +166,59 @@ if __name__ == "__main__":
     print("Scalar x, gq:",
           pdf.product_parametrizations(xs, xs, 21, 1, coeffs))
 
+    print("Taylor expansion test:")
+    import numpy as np
+
+    # Taylor reconstruction using derivatives returned as a single np.array
+    # with shape (..., len(pdf.combinations)), i.e. last axis indexes combinations.
+    def taylor_reconstruct(pdf, x1, x2, id1, id2, coeffs):
+        derivs = pdf.derivatives(x1, x2, id1, id2)  # shape (..., M)
+        total = derivs[..., 0]  # () term
+
+        # First-order terms: indices 1 .. n+1 map to ('c0',)..('c_n',)
+        offset = 1
+        for k in range(pdf.n + 1):
+            total = total + derivs[..., offset + k] * coeffs[k]
+
+        # Second-order terms follow in the order:
+        # ('c0','c0'), ('c0','c1'), ..., ('c0','c_n'), ('c1','c1'), ..., ('c_n','c_n')
+        idx = offset + (pdf.n + 1)
+        for i in range(pdf.n + 1):
+            for j in range(i, pdf.n + 1):
+                w = 0.5 if i == j else 1.0
+                total = total + w * derivs[..., idx] * coeffs[i] * coeffs[j]
+                idx += 1
+        return total
+
+    # ---- Nontrivial vector test ----
+    pdf = PDFParametrization(n=3)
+    x1 = np.linspace(0.0, 1.0, 7)
+    x2 = np.linspace(1.0, 0.0, 7)
+    id1 = np.array([21, 1, 21, 2, 3, 21, 4])
+    id2 = np.array([1, 21, 2, 21, 21, 3, 5])
+    coeffs = (0.15, -0.07, 0.02, 0.01)  # c0..c3
+
+    F_nom = pdf.product_parametrizations(x1, x2, id1, id2, coeffs)
+    F_taylor = taylor_reconstruct(pdf, x1, x2, id1, id2, coeffs)
+    print("Vector test: max |F_nom - F_taylor| =",
+          float(np.max(np.abs(F_nom - F_taylor))))
+    assert np.allclose(F_nom, F_taylor, rtol=1e-12, atol=1e-12)
+
+    # ---- Scalar test (all gluons) ----
+    xs1, xs2 = 0.25, 0.6
+    ids1, ids2 = 21, 21
+    F_nom_s = pdf.product_parametrizations(xs1, xs2, ids1, ids2, coeffs)
+    F_taylor_s = taylor_reconstruct(pdf, xs1, xs2, ids1, ids2, coeffs)
+    print("Scalar gg test: |F_nom - F_taylor| =",
+          abs(F_nom_s - F_taylor_s))
+    assert np.allclose(F_nom_s, F_taylor_s, rtol=1e-12, atol=1e-12)
+
+    # ---- Scalar test (g×q -> linear only) ----
+    ids1, ids2 = 21, 1
+    F_nom_s2 = pdf.product_parametrizations(xs1, xs2, ids1, ids2, coeffs)
+    F_taylor_s2 = taylor_reconstruct(pdf, xs1, xs2, ids1, ids2, coeffs)
+    print("Scalar gq test: |F_nom - F_taylor| =",
+          abs(F_nom_s2 - F_taylor_s2))
+    assert np.allclose(F_nom_s2, F_taylor_s2, rtol=1e-12, atol=1e-12)
+
+    print("All Taylor tests passed ✅")
