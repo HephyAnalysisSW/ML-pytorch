@@ -6,6 +6,8 @@ if __name__=="__main__":
     import sys
     sys.path.append('..')
 
+import tools.user as user
+import os
 from tools.DataGenerator import DataGenerator
 from tools.PDFParametrization import PDFParametrization
 
@@ -65,9 +67,8 @@ def make_pdf(**kwargs):
     return result
 
 sm         = make_pdf()
-
 data_generator =  DataGenerator(
-    input_files = [ "/scratch-cbe/users/robert.schoefbeck/TT2lUnbinned/training-ntuples-v7/MVA-training/PDF_tr-minDLmass20-dilepM-offZ1-njet3p-btagM2p/TTLep_Summer16_preVFP/TTLep_Summer16_preVFP.root"],
+    input_files = [ os.path.join( user.training_data_dir, "training-ntuples-v7/MVA-training/PDF_tr-minDLmass20-dilepM-offZ1-njet3p-btagM2p/TTLep_Summer16_preVFP/TTLep_Summer16_preVFP.root")],
         n_split = 1,
         splitting_strategy = "events",
         selection   = selection,
