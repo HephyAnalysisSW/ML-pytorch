@@ -52,7 +52,7 @@ feature_names = top_kinematics_features + lepton_kinematics_features + asymmetry
             "nBTag", "nrecoJet", "jet0_pt", "jet1_pt", "ht", "recoLep0_pt", "recoLep1_pt", 
         ]
 
-observers = ["Generator_x1", "Generator_x2", "Generator_id1", "Generator_id2"]
+observers = ["Generator_x1", "Generator_x2", "Generator_id1", "Generator_id2", "Generator_scalePDF"]
 
 pdf = PDFParametrization(n = 5)
 
@@ -72,7 +72,7 @@ data_generator =  DataGenerator(
         n_split = 1,
         splitting_strategy = "events",
         selection   = selection,
-        branches = ["Generator_x1", "Generator_x2", "Generator_id1", "Generator_id2"] + feature_names   ) 
+        branches = ["Generator_x1", "Generator_x2", "Generator_id1", "Generator_id2", "Generator_scalePDF"] + feature_names   ) 
 
 class DataModel:
     
