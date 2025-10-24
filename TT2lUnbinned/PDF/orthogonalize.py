@@ -165,21 +165,22 @@ if args.bias is not None:
     training_weights = {k:v*bias_weights for k,v in training_weights.items()} 
 
 if bit is None or args.overwrite in ["all", "training"]:
-    time1 = time.time()
-    bit = MultiBoostedInformationTree(
-            training_features     = training_features,
-            training_weights      = training_weights,
-            base_points           = base_points,
-            feature_names         = data_model.feature_names,
-            **model.multi_bit_cfg
-                )
-    bit.boost()
-    bit.save(filename)
-    print ("Written %s"%( filename ))
-
-    time2 = time.time()
-    boosting_time = time2 - time1
-    print ("Boosting time: %.2f seconds" % boosting_time)
+    raise NotImplementedError("I don't want to boost here, but if you uncomment the following you will.")
+#    time1 = time.time()
+#    bit = MultiBoostedInformationTree(
+#            training_features     = training_features,
+#            training_weights      = training_weights,
+#            base_points           = base_points,
+#            feature_names         = data_model.feature_names,
+#            **model.multi_bit_cfg
+#                )
+#    bit.boost()
+#    bit.save(filename)
+#    print ("Written %s"%( filename ))
+#
+#    time2 = time.time()
+#    boosting_time = time2 - time1
+#    print ("Boosting time: %.2f seconds" % boosting_time)
 
 test_data_filename = os.path.join(user.data_directory, args.model, data_model.name, "test_%i"%args.nTraining)+'.pkl'
 if args.overwrite in ["all", "data"] or not os.path.exists(test_data_filename):
