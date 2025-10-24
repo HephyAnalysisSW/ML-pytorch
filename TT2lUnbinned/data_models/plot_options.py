@@ -3,8 +3,6 @@ from math import pi
 tex = {"ctGIm":"C_{tG}^{Im}", "ctGRe":"C_{tG}^{Re}", "cQj18":"c_{Qj}^{18}" ,"cQj38":"c_{Qj}^{38}" ,"cQj11":"c_{Qj}^{11}" ,"cjj31":"c_{jj}^{31}" ,"ctu8":"c_{tu}^{8}" ,"ctd8":"c_{td}^{8}" ,"ctj8":"c_{tj}^{8}" ,"cQu8":"c_{Qu}^{8}" ,"cQd8":"c_{Qd}^{8}" ,"ctu1":"c_{tu}^{1}" ,"ctd1":"c_{td}^{1}" ,"ctj1":"c_{tj}^{1}" ,"cQu1":"c_{Qu}^{1}" ,"cQd1":"c_{Qd}^{1}"}
 
 plot_options =  {
-
-
     "parton_top1_decayAngle_theta" :{'binning':[30,0,pi], 'tex':'#theta(t_{1})'},
     "parton_top1_decayAngle_phi"   :{'binning':[30,-pi,pi], 'tex':'#phi(t_{1})'},
     "parton_top1_pt" :{'binning':[50,0,1500], 'tex':'p_{T}(t_{1})'},
@@ -68,16 +66,16 @@ plot_options =  {
     "recoBj01_pt"     :{'binning':[30,0,1500], 'tex':'p_{T}(bb)'},
     "recoBj01_mass"   :{'binning':[30,0,1500], 'tex':'M(bb)'},
     "nBTag"           :{'binning':[4,0,4], 'tex':'N_{b}'},
-    "recoLep0_pt"     :{'binning':[21,20,220], 'tex':'p_{T}(l_{1})'},
+    "recoLep0_pt"     :{'binning':[21,20,440], 'tex':'p_{T}(l_{1})'},
     "recoLep0_eta"   :{'binning':[26,-2.6,2.6], 'tex':'#eta(l_{1})'},
-    "recoLep1_pt"   :{'binning':[21,20,220], 'tex':'p_{T}(l_{2})'},
+    "recoLep1_pt"   :{'binning':[21,20,440], 'tex':'p_{T}(l_{2})'},
     "recoLep1_eta"   :{'binning':[26,-2.6,2.6], 'tex':'#eta(l_{2})'},
-    "recoLepPos_pt"   :{'binning':[21,20,220], 'tex':'p_{T}(l^{+})'},
+    "recoLepPos_pt"   :{'binning':[21,20,440], 'tex':'p_{T}(l^{+})'},
     "recoLepPos_eta"   :{'binning':[26,-2.6,2.6], 'tex':'#eta(l^{+})'},
-    "recoLepNeg_pt"   :{'binning':[21,20,220], 'tex':'p_{T}(l^{-})'},
+    "recoLepNeg_pt"   :{'binning':[21,20,440], 'tex':'p_{T}(l^{-})'},
     "recoLepNeg_eta"   :{'binning':[26,-2.6,2.6], 'tex':'#eta(l^{-})'},
-    "recoLep01_pt"   :{'binning':[21,0,220], 'tex':'p_{T}(ll)'},
-    "recoLep01_mass"   :{'binning':[20,20,520], 'tex':'M(ll)'},
+    "recoLep01_pt"   :{'binning':[21,0,440], 'tex':'p_{T}(ll)'},
+    "recoLep01_mass"   :{'binning':[20,20,1020], 'tex':'M(ll)'},
     "recoLep_dPhi"     :{'binning':[30,-pi,pi], 'tex':'#Delta#phi(ll)'},
     "recoLep_dEta"     :{'binning':[26,-2.6,2.6], 'tex':'#Delta#eta(ll)'},
     "recoLep_dAbsEta"     :{'binning':[26,-2.6,2.6], 'tex':'#Delta|#eta|(ll)'},
@@ -142,17 +140,14 @@ plot_options =  {
     "tr_cos_phi_lab"        :{'binning':[30,-1,1], 'tex':'cos(#phi lab)'},
     "tr_abs_delta_phi_ll_lab":{'binning':[30,0,pi], 'tex':'|#Delta(#phi(l,l))|'},
 
-
     "nrecoJet":{'binning':[7,3,10], 'tex':'N_{jet}'},
     "nrecoLep":{'binning':[4,0,4], 'tex':'N_{lep}'},
-    "jet0_pt":{'binning':[30,0,800], 'tex':'p_{T}(jet0)'},
+    "jet0_pt":{'binning':[30,0,1500], 'tex':'p_{T}(jet0)'},
     "jet1_pt":{'binning':[30,0,800], 'tex':'p_{T}(jet1)'},
-    "ht":{'binning':[30,0,1500], 'tex':'H_T'},
+    "ht":{'binning':[30,0,1500], 'tex':'H_{T} (GeV)'},
 
     "Generator_x1":{'binning':[30,0,1], 'tex':'x_{1,Bjorken}'},
     "Generator_x2":{'binning':[30,0,1], 'tex':'x_{2,Bjorken}'},
     "Generator_id1":{'binning':[26,-5,21], 'tex':'PDGID(1)'},
     "Generator_id2":{'binning':[26,-5,21], 'tex':'PDGID(2)'},
-
 }
-
